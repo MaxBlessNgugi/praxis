@@ -1,0 +1,406 @@
+import React, { useState } from 'react';
+import { 
+  ParishNavTab, 
+  MembersSubTab, 
+  MinistriesSubTab, 
+  FinancesSubTab, 
+  AdminSubTab,
+  ReportsSubTab,
+  GovernanceSubTab,
+  ParishMember, 
+  SoftDeleteRecord 
+} from '../../types';
+import { INITIAL_CHURCH_MEMBERS } from '../../data/churchMockData';
+import { ChurchSidebar } from './ChurchSidebar';
+import { ChurchHeader } from './ChurchHeader';
+import { HomeDashboardView } from './views/HomeDashboardView';
+import { AddNewChristianView } from './views/AddNewChristianView';
+import { FindChristianView } from './views/FindChristianView';
+import { DeleteChristianView } from './views/DeleteChristianView';
+import { FamilyUnitView } from './views/FamilyUnitView';
+import { MinistriesView } from './views/MinistriesView';
+import { StewardshipFinancesView } from './views/StewardshipFinancesView';
+import { ReportsCertsView } from './views/ReportsCertsView';
+import { GovernanceView } from './views/GovernanceView';
+import { AdminSecurityView } from './views/AdminSecurityView';
+
+interface ChurchSystemAppProps {
+  initialTab?: ParishNavTab;
+  initialSubTab?: MembersSubTab;
+  initialMinistriesSubTab?: MinistriesSubTab;
+  initialFinancesSubTab?: FinancesSubTab;
+  initialAdminSubTab?: AdminSubTab;
+  compactMode?: boolean;
+}
+
+export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
+  initialTab = 'home',
+  initialSubTab = 'find-christian',
+  initialMinistriesSubTab = 'ministries-departmental',
+  initialFinancesSubTab = 'tithes',
+  initialAdminSubTab = 'users-rights',
+  compactMode = false,
+}) => {
+  const [activeTab, setActiveTab] = useState<ParishNavTab>(initialTab);
+  const [activeSubTab, setActiveSubTab] = useState<MembersSubTab>(initialSubTab);
+  const [activeMinistriesSubTab, setActiveMinistriesSubTab] = useState<MinistriesSubTab>(initialMinistriesSubTab);
+  const [activeFinancesSubTab, setActiveFinancesSubTab] = useState<FinancesSubTab>(initialFinancesSubTab);
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState<AdminSubTab>(initialAdminSubTab);
+  const [members, setMembers] = useState<ParishMember[]>(INITIAL_CHURCH_MEMBERS);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [quickActionModal, setQuickActionModal] = useState(false);
+
+  const handleAddMember = (newPartial: Partial<ParishMember>) => {
+    const fullMember: ParishMember = {
+      id: `mbr-${Date.now()}`,
+      name: newPartial.name || 'New Member',
+      memberId: newPartial.memberId || `#MBR-${Math.floor(1000 + Math.random() * 900)}`,
+      initials: newPartial.initials || 'NM',
+      parish: newPartial.parish || 'Downtown #01',
+      roleDescription: newPartial.roleDescription || 'Communicant',
+      membershipTier: newPartial.membershipTier || 'covenant',
+      baptismType: newPartial.baptismType || 'baptized',
+      baptismDate: newPartial.baptismDate || 'Nov 12, 2024',
+      baptismOfficiant: newPartial.baptismOfficiant || 'Rev. Vance',
+      householdName: newPartial.householdName || 'The Household',
+      householdId: newPartial.householdId || '#108',
+      householdRole: newPartial.householdRole || 'Head',
+      email: newPartial.email || 'member@example.com',
+      phone: newPartial.phone || '(555) 000-0000',
+      residentialAddress: newPartial.residentialAddress || 'Springfield',
+      pastoralStatus: newPartial.pastoralStatus || 'active-regular',
+      statusLabel: newPartial.statusLabel || 'Active Regular',
+      dateOfBirth: newPartial.dateOfBirth || '1990-01-01',
+      pastoralNotes: newPartial.pastoralNotes || '',
+      tags: newPartial.tags || [],
+      envelopeNumber: newPartial.envelopeNumber || 'ENV-1402',
+    };
+
+    setMembers([fullMember, ...members]);
+  };
+
+  const handleRestoreMember = (record: SoftDeleteRecord) => {
+    const restored: ParishMember = {
+      id: `restored-${record.id}`,
+      name: record.name,
+      memberId: record.memberId,
+      initials: record.initials,
+      parish: 'Downtown #01',
+      membershipTier: 'covenant',
+      baptismType: 'baptized',
+      householdName: `${record.name.split(' ').slice(-1)[0]} Household`,
+      householdId: '#108',
+      householdRole: 'Member',
+      email: `${record.name.toLowerCase().replace(' ', '.')}@gracevalley.org`,
+      phone: '+1 (555) 300-8800',
+      pastoralStatus: 'active-regular',
+      statusLabel: 'Active Restored',
+      pastoralNotes: record.rationale,
+    };
+    setMembers([restored, ...members]);
+  };
+
+  const isMembersView = 
+    activeTab === 'find-christian' || 
+    activeTab === 'add-new-christian' || 
+    activeTab === 'delete-christian' || 
+    activeTab === 'family-unit';
+
+  const getHeaderTitle = () => {
+    if (activeTab === 'home') return 'Home Cloud Dashboard';
+    if (isMembersView) return 'Members & Pastoral Care Registry';
+    if (activeTab === 'ministries-groups') return 'Ministries & Volunteer Rosters';
+    if (activeTab === 'giving-stewardship') return 'Giving & Stewardship Treasury';
+    if (activeTab === 'governance') return 'Governance & Council Sessions';
+    if (activeTab === 'reports-certs') return 'Reports & Canonical Certificates';
+    if (activeTab === 'admin-portal') return 'Admin & System Security';
+    return 'Grace Valley Fellowship Console';
+  };
+
+  return (
+    <div className="w-full h-full flex bg-[#FDF8F3] text-[#1C1917] font-['Inter',sans-serif] overflow-hidden">
+      {/* Sidebar Navigation */}
+      <ChurchSidebar
+        activeTab={activeTab}
+        activeSubTab={activeSubTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          if (tab === 'find-christian' || tab === 'add-new-christian' || tab === 'delete-christian' || tab === 'family-unit') {
+            setActiveSubTab(tab);
+          }
+        }}
+        onSelectSubTab={(sub) => {
+          setActiveSubTab(sub);
+          setActiveTab(sub);
+        }}
+        collapsed={compactMode}
+      />
+
+      {/* Main Panel Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#FDF8F3]">
+        {/* Top Header */}
+        <ChurchHeader
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          onQuickAction={() => setQuickActionModal(true)}
+          activeTabTitle={getHeaderTitle()}
+        />
+
+        {/* Inner Scrollable Workspace */}
+        <div className="flex-1 overflow-y-auto">
+          {/* If Home Dashboard tab is selected */}
+          {activeTab === 'home' && (
+            <HomeDashboardView
+              onNavigateTab={(tab, subTab) => {
+                setActiveTab(tab);
+                if (subTab) setActiveSubTab(subTab as MembersSubTab);
+              }}
+              onAddMember={handleAddMember}
+            />
+          )}
+
+          {/* If Ministries & Groups tab is selected */}
+          {activeTab === 'ministries-groups' && (
+            <div className="w-full px-6 sm:px-8 py-6">
+              <MinistriesView 
+                initialSubTab={activeMinistriesSubTab}
+                onSubTabChange={setActiveMinistriesSubTab}
+              />
+            </div>
+          )}
+
+          {/* If Giving & Stewardship tab is selected */}
+          {activeTab === 'giving-stewardship' && (
+            <div className="w-full px-6 sm:px-8 py-6">
+              <StewardshipFinancesView
+                initialSubTab={activeFinancesSubTab}
+                onSubTabChange={setActiveFinancesSubTab}
+              />
+            </div>
+          )}
+
+          {/* If Governance & Sessions tab is selected */}
+          {activeTab === 'governance' && (
+            <div className="w-full px-6 sm:px-8 py-6">
+              <GovernanceView />
+            </div>
+          )}
+
+          {/* If Reports & Certificates tab is selected */}
+          {activeTab === 'reports-certs' && (
+            <div className="w-full px-6 sm:px-8 py-6">
+              <ReportsCertsView />
+            </div>
+          )}
+
+          {/* If Admin & Security Portal tab is selected */}
+          {activeTab === 'admin-portal' && (
+            <div className="w-full px-6 sm:px-8 py-6">
+              <AdminSecurityView
+                initialSubTab={activeAdminSubTab}
+                onSubTabChange={setActiveAdminSubTab}
+              />
+            </div>
+          )}
+
+          {/* If Members & Pastoral Care Registry is selected */}
+          {isMembersView && (
+            <>
+              {/* Section Header with Tabs */}
+              <div className="w-full px-6 sm:px-8 pt-6 pb-4 border-b border-[#E7E5E4] bg-[#FFFFFF] shadow-sm">
+                <div className="flex flex-col gap-1">
+                  <h1 className="font-headline text-2xl font-bold text-[#1C1917] tracking-tight">
+                    Members & Pastoral Care Registry
+                  </h1>
+                  <p className="font-body text-xs sm:text-sm text-[#57534E]">
+                    Comprehensive parish roll, sacramental registry, household mappings, and ecclesiastical records.
+                  </p>
+                </div>
+
+                {/* Sub Tabs Navigation */}
+                <div className="mt-4">
+                  <nav className="flex items-center gap-6 border-b border-[#E7E5E4] text-xs font-headline font-bold">
+                    {[
+                      { id: 'add-new-christian', label: 'Add New Christian' },
+                      { id: 'find-christian', label: 'Find Christian' },
+                      { id: 'delete-christian', label: 'Delete Christian' },
+                      { id: 'family-unit', label: 'Family Unit' },
+                    ].map((tab) => {
+                      const isActive = activeSubTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveSubTab(tab.id as MembersSubTab);
+                            setActiveTab(tab.id as ParishNavTab);
+                          }}
+                          className={`pb-3 px-1 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                            isActive
+                              ? 'border-[#C2410C] text-[#C2410C] font-bold'
+                              : 'border-transparent text-[#57534E] hover:text-[#1C1917]'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
+              </div>
+
+              {/* Sub-view Rendering Container */}
+              <div className="w-full px-6 sm:px-8 py-6">
+                {activeSubTab === 'add-new-christian' && (
+                  <AddNewChristianView
+                    onSaveMember={handleAddMember}
+                    onNavigateToFind={() => {
+                      setActiveSubTab('find-christian');
+                      setActiveTab('find-christian');
+                    }}
+                  />
+                )}
+
+                {activeSubTab === 'find-christian' && (
+                  <FindChristianView
+                    members={members}
+                    onNavigateToAdd={() => {
+                      setActiveSubTab('add-new-christian');
+                      setActiveTab('add-new-christian');
+                    }}
+                    onNavigateToFamilyUnit={() => {
+                      setActiveSubTab('family-unit');
+                      setActiveTab('family-unit');
+                    }}
+                    onSelectMemberForArchive={() => {
+                      setActiveSubTab('delete-christian');
+                      setActiveTab('delete-christian');
+                    }}
+                  />
+                )}
+
+                {activeSubTab === 'delete-christian' && (
+                  <DeleteChristianView
+                    onRestoreMember={handleRestoreMember}
+                  />
+                )}
+
+                {activeSubTab === 'family-unit' && (
+                  <FamilyUnitView
+                    onNavigateToAddChristian={() => {
+                      setActiveSubTab('add-new-christian');
+                      setActiveTab('add-new-christian');
+                    }}
+                  />
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Other tabs fallback */}
+          {!isMembersView && 
+            activeTab !== 'home' &&
+            activeTab !== 'ministries-groups' && 
+            activeTab !== 'giving-stewardship' && 
+            activeTab !== 'governance' && 
+            activeTab !== 'reports-certs' && 
+            activeTab !== 'admin-portal' && (
+            <div className="w-full px-6 sm:px-8 py-12 text-center">
+              <div className="max-w-md mx-auto p-8 rounded-[14px] bg-[#FFFFFF] border border-[#E7E5E4] shadow-warm-card">
+                <span className="material-symbols-outlined text-4xl text-[#C2410C] mb-2">church</span>
+                <h3 className="font-headline text-lg font-bold text-[#1C1917] capitalize">
+                  {activeTab.replace('-', ' ')}
+                </h3>
+                <p className="text-xs text-[#57534E] mt-1 mb-5">
+                  Module configuration and live feeds loaded. Switch to Ministries or Giving & Stewardship to inspect the comprehensive operating panels.
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => setActiveTab('ministries-groups')}
+                    className="px-4 py-2 rounded-[9px] bg-[#F5EDE4] hover:bg-[#EAE1D7] text-xs font-bold text-[#C2410C] border border-[#E7E5E4] transition-colors cursor-pointer"
+                  >
+                    Ministries & Groups
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('giving-stewardship')}
+                    className="px-4 py-2 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-[0_2px_8px_rgba(194,65,12,0.25)] transition-all cursor-pointer"
+                  >
+                    Giving & Stewardship
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Quick Action Modal */}
+      {quickActionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs">
+          <div className="bg-[#FFFFFF] rounded-[14px] max-w-sm w-full p-5 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
+              <h3 className="font-headline text-sm font-bold text-[#1C1917]">Quick Actions</h3>
+              <button
+                type="button"
+                onClick={() => setQuickActionModal(false)}
+                className="text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4] p-1 rounded-[9px] transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+            <div className="py-3 space-y-2 text-xs font-headline font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSubTab('add-new-christian');
+                  setActiveTab('add-new-christian');
+                  setQuickActionModal(false);
+                }}
+                className="w-full p-2.5 rounded-[9px] bg-[#FDF8F3] hover:bg-[#F5EDE4] text-left flex items-center gap-2.5 text-[#1C1917] border border-[#E7E5E4] transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[#C2410C] text-[18px]">person_add</span>
+                <span>Enroll New Christian</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('ministries-groups');
+                  setActiveMinistriesSubTab('ministries-departmental');
+                  setQuickActionModal(false);
+                }}
+                className="w-full p-2.5 rounded-[9px] bg-[#FDF8F3] hover:bg-[#F5EDE4] text-left flex items-center gap-2.5 text-[#1C1917] border border-[#E7E5E4] transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[#D97706] text-[18px]">domain_add</span>
+                <span>Manage Ministries & Departments</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('giving-stewardship');
+                  setActiveFinancesSubTab('tithes');
+                  setQuickActionModal(false);
+                }}
+                className="w-full p-2.5 rounded-[9px] bg-[#FDF8F3] hover:bg-[#F5EDE4] text-left flex items-center gap-2.5 text-[#1C1917] border border-[#E7E5E4] transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[#059669] text-[18px]">volunteer_activism</span>
+                <span>Giving & Stewardship Treasury</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSubTab('family-unit');
+                  setActiveTab('family-unit');
+                  setQuickActionModal(false);
+                }}
+                className="w-full p-2.5 rounded-[9px] bg-[#FDF8F3] hover:bg-[#F5EDE4] text-left flex items-center gap-2.5 text-[#1C1917] border border-[#E7E5E4] transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[#C2410C] text-[18px]">add_home</span>
+                <span>Create Household Unit</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -1,0 +1,677 @@
+import React, { useState, useMemo } from 'react';
+import { ParishMember } from '../../../types';
+
+interface FindChristianViewProps {
+  members: ParishMember[];
+  onNavigateToAdd: () => void;
+  onNavigateToFamilyUnit?: () => void;
+  onSelectMemberForArchive?: (member: ParishMember) => void;
+}
+
+export const FindChristianView: React.FC<FindChristianViewProps> = ({
+  members,
+  onNavigateToAdd,
+  onNavigateToFamilyUnit,
+  onSelectMemberForArchive,
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [tierFilter, setTierFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [parishFilter, setParishFilter] = useState('');
+  const [density, setDensity] = useState<'compact' | 'comfortable'>('compact');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [activeCareModalMember, setActiveCareModalMember] = useState<ParishMember | null>(null);
+
+  const filteredMembers = useMemo(() => {
+    return members.filter((m) => {
+      const matchSearch =
+        searchTerm === '' ||
+        m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.memberId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.householdName.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchTier = tierFilter === '' || m.membershipTier === tierFilter;
+      const matchStatus =
+        statusFilter === '' ||
+        (statusFilter === 'active' && m.pastoralStatus.startsWith('active')) ||
+        (statusFilter === 'care' && m.pastoralStatus === 'homebound') ||
+        (statusFilter === 'homebound' && m.pastoralStatus === 'homebound');
+
+      const matchParish =
+        parishFilter === '' ||
+        (parishFilter === 'downtown' && m.parish.includes('Downtown')) ||
+        (parishFilter === 'north' && m.parish.includes('North')) ||
+        (parishFilter === 'valley' && m.parish.includes('Valley'));
+
+      return matchSearch && matchTier && matchStatus && matchParish;
+    });
+  }, [members, searchTerm, tierFilter, statusFilter, parishFilter]);
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(filteredMembers.map((m) => m.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleToggleRow = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  return (
+    <div className="flex flex-col w-full gap-6 pb-12">
+      {/* Top Metric Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* Stat 1: Total Roll */}
+        <div className="relative overflow-hidden rounded-xl bg-white p-4 shadow-sm border border-[#EAE1D7]/60 hover:shadow-md transition-all">
+          <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-[#9b2f00]/5 pointer-events-none"></div>
+          <div className="flex items-center justify-between">
+            <span className="font-headline text-xs font-semibold uppercase tracking-wider text-[#59413a]">
+              Parish Roll Census
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#006243]/10 px-2 py-0.5 font-headline text-xs text-[#006243] font-bold">
+              <span className="material-symbols-outlined text-[14px]">arrow_upward</span>+12 this mo
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">1,248</span>
+            <span className="font-body text-xs text-[#59413a]">Active Souls</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
+            <span>Parish Book Vol. IV</span>
+            <span className="text-[#9b2f00] font-bold">99.2% verified</span>
+          </div>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
+            <div className="h-1.5 rounded-full bg-[#9b2f00]" style={{ width: '88%' }}></div>
+          </div>
+        </div>
+
+        {/* Stat 2: Covenant Partners */}
+        <div className="relative overflow-hidden rounded-xl bg-white p-4 shadow-sm border border-[#EAE1D7]/60 hover:shadow-md transition-all">
+          <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-[#fe932c]/10 pointer-events-none"></div>
+          <div className="flex items-center justify-between">
+            <span className="font-headline text-xs font-semibold uppercase tracking-wider text-[#59413a]">
+              Covenant Partners
+            </span>
+            <span className="inline-flex items-center rounded-md bg-[#f4ece8] px-2 py-0.5 font-mono text-xs text-[#904d00] font-bold">
+              71.6% ratio
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">894</span>
+            <span className="font-body text-xs text-[#59413a]">Full Voting Roll</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
+            <span>Communion status current</span>
+            <span className="text-[#006243] font-bold">812 attending</span>
+          </div>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
+            <div className="h-1.5 rounded-full bg-[#fe932c]" style={{ width: '71.6%' }}></div>
+          </div>
+        </div>
+
+        {/* Stat 3: Inquirers / Adherents */}
+        <div className="relative overflow-hidden rounded-xl bg-white p-4 shadow-sm border border-[#EAE1D7]/60 hover:shadow-md transition-all">
+          <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-[#006243]/10 pointer-events-none"></div>
+          <div className="flex items-center justify-between">
+            <span className="font-headline text-xs font-semibold uppercase tracking-wider text-[#59413a]">
+              Inquirers & Adherents
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#f4ece8] px-2 py-0.5 font-headline text-xs text-[#59413a] font-semibold">
+              Catechumenate
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">218</span>
+            <span className="font-body text-xs text-[#59413a]">Under Instruction</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
+            <span>Next Covenant Class</span>
+            <span className="font-bold text-[#1e1b19]">Nov 14</span>
+          </div>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
+            <div className="h-1.5 rounded-full bg-[#006243]" style={{ width: '44%' }}></div>
+          </div>
+        </div>
+
+        {/* Stat 4: Youth & Children */}
+        <div className="relative overflow-hidden rounded-xl bg-white p-4 shadow-sm border border-[#EAE1D7]/60 hover:shadow-md transition-all">
+          <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-[#ffdcc3]/40 pointer-events-none"></div>
+          <div className="flex items-center justify-between">
+            <span className="font-headline text-xs font-semibold uppercase tracking-wider text-[#59413a]">
+              Youth & Children
+            </span>
+            <span className="inline-flex items-center rounded-md bg-[#ffdcc3]/60 px-2 py-0.5 font-headline text-xs text-[#2f1500] font-bold">
+              Nursery – Gr 12
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">136</span>
+            <span className="font-body text-xs text-[#59413a]">Baptized Dependents</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
+            <span>Confirmation Track</span>
+            <span className="text-[#9b2f00] font-bold">24 enrolled</span>
+          </div>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
+            <div className="h-1.5 rounded-full bg-[#8d7168]" style={{ width: '32%' }}></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Search, Filtering & Tools Bar */}
+      <div className="rounded-xl bg-white p-4 shadow-sm border border-[#EAE1D7]/60 flex flex-col gap-4">
+        <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-4">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[280px]">
+            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-[#59413a]">
+              search
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by name, member ID #, email, phone, or household..."
+              className="w-full h-11 pl-11 pr-10 rounded-lg bg-[#faf2ee] font-body text-sm text-[#1e1b19] placeholder:text-[#59413a]/60 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#9b2f00]/20 shadow-inner"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#59413a] hover:text-[#1e1b19]"
+                title="Clear input"
+              >
+                <span className="material-symbols-outlined text-[18px]">backspace</span>
+              </button>
+            )}
+          </div>
+
+          {/* Quick Filter Selects */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+            <div className="relative min-w-[155px] flex-1 sm:flex-initial">
+              <select
+                value={tierFilter}
+                onChange={(e) => setTierFilter(e.target.value)}
+                className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-[#9b2f00]/20"
+              >
+                <option value="">All Tiers</option>
+                <option value="covenant">Covenant Partner</option>
+                <option value="communicant">Communicant</option>
+                <option value="inquirer">Inquirer / Adherent</option>
+                <option value="youth">Youth / Confirmand</option>
+              </select>
+              <span className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
+                expand_more
+              </span>
+            </div>
+
+            <div className="relative min-w-[160px] flex-1 sm:flex-initial">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-[#9b2f00]/20"
+              >
+                <option value="">All Statuses</option>
+                <option value="active">Active Regular</option>
+                <option value="care">Under Pastoral Care</option>
+                <option value="homebound">Homebound / Convalescent</option>
+              </select>
+              <span className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
+                expand_more
+              </span>
+            </div>
+
+            <div className="relative min-w-[160px] flex-1 sm:flex-initial">
+              <select
+                value={parishFilter}
+                onChange={(e) => setParishFilter(e.target.value)}
+                className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-[#9b2f00]/20"
+              >
+                <option value="">All Parishes</option>
+                <option value="downtown">Downtown Sanctuary #01</option>
+                <option value="north">North Annex Chapel</option>
+                <option value="valley">Valley Creek Fellowship</option>
+              </select>
+              <span className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
+                expand_more
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Toolbar Secondary Row */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <div className="flex items-center gap-2">
+            <span className="font-headline text-xs text-[#59413a]">View Density:</span>
+            <div className="inline-flex rounded-lg bg-[#f4ece8] p-0.5 border border-[#e1bfb5]/40">
+              <button
+                type="button"
+                onClick={() => setDensity('compact')}
+                className={`px-2.5 py-1 rounded font-headline text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer ${
+                  density === 'compact'
+                    ? 'bg-white text-[#1e1b19] shadow-sm font-bold'
+                    : 'text-[#59413a] hover:text-[#1e1b19]'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">density_small</span>
+                <span>Compact</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDensity('comfortable')}
+                className={`px-2.5 py-1 rounded font-headline text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer ${
+                  density === 'comfortable'
+                    ? 'bg-white text-[#1e1b19] shadow-sm font-bold'
+                    : 'text-[#59413a] hover:text-[#1e1b19]'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">density_medium</span>
+                <span>Comfortable</span>
+              </button>
+            </div>
+
+            <span className="ml-2 hidden lg:inline-flex items-center gap-1 rounded-md bg-[#ffdcc3]/40 px-2 py-0.5 font-mono text-xs text-[#6e3900]">
+              Showing: Grace Valley Roll 2024
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#faf2ee] hover:bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] transition-colors shadow-sm cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">view_column</span>
+              <span>Columns (7/7)</span>
+            </button>
+
+            <div className="inline-flex items-center rounded-lg bg-[#faf2ee] shadow-sm border border-[#e1bfb5]/30">
+              <button
+                type="button"
+                onClick={() => alert('Exporting parish roll census as CSV file...')}
+                className="inline-flex items-center gap-1 px-3 py-1.5 hover:bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] transition-colors rounded-l-lg cursor-pointer"
+                title="Export current roll filtered view"
+              >
+                <span className="material-symbols-outlined text-[18px]">download</span>
+                <span>Export CSV</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="p-1.5 hover:bg-[#f4ece8] text-[#59413a] transition-colors rounded-r-lg border-l border-[#e1bfb5]/40 cursor-pointer"
+                title="Print Sacrament Register"
+              >
+                <span className="material-symbols-outlined text-[18px]">print</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onNavigateToAdd}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#9b2f00] hover:bg-[#c2410c] text-white font-headline text-xs font-bold shadow-md transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">person_add</span>
+              <span>+ Add Christian</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Data Table Container */}
+      <div className="rounded-xl bg-white shadow-sm border border-[#EAE1D7]/60 overflow-hidden flex flex-col">
+        {/* Floating Batch Tray */}
+        {selectedIds.length > 0 && (
+          <div className="bg-[#e9e1dd] px-4 py-2.5 flex items-center justify-between transition-all border-b border-[#e1bfb5]">
+            <div className="flex items-center gap-3 font-headline text-xs text-[#1e1b19]">
+              <span className="font-bold text-[#9b2f00]">{selectedIds.length}</span> selected congregants
+              <span className="text-[#8d7168]/40">|</span>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(members.map((m) => m.id))}
+                className="text-[#9b2f00] hover:underline font-bold cursor-pointer"
+              >
+                Select all 1,248
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => alert(`Batch email composer initialized for ${selectedIds.length} members.`)}
+                className="px-2.5 py-1 rounded bg-white text-[#1e1b19] font-headline text-xs font-semibold hover:bg-[#fff8f5] shadow-sm flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">mail</span> Batch Email
+              </button>
+              <button
+                type="button"
+                onClick={() => alert(`Printing nametags for ${selectedIds.length} members...`)}
+                className="px-2.5 py-1 rounded bg-white text-[#1e1b19] font-headline text-xs font-semibold hover:bg-[#fff8f5] shadow-sm flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">label</span> Print Nametags
+              </button>
+              <button
+                type="button"
+                onClick={() => alert(`Marked attendance for ${selectedIds.length} selected believers.`)}
+                className="px-2.5 py-1 rounded bg-white text-[#1e1b19] font-headline text-xs font-semibold hover:bg-[#fff8f5] shadow-sm flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">assignment_turned_in</span> Mark Attendance
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#f8f1e9] font-headline text-xs font-semibold text-[#59413a] uppercase tracking-wider select-none border-b border-[#EAE1D7]">
+                <th className="w-12 px-4 py-3 text-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.length > 0 && selectedIds.length === filteredMembers.length}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 rounded bg-white border border-[#e1bfb5] accent-[#9b2f00] cursor-pointer"
+                  />
+                </th>
+                <th className="px-4 py-3">
+                  <div className="flex items-center gap-1 cursor-pointer hover:text-[#1e1b19]">
+                    <span>Member Name & ID</span>
+                    <span className="material-symbols-outlined text-[16px] text-[#9b2f00]">arrow_downward</span>
+                  </div>
+                </th>
+                <th className="px-4 py-3">Membership Tier</th>
+                <th className="px-4 py-3">Baptism & Sacraments</th>
+                <th className="px-4 py-3">Household / Unit</th>
+                <th className="px-4 py-3">Contact & Pastoral Care</th>
+                <th className="px-4 py-3">Pastoral Status</th>
+                <th className="px-4 py-3 text-right">Quick Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#f4ece8] text-[#1e1b19] font-body text-xs">
+              {filteredMembers.map((member) => {
+                const isSelected = selectedIds.includes(member.id);
+                return (
+                  <tr
+                    key={member.id}
+                    className={`group transition-colors ${
+                      isSelected
+                        ? 'bg-[#ffdbd0]/30'
+                        : member.pastoralStatus === 'homebound'
+                        ? 'bg-[#ffdcc3]/10 hover:bg-[#ffdcc3]/20'
+                        : 'hover:bg-[#faf2ee]'
+                    }`}
+                  >
+                    <td className={`px-4 text-center ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleRow(member.id)}
+                        className="w-4 h-4 rounded bg-white accent-[#9b2f00] cursor-pointer"
+                      />
+                    </td>
+
+                    <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-[#ffdbd0] text-[#390c00] flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+                          {member.initials}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-headline text-sm text-[#1e1b19] font-bold group-hover:text-[#9b2f00] transition-colors cursor-pointer truncate">
+                            {member.name}
+                          </span>
+                          <div className="flex items-center gap-1.5 font-mono text-[11px] text-[#59413a]">
+                            <span className="bg-[#f4ece8] px-1 rounded">{member.memberId}</span>
+                            <span>•</span>
+                            <span>{member.roleDescription || member.parish}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
+                      {member.membershipTier === 'covenant' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#c2410c] text-white font-headline text-xs font-semibold shadow-sm">
+                          <span className="material-symbols-outlined text-[14px]">verified</span> Covenant Partner
+                        </span>
+                      )}
+                      {member.membershipTier === 'communicant' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#eee7e3] text-[#1e1b19] font-headline text-xs font-semibold border border-[#e1bfb5]/50">
+                          <span className="material-symbols-outlined text-[14px]">church</span> Communicant
+                        </span>
+                      )}
+                      {member.membershipTier === 'youth' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ffdcc3] text-[#2f1500] font-headline text-xs font-semibold">
+                          <span className="material-symbols-outlined text-[14px]">school</span> Youth Confirmand
+                        </span>
+                      )}
+                      {member.membershipTier === 'inquirer' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] font-headline text-xs font-semibold">
+                          <span className="material-symbols-outlined text-[14px]">help</span> Inquirer / Adherent
+                        </span>
+                      )}
+                    </td>
+
+                    <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
+                      <div className="flex flex-col">
+                        <span className="font-headline text-xs text-[#1e1b19] font-bold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[15px] text-[#006243]">water_drop</span>
+                          {member.baptismType === 'baptized' ? 'Baptized (Believer)' : member.baptismType === 'dedicated' ? 'Infant Dedication' : 'Sacrament Pending'}
+                        </span>
+                        <span className="text-[#59413a] font-mono text-[11px]">
+                          {member.baptismDate || 'Nov 12, 2024'} • {member.baptismOfficiant || 'Rev. Vance'}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
+                      <div
+                        onClick={() => onNavigateToFamilyUnit && onNavigateToFamilyUnit()}
+                        className="flex items-center gap-1.5 group/unit cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px] text-[#fe932c]">home</span>
+                        <div className="flex flex-col">
+                          <span className="font-headline text-xs text-[#1e1b19] font-bold group-hover/unit:text-[#9b2f00] underline decoration-dotted">
+                            {member.householdName}
+                          </span>
+                          <span className="text-[#59413a] text-[11px]">
+                            {member.householdId} ({member.householdRole})
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
+                      <div className="flex flex-col">
+                        <span className="text-[#1e1b19] hover:text-[#9b2f00] cursor-pointer truncate font-medium">
+                          {member.email}
+                        </span>
+                        <div className="flex items-center gap-1 text-[#59413a] text-[11px] group/phone">
+                          <span>{member.phone}</span>
+                          <button
+                            type="button"
+                            className="opacity-0 group-hover/phone:opacity-100 text-[#9b2f00] cursor-pointer"
+                            title="Quick Call or SMS"
+                            onClick={() => alert(`Calling ${member.phone}`)}
+                          >
+                            <span className="material-symbols-outlined text-[13px]">edit</span>
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
+                      {member.pastoralStatus === 'homebound' ? (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#ffdcc3]/80 text-[#6e3900] font-headline text-xs font-bold border border-[#fe932c]/40">
+                          <span className="material-symbols-outlined text-[14px] text-[#904d00]">local_hospital</span>
+                          Homebound Care
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#006243]/10 text-[#006243] font-headline text-xs font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#006243] animate-pulse"></span>
+                          {member.statusLabel}
+                        </div>
+                      )}
+                    </td>
+
+                    <td className={`px-4 text-right whitespace-nowrap ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setActiveCareModalMember(member)}
+                          className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#9b2f00] transition-colors cursor-pointer"
+                          title="View Care Log"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">clinical_notes</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onNavigateToFamilyUnit && onNavigateToFamilyUnit()}
+                          className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#1e1b19] transition-colors cursor-pointer"
+                          title="Manage Household"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">family_restroom</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onSelectMemberForArchive && onSelectMemberForArchive(member)}
+                          className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#ba1a1a] transition-colors cursor-pointer"
+                          title="Canonical Archival / Delete"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => alert(`Details for ${member.name}: Member ${member.memberId}, Envelope ${member.envelopeNumber || 'N/A'}`)}
+                          className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#1e1b19] transition-colors cursor-pointer"
+                          title="More Actions"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">more_vert</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Table Footer */}
+        <div className="p-4 bg-[#f8f1e9] flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#EAE1D7]">
+          <div className="flex items-center gap-2 text-[#59413a] font-headline text-xs font-semibold">
+            <span>
+              Showing <strong className="text-[#1e1b19]">1–{filteredMembers.length}</strong> of{' '}
+              <strong className="text-[#1e1b19]">1,248</strong> congregants
+            </span>
+            <span className="text-[#8d7168]/40">•</span>
+            <div className="flex items-center gap-1">
+              <span>Per page:</span>
+              <select className="bg-white rounded px-2 py-0.5 font-bold text-[#1e1b19] border border-[#e1bfb5] focus:outline-none cursor-pointer">
+                <option>8</option>
+                <option defaultValue="25">25</option>
+                <option>50</option>
+                <option>100</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="inline-flex items-center gap-1 font-headline text-xs">
+            <button
+              type="button"
+              disabled
+              className="w-8 h-8 rounded-lg bg-white text-[#59413a] flex items-center justify-center shadow-sm disabled:opacity-50 border border-[#e1bfb5]/50"
+            >
+              <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+            </button>
+            <button
+              type="button"
+              className="w-8 h-8 rounded-lg bg-[#9b2f00] text-white font-bold flex items-center justify-center shadow-sm"
+            >
+              1
+            </button>
+            <button
+              type="button"
+              className="w-8 h-8 rounded-lg bg-white text-[#1e1b19] hover:bg-[#f4ece8] font-bold flex items-center justify-center shadow-sm border border-[#e1bfb5]/50 cursor-pointer"
+            >
+              2
+            </button>
+            <button
+              type="button"
+              className="w-8 h-8 rounded-lg bg-white text-[#1e1b19] hover:bg-[#f4ece8] font-bold flex items-center justify-center shadow-sm border border-[#e1bfb5]/50 cursor-pointer"
+            >
+              3
+            </button>
+            <span className="px-1 text-[#59413a] font-bold">…</span>
+            <button
+              type="button"
+              className="w-8 h-8 rounded-lg bg-white text-[#1e1b19] hover:bg-[#f4ece8] font-bold flex items-center justify-center shadow-sm border border-[#e1bfb5]/50 cursor-pointer"
+            >
+              156
+            </button>
+            <button
+              type="button"
+              className="w-8 h-8 rounded-lg bg-white text-[#1e1b19] hover:text-[#9b2f00] flex items-center justify-center shadow-sm border border-[#e1bfb5]/50 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Care Log View Modal */}
+      {activeCareModalMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-150">
+            <button
+              type="button"
+              onClick={() => setActiveCareModalMember(null)}
+              className="absolute top-4 right-4 p-1 rounded-lg text-[#59413a] hover:bg-[#f4ece8] cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-[#ffdbd0] text-[#390c00] flex items-center justify-center font-bold">
+                {activeCareModalMember.initials}
+              </div>
+              <div>
+                <h3 className="font-headline text-base font-bold text-[#1e1b19]">
+                  {activeCareModalMember.name}
+                </h3>
+                <span className="text-xs text-[#59413a] font-mono">{activeCareModalMember.memberId}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-[#faf2ee] rounded-lg">
+                <span className="font-bold text-[#1e1b19] block mb-1">Pastoral Triage & Notes:</span>
+                <p className="text-[#59413a] leading-relaxed">
+                  {activeCareModalMember.pastoralNotes || 'Active regular communicant in good standing. Assigned to Elder Circle #4 for quarterly pastoral communion visitation.'}
+                </p>
+              </div>
+              <div className="flex items-center justify-between text-[#59413a]">
+                <span>Sacramental Date:</span>
+                <span className="font-bold text-[#1e1b19]">{activeCareModalMember.baptismDate || 'Nov 12, 2024'}</span>
+              </div>
+              <div className="flex items-center justify-between text-[#59413a]">
+                <span>Household Unit:</span>
+                <span className="font-bold text-[#1e1b19]">{activeCareModalMember.householdName}</span>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActiveCareModalMember(null)}
+                className="px-4 py-2 rounded-lg bg-[#9b2f00] text-white font-headline text-xs font-bold shadow-sm cursor-pointer"
+              >
+                Close Care Log
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
