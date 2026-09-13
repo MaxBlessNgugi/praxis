@@ -7,6 +7,9 @@ import {
   AdminSubTab,
   ReportsSubTab,
   GovernanceSubTab,
+  ServicesSubTab,
+  CommunicationsSubTab,
+  SettingsSubTab,
   ParishMember, 
   SoftDeleteRecord 
 } from '../../types';
@@ -23,6 +26,9 @@ import { StewardshipFinancesView } from './views/StewardshipFinancesView';
 import { ReportsCertsView } from './views/ReportsCertsView';
 import { GovernanceView } from './views/GovernanceView';
 import { AdminSecurityView } from './views/AdminSecurityView';
+import { ServicesWorshipView } from './views/ServicesWorshipView';
+import { CommunicationsView } from './views/CommunicationsView';
+import { SettingsView } from './views/SettingsView';
 
 interface ChurchSystemAppProps {
   initialTab?: ParishNavTab;
@@ -30,6 +36,9 @@ interface ChurchSystemAppProps {
   initialMinistriesSubTab?: MinistriesSubTab;
   initialFinancesSubTab?: FinancesSubTab;
   initialAdminSubTab?: AdminSubTab;
+  initialServicesSubTab?: ServicesSubTab;
+  initialCommunicationsSubTab?: CommunicationsSubTab;
+  initialSettingsSubTab?: SettingsSubTab;
   compactMode?: boolean;
 }
 
@@ -39,6 +48,9 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
   initialMinistriesSubTab = 'ministries-departmental',
   initialFinancesSubTab = 'tithes',
   initialAdminSubTab = 'users-rights',
+  initialServicesSubTab = 'service-planner',
+  initialCommunicationsSubTab = 'announcements',
+  initialSettingsSubTab = 'org-profile',
   compactMode = false,
 }) => {
   const [activeTab, setActiveTab] = useState<ParishNavTab>(initialTab);
@@ -46,6 +58,9 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
   const [activeMinistriesSubTab, setActiveMinistriesSubTab] = useState<MinistriesSubTab>(initialMinistriesSubTab);
   const [activeFinancesSubTab, setActiveFinancesSubTab] = useState<FinancesSubTab>(initialFinancesSubTab);
   const [activeAdminSubTab, setActiveAdminSubTab] = useState<AdminSubTab>(initialAdminSubTab);
+  const [activeServicesSubTab, setActiveServicesSubTab] = useState<ServicesSubTab>(initialServicesSubTab);
+  const [activeCommunicationsSubTab, setActiveCommunicationsSubTab] = useState<CommunicationsSubTab>(initialCommunicationsSubTab);
+  const [activeSettingsSubTab, setActiveSettingsSubTab] = useState<SettingsSubTab>(initialSettingsSubTab);
   const [members, setMembers] = useState<ParishMember[]>(INITIAL_CHURCH_MEMBERS);
   const [searchTerm, setSearchTerm] = useState('');
   const [quickActionModal, setQuickActionModal] = useState(false);
@@ -109,10 +124,13 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
   const getHeaderTitle = () => {
     if (activeTab === 'home') return 'Home Cloud Dashboard';
     if (isMembersView) return 'Members & Pastoral Care Registry';
+    if (activeTab === 'services-worship') return 'Services & Worship Administration';
     if (activeTab === 'ministries-groups') return 'Ministries & Volunteer Rosters';
     if (activeTab === 'giving-stewardship') return 'Giving & Stewardship Treasury';
     if (activeTab === 'governance') return 'Governance & Council Sessions';
     if (activeTab === 'reports-certs') return 'Reports & Canonical Certificates';
+    if (activeTab === 'communications') return 'Parish Communications & Community';
+    if (activeTab === 'settings-profile') return 'Parish Settings & Configuration';
     if (activeTab === 'admin-portal') return 'Admin & System Security';
     return 'Grace Valley Fellowship Console';
   };
@@ -159,6 +177,16 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
             />
           )}
 
+          {/* If Services & Worship tab is selected */}
+          {activeTab === 'services-worship' && (
+            <div className="w-full px-6 sm:px-8 py-6">
+              <ServicesWorshipView
+                activeSubTab={activeServicesSubTab}
+                onSelectSubTab={setActiveServicesSubTab}
+              />
+            </div>
+          )}
+
           {/* If Ministries & Groups tab is selected */}
           {activeTab === 'ministries-groups' && (
             <div className="w-full px-6 sm:px-8 py-6">
@@ -190,6 +218,26 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
           {activeTab === 'reports-certs' && (
             <div className="w-full px-6 sm:px-8 py-6">
               <ReportsCertsView />
+            </div>
+          )}
+
+          {/* If Communications tab is selected */}
+          {activeTab === 'communications' && (
+            <div className="w-full px-6 sm:px-8 py-6">
+              <CommunicationsView
+                activeSubTab={activeCommunicationsSubTab}
+                onSelectSubTab={setActiveCommunicationsSubTab}
+              />
+            </div>
+          )}
+
+          {/* If Settings & Profile tab is selected */}
+          {activeTab === 'settings-profile' && (
+            <div className="w-full px-6 sm:px-8 py-6">
+              <SettingsView
+                activeSubTab={activeSettingsSubTab}
+                onSelectSubTab={setActiveSettingsSubTab}
+              />
             </div>
           )}
 
@@ -300,10 +348,13 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
           {/* Other tabs fallback */}
           {!isMembersView && 
             activeTab !== 'home' &&
+            activeTab !== 'services-worship' &&
             activeTab !== 'ministries-groups' && 
             activeTab !== 'giving-stewardship' && 
             activeTab !== 'governance' && 
             activeTab !== 'reports-certs' && 
+            activeTab !== 'communications' && 
+            activeTab !== 'settings-profile' && 
             activeTab !== 'admin-portal' && (
             <div className="w-full px-6 sm:px-8 py-12 text-center">
               <div className="max-w-md mx-auto p-8 rounded-[14px] bg-[#FFFFFF] border border-[#E7E5E4] shadow-warm-card">
