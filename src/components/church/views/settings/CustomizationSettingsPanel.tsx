@@ -83,10 +83,10 @@ export const CustomizationSettingsPanel: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">
+              <label htmlFor="terminology-congregant" className="block text-xs font-bold text-[#1C1917] mb-1">
                 Congregant Terminology
               </label>
-              <select aria-label="Congregant Terminology"
+              <select id="terminology-congregant" aria-label="Congregant Terminology"
                 value={settings.memberTerminology}
                 onChange={(e) => setSettings({ ...settings, memberTerminology: e.target.value as any })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -99,10 +99,10 @@ export const CustomizationSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">
+              <label htmlFor="terminology-council" className="block text-xs font-bold text-[#1C1917] mb-1">
                 Church Council Body
               </label>
-              <select aria-label="Church Council Body"
+              <select id="terminology-council" aria-label="Church Council Body"
                 value={settings.leadershipTerminology}
                 onChange={(e) => setSettings({ ...settings, leadershipTerminology: e.target.value as any })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -115,10 +115,10 @@ export const CustomizationSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">
+              <label htmlFor="terminology-stewardship" className="block text-xs font-bold text-[#1C1917] mb-1">
                 Stewardship Terminology
               </label>
-              <select aria-label="Stewardship Terminology"
+              <select id="terminology-stewardship" aria-label="Stewardship Terminology"
                 value={settings.givingTerminology}
                 onChange={(e) => setSettings({ ...settings, givingTerminology: e.target.value as any })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -140,8 +140,8 @@ export const CustomizationSettingsPanel: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Currency Code</label>
-              <input aria-label="Currency Code"
+              <label htmlFor="settings-currency-code" className="block text-xs font-bold text-[#1C1917] mb-1">Currency Code</label>
+              <input id="settings-currency-code" aria-label="Currency Code"
                 type="text"
                 value={settings.currencySymbol}
                 onChange={(e) => setSettings({ ...settings, currencySymbol: e.target.value })}
@@ -150,15 +150,15 @@ export const CustomizationSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Date Display Format</label>
-              <select aria-label="Date Display Format"
+              <label htmlFor="settings-date-format" className="block text-xs font-bold text-[#1C1917] mb-1">Date Display Format</label>
+              <select id="settings-date-format" aria-label="Date Display Format"
                 value={settings.dateFormat}
                 onChange={(e) => setSettings({ ...settings, dateFormat: e.target.value })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
               >
-                <option value="MMM D, YYYY">MMM D, YYYY (Oct 14, 2026)</option>
-                <option value="YYYY-MM-DD">YYYY-MM-DD (2026-10-14)</option>
-                <option value="DD/MM/YYYY">DD/MM/YYYY (14/10/2026)</option>
+                <option value="MMM D, YYYY">MMM D, YYYY (Oct 14, 2025)</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD (2025-10-14)</option>
+                <option value="DD/MM/YYYY">DD/MM/YYYY (14/10/2025)</option>
               </select>
             </div>
           </div>

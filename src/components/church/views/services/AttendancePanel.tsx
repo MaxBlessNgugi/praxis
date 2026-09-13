@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { dialogProps } from '../../dialog';
 import {
   AttendanceRecord,
   FirstTimeVisitorLink,
@@ -11,7 +12,8 @@ import {
   INITIAL_SERVICES,
   INITIAL_CHURCH_MEMBERS,
 } from '../../../../data/churchMockData';
-import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain';
+import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain'
+;
 
 /** The ministries a first-time visitor can ask about; the form defaults to the first. */
 const INTERESTED_MINISTRIES = [
@@ -120,7 +122,7 @@ export const AttendancePanel: React.FC = () => {
   const trendData = [...attendanceRecords]
     .reverse()
     .map((record) => ({
-      date: record.date.replace(', 2026', ''),
+      date: record.date.replace(', 2025', ''),
       Sanctuary: record.sanctuaryHeadcount,
       Online: record.onlineStreams,
       Kids: record.kidsNurseryCount,
@@ -216,8 +218,8 @@ export const AttendancePanel: React.FC = () => {
 
           <form onSubmit={handleLogAttendance} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Target Service</label>
-              <select aria-label="Target Service"
+              <label htmlFor="attendance-service" className="block text-xs font-bold text-[#1C1917] mb-1">Target Service</label>
+              <select id="attendance-service" aria-label="Target Service"
                 value={selectedServiceId}
                 onChange={(e) => setSelectedServiceId(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-medium"
@@ -232,8 +234,8 @@ export const AttendancePanel: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Sanctuary Headcount *</label>
-                <input aria-label="Sanctuary Headcount"
+                <label htmlFor="attendance-sanctuary" className="block text-xs font-bold text-[#1C1917] mb-1">Sanctuary Headcount *</label>
+                <input id="attendance-sanctuary" aria-label="Sanctuary Headcount"
                   type="number"
                   min={0}
                   required
@@ -244,8 +246,8 @@ export const AttendancePanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Online Streams</label>
-                <input aria-label="Online Streams"
+                <label htmlFor="attendance-online" className="block text-xs font-bold text-[#1C1917] mb-1">Online Streams</label>
+                <input id="attendance-online" aria-label="Online Streams"
                   type="number"
                   min={0}
                   value={onlineStreams}
@@ -257,8 +259,8 @@ export const AttendancePanel: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Kids & Nursery</label>
-                <input aria-label="Kids &amp; Nursery"
+                <label htmlFor="attendance-kids" className="block text-xs font-bold text-[#1C1917] mb-1">Kids & Nursery</label>
+                <input id="attendance-kids" aria-label="Kids &amp; Nursery"
                   type="number"
                   min={0}
                   value={kidsNursery}
@@ -268,8 +270,8 @@ export const AttendancePanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">First-Time Visitors</label>
-                <input aria-label="First-Time Visitors"
+                <label htmlFor="attendance-visitors" className="block text-xs font-bold text-[#1C1917] mb-1">First-Time Visitors</label>
+                <input id="attendance-visitors" aria-label="First-Time Visitors"
                   type="number"
                   min={0}
                   value={firstTimeCount}
@@ -280,8 +282,8 @@ export const AttendancePanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Campus Location</label>
-              <select aria-label="Campus Location"
+              <label htmlFor="attendance-campus" className="block text-xs font-bold text-[#1C1917] mb-1">Campus Location</label>
+              <select id="attendance-campus" aria-label="Campus Location"
                 value={campusSelect}
                 onChange={(e) => setCampusSelect(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -295,8 +297,8 @@ export const AttendancePanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Field Observations / Notes</label>
-              <textarea aria-label="Field Observations / Notes"
+              <label htmlFor="attendance-notes" className="block text-xs font-bold text-[#1C1917] mb-1">Field Observations / Notes</label>
+              <textarea id="attendance-notes" aria-label="Field Observations / Notes"
                 rows={2}
                 placeholder="e.g. Overflow seating used at the main entrance; extra seats dispatched."
                 value={notes}
@@ -353,7 +355,13 @@ export const AttendancePanel: React.FC = () => {
               </div>
 
               <div className="relative w-full h-48">
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 500 160" preserveAspectRatio="none">
+                <svg
+                  role="img"
+                  aria-label="Attendance across the past five Lord's Days, 5 January to 2 February 2025. Total attendance rose from 345 to a high of 387, averaging 374 a week; sanctuary in-person attendance averaged 270, with online viewers holding steady below it."
+                  className="w-full h-full overflow-visible"
+                  viewBox="0 0 500 160"
+                  preserveAspectRatio="none"
+                >
                   <defs>
                     <linearGradient id="totalGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#C2410C" stopOpacity="0.25" />
@@ -411,11 +419,11 @@ export const AttendancePanel: React.FC = () => {
 
                   {/* Circles & Labels on Points */}
                   {[
-                    { x: 30, date: 'Aug 16', total: 345, sanc: 250 },
-                    { x: 135, date: 'Aug 23', total: 338, sanc: 242 },
-                    { x: 245, date: 'Aug 30', total: 362, sanc: 268 },
-                    { x: 355, date: 'Sep 06', total: 350, sanc: 255 },
-                    { x: 465, date: 'Sep 13', total: 387, sanc: 280 },
+                    { x: 30, date: 'Jan 05', total: 345, sanc: 250 },
+                    { x: 135, date: 'Jan 12', total: 338, sanc: 242 },
+                    { x: 245, date: 'Jan 19', total: 362, sanc: 268 },
+                    { x: 355, date: 'Jan 26', total: 350, sanc: 255 },
+                    { x: 465, date: 'Feb 02', total: 387, sanc: 280 },
                   ].map((pt, i) => (
                     <g key={i}>
                       <circle cx={pt.x} cy={i === 2 ? 28 : i === 4 ? 30 : 38} r="4.5" fill="#C2410C" stroke="#FFFFFF" strokeWidth="2" />
@@ -562,7 +570,7 @@ export const AttendancePanel: React.FC = () => {
 
       {/* MODAL: Intake New Visitor */}
       {isAddingVisitor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsAddingVisitor(false), "Register New Guest / Visitor")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Register New Guest / Visitor</h3>
@@ -570,18 +578,18 @@ export const AttendancePanel: React.FC = () => {
                 type="button"
                 onClick={() => setIsAddingVisitor(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateVisitor} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Full Name *</label>
-                <input aria-label="Full Name"
+                <label htmlFor="visitor-name" className="block text-xs font-bold text-[#1C1917] mb-1">Full Name *</label>
+                <input id="visitor-name" aria-label="Full Name"
                   type="text"
                   required
-                  placeholder="e.g. Jonathan & Lisa Miller"
+                  placeholder="e.g. Jonathan & Lisa Wanjala"
                   value={visitorName}
                   onChange={(e) => setVisitorName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -590,8 +598,8 @@ export const AttendancePanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Phone Number</label>
-                  <input aria-label="Phone Number"
+                  <label htmlFor="visitor-phone" className="block text-xs font-bold text-[#1C1917] mb-1">Phone Number</label>
+                  <input id="visitor-phone" aria-label="Phone Number"
                     type="tel"
                     placeholder="+254 750 000 000"
                     value={visitorPhone}
@@ -600,8 +608,8 @@ export const AttendancePanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Email Address</label>
-                  <input aria-label="Email Address"
+                  <label htmlFor="visitor-email" className="block text-xs font-bold text-[#1C1917] mb-1">Email Address</label>
+                  <input id="visitor-email" aria-label="Email Address"
                     type="email"
                     placeholder="guest@domain.com"
                     value={visitorEmail}
@@ -612,8 +620,8 @@ export const AttendancePanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Ministry Interest</label>
-                <select aria-label="Ministry Interest"
+                <label htmlFor="visitor-ministry" className="block text-xs font-bold text-[#1C1917] mb-1">Ministry Interest</label>
+                <select id="visitor-ministry" aria-label="Ministry Interest"
                   value={visitorMinistry}
                   onChange={(e) => setVisitorMinistry(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -627,16 +635,15 @@ export const AttendancePanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Assigned Follow-Up Shepherd</label>
-                <select aria-label="Assigned Follow-Up Shepherd"
+                <label htmlFor="visitor-shepherd" className="block text-xs font-bold text-[#1C1917] mb-1">Assigned Follow-Up Shepherd</label>
+                <select id="visitor-shepherd" aria-label="Assigned Follow-Up Shepherd"
                   value={visitorPastor}
                   onChange={(e) => setVisitorPastor(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                 >
-                  <option value="Bishop Sammy">Bishop Sammy</option>
                   <option value="Bishop Sammy">Bishop Sammy (Visionary Leader)</option>
-                  <option value="Clara Oswald">Clara Oswald (Deaconess of Welcome)</option>
-                  <option value="Marcus Jenkins">Marcus Jenkins (Elder)</option>
+                  <option value="Clara Wambui">Clara Wambui (Welcome & Mercy Lead)</option>
+                  <option value="Marcus Kamau">Marcus Kamau (Elder)</option>
                 </select>
               </div>
 
@@ -662,7 +669,7 @@ export const AttendancePanel: React.FC = () => {
 
       {/* MODAL: Link Visitor to Member / Household */}
       {linkingVisitor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setLinkingVisitor(null), "Link Guest to Members Register")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">
@@ -672,7 +679,7 @@ export const AttendancePanel: React.FC = () => {
                 type="button"
                 onClick={() => setLinkingVisitor(null)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
@@ -687,8 +694,8 @@ export const AttendancePanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Select Church Member / Household to Associate</label>
-                <select aria-label="Select Church Member / Household to Associate"
+                <label htmlFor="link-member" className="block text-xs font-bold text-[#1C1917] mb-1">Select Church Member / Household to Associate</label>
+                <select id="link-member" aria-label="Select Church Member / Household to Associate"
                   value={selectedMemberId}
                   onChange={(e) => setSelectedMemberId(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"

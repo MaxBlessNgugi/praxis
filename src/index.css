@@ -64,22 +64,38 @@ html {
 
 }
 
-/* Focus policy — one visible keyboard indicator for every control.
+/* Focus policy — one visible keyboard indicator for every focusable control.
 
-   Most controls here set `outline-none` and then rely on a `focus:border-*`
-   colour change that is almost invisible on a light field; a quarter of them
-   draw no indicator at all. Fixing that one class string at a time is ~180
-   edits that drift apart, so the indicator lives here instead. This block is
-   deliberately outside any cascade layer: unlayered rules beat Tailwind's
-   `outline-none` utility without needing `!important`.
+   Nearly every control here carries `outline-none` or `focus:outline-none`
+   (185 sites) and then relies on a `focus:border-*` colour change that is
+   almost invisible on a light field; five drew no indicator at all. Editing
+   that one class string in 185 places is churn that drifts apart, so the
+   indicator lives here instead. This block is deliberately outside any cascade
+   layer: an unlayered rule beats Tailwind's `outline-none` utility without
+   needing `!important`, which is exactly why those per-site classes can stay
+   inert rather than being rewritten one at a time.
 
-   `:focus-visible` keeps the ring off mouse clicks. Real <button>/<a> elements
-   keep the `focus:ring-*` utilities they already carry, and form controls no
-   longer carry any of their own (see tools/a11y-control-names.mjs). */
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[role='button']:focus-visible {
+   The selector is structural — anything focusable, whatever the element happens
+   to be — not a list of the ones we use today, so a new control (a plain
+   <button>, a link, a tabindex card) cannot ship without an indicator. That
+   also gives buttons and links the brand outline instead of Chrome's generic
+   ring, so one style means "the keyboard is here" across the whole app.
+   `:focus-visible` keeps the indicator off mouse clicks, and `:where()` drops
+   the selector's specificity to zero so this stays a baseline any control may
+   style over.
+
+   Verified by tools/audit-focus.mjs, which walks the real tab order on every
+   screen and fails on any focused control whose computed style does not change. */
+:where(
+  a[href],
+  button,
+  input,
+  select,
+  textarea,
+  summary,
+  [tabindex]:not([tabindex='-1']),
+  [role='button']
+):focus-visible {
   outline: 2px solid #C2410C;
   outline-offset: 2px;
 }

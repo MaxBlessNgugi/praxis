@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { HouseholdUnit } from '../../../types';
 import { INITIAL_HOUSEHOLDS } from '../../../data/churchMockData';
-import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
+import { dialogProps } from '../dialog';
+import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain'
+;
 
 /** The statuses the mock households actually carry, so the filter cannot go dead. */
 const HOUSEHOLD_STATUSES = [...new Set(INITIAL_HOUSEHOLDS.map((household) => household.statusBadge))];
@@ -54,7 +56,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
       headDob: 'Active Member',
       headTitle: 'Household Head',
       dependents: [],
-      address: newAddress || '100 Church Way',
+      address: newAddress || 'Plot 100, Milimani Estate, Nyahururu',
       phone: newPhone || '+254 700 000 000',
     };
 
@@ -456,13 +458,13 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
 
       {/* Create New Household Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreateModalOpen(false), "Create New Household")}>
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-150">
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(false)}
               className="absolute top-4 right-4 p-1 rounded-lg text-[#59413a] hover:bg-[#f4ece8] cursor-pointer"
-            >
+            aria-label="Close">
               <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
             </button>
             <div className="flex items-center gap-3 mb-4">
@@ -479,38 +481,38 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
 
             <form onSubmit={handleCreateHousehold} className="space-y-4 text-xs font-body">
               <div>
-                <label className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                <label htmlFor="household-surname" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
                   Household Surname *
                 </label>
-                <input aria-label="Household Surname"
+                <input id="household-surname" aria-label="Household Surname"
                   type="text"
                   required
                   value={newSurname}
                   onChange={(e) => setNewSurname(e.target.value)}
-                  placeholder="e.g. Vance"
+                  placeholder="e.g. Mwangi"
                   className="w-full h-9 px-3 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 />
               </div>
 
               <div>
-                <label className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                <label htmlFor="household-head" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
                   Primary Family Head *
                 </label>
-                <input aria-label="Primary Family Head"
+                <input id="household-head" aria-label="Primary Family Head"
                   type="text"
                   required
                   value={newHead}
                   onChange={(e) => setNewHead(e.target.value)}
-                  placeholder="e.g. Timothy Vance"
+                  placeholder="e.g. Timothy Mwangi"
                   className="w-full h-9 px-3 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 />
               </div>
 
               <div>
-                <label className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                <label htmlFor="household-campus" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
                   Church Campus
                 </label>
-                <select aria-label="Church Campus"
+                <select id="household-campus" aria-label="Church Campus"
                   value={newCampus}
                   onChange={(e) => setNewCampus(e.target.value)}
                   className="w-full h-9 px-2.5 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
@@ -524,23 +526,23 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                <label htmlFor="household-address" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
                   Residential Address
                 </label>
-                <input aria-label="Residential Address"
+                <input id="household-address" aria-label="Residential Address"
                   type="text"
                   value={newAddress}
                   onChange={(e) => setNewAddress(e.target.value)}
-                  placeholder="Street Address, City"
+                  placeholder="Street Address, Estate, Town"
                   className="w-full h-9 px-3 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 />
               </div>
 
               <div>
-                <label className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                <label htmlFor="household-phone" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
                   Primary Contact Phone
                 </label>
-                <input aria-label="Primary Contact Phone"
+                <input id="household-phone" aria-label="Primary Contact Phone"
                   type="tel"
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}

@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { dialogProps } from '../../dialog';
+import React, { useState } from 'react'
+;
 import {
   VolunteerRosterDuty,
   SwapRequest,
@@ -372,7 +374,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
       {/* MODAL: Assign Volunteer Duty */}
       {isAssigningDuty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsAssigningDuty(false), "Assign Volunteer to Service")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Assign Volunteer to Service</h3>
@@ -380,15 +382,15 @@ export const VolunteerRosterPanel: React.FC = () => {
                 type="button"
                 onClick={() => setIsAssigningDuty(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateAssignment} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Ministry Department</label>
-                <select aria-label="Ministry Department"
+                <label htmlFor="roster-department" className="block text-xs font-bold text-[#1C1917] mb-1">Ministry Department</label>
+                <select id="roster-department" aria-label="Ministry Department"
                   value={targetDept}
                   onChange={(e) => setTargetDept(e.target.value as any)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -404,8 +406,8 @@ export const VolunteerRosterPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Role Title *</label>
-                <input aria-label="Role Title"
+                <label htmlFor="roster-role-title" className="block text-xs font-bold text-[#1C1917] mb-1">Role Title *</label>
+                <input id="roster-role-title" aria-label="Role Title"
                   type="text"
                   required
                   placeholder="e.g. Aisle 2 Collection Steward"
@@ -416,8 +418,8 @@ export const VolunteerRosterPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Select Volunteer (Member Roll)</label>
-                <select aria-label="Select Volunteer (Member Roll)"
+                <label htmlFor="roster-volunteer" className="block text-xs font-bold text-[#1C1917] mb-1">Select Volunteer (Member Roll)</label>
+                <select id="roster-volunteer" aria-label="Select Volunteer (Member Roll)"
                   value={selectedMemberId}
                   onChange={(e) => setSelectedMemberId(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -431,8 +433,8 @@ export const VolunteerRosterPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Call Time</label>
-                <input aria-label="Call Time"
+                <label htmlFor="roster-call-time" className="block text-xs font-bold text-[#1C1917] mb-1">Call Time</label>
+                <input id="roster-call-time" aria-label="Call Time"
                   type="text"
                   placeholder="09:45 AM"
                   value={callTime}
@@ -442,8 +444,8 @@ export const VolunteerRosterPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Duty Notes / Special Instructions</label>
-                <textarea aria-label="Duty Notes / Special Instructions"
+                <label htmlFor="roster-duty-notes" className="block text-xs font-bold text-[#1C1917] mb-1">Duty Notes / Special Instructions</label>
+                <textarea id="roster-duty-notes" aria-label="Duty Notes / Special Instructions"
                   rows={2}
                   placeholder="e.g. Please pick up badge at Welcome Kiosk by 09:30 AM"
                   value={dutyNotes}
@@ -474,7 +476,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
       {/* MODAL: Request Swap */}
       {swappingDuty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setSwappingDuty(null), "Request Duty Replacement")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Request Duty Replacement</h3>
@@ -482,7 +484,7 @@ export const VolunteerRosterPanel: React.FC = () => {
                 type="button"
                 onClick={() => setSwappingDuty(null)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
@@ -499,11 +501,11 @@ export const VolunteerRosterPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Proposed Replacement Volunteer *</label>
-                <input aria-label="Proposed Replacement Volunteer"
+                <label htmlFor="swap-replacement" className="block text-xs font-bold text-[#1C1917] mb-1">Proposed Replacement Volunteer *</label>
+                <input id="swap-replacement" aria-label="Proposed Replacement Volunteer"
                   type="text"
                   required
-                  placeholder="e.g. Elena Vance"
+                  placeholder="e.g. Elena Mwangi"
                   value={replacementName}
                   onChange={(e) => setReplacementName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -511,8 +513,8 @@ export const VolunteerRosterPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Reason for Swap</label>
-                <textarea aria-label="Reason for Swap"
+                <label htmlFor="swap-reason" className="block text-xs font-bold text-[#1C1917] mb-1">Reason for Swap</label>
+                <textarea id="swap-reason" aria-label="Reason for Swap"
                   rows={2}
                   placeholder="e.g. Family travel / rehearsal overlap"
                   value={swapReason}

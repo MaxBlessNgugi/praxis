@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { AdminSubTab } from '../../../types';
-import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
+import { dialogProps } from '../dialog';
+import { AdminSubTab } from '../../../types'
+;
 
 interface TrashItem {
   id: string;
@@ -17,45 +18,45 @@ interface TrashItem {
 const INITIAL_TRASH_ITEMS: TrashItem[] = [
   {
     id: 'trash-1',
-    name: 'Elena Vance',
+    name: 'Elena Mwangi',
     recordType: 'Members & Believers',
     recordId: '#MBR-1082',
-    deletedBy: 'Deaconess Clara Oswald',
+    deletedBy: 'Clara Wambui',
     daysRemaining: 2,
-    expiryDate: 'Nov 19',
+    expiryDate: 'Feb 11',
     isExpiringSoon: true,
-    rationale: 'Duplicate household entry during autumn census reconciliation; preserved for confirmation record cross-check.',
+    rationale: 'Duplicate household entry during the January census reconciliation; preserved for confirmation record cross-check.',
   },
   {
     id: 'trash-2',
     name: 'Batch #041 Draft Tithe Slips',
     recordType: 'Giving & Stewardship',
     recordId: '#TTH-8821',
-    deletedBy: 'Hannah Abbott (Bookkeeper)',
+    deletedBy: 'Hannah Kimani (Bookkeeper)',
     daysRemaining: 26,
-    expiryDate: 'Dec 13',
+    expiryDate: 'Mar 07',
     isExpiringSoon: false,
-    rationale: 'Draft tithe batch superseded by automated ACH reconciliation ledger #8822.',
+    rationale: 'Draft tithe batch superseded by automated bank reconciliation ledger #8822.',
   },
   {
     id: 'trash-3',
-    name: 'Q3 Council Minutes (Redacted Draft)',
+    name: 'Q1 Council Minutes (Redacted Draft)',
     recordType: 'Church Council & Council Records',
     recordId: '#GOV-509',
     deletedBy: 'Bishop Sammy',
     daysRemaining: 1,
-    expiryDate: 'Nov 18',
+    expiryDate: 'Feb 10',
     isExpiringSoon: true,
     rationale: 'Preliminary council working notes replaced by final ratified minutes with pastoral seal.',
   },
   {
     id: 'trash-4',
-    name: 'High School Autumn Retreat Roster',
+    name: 'Secondary School Retreat Roster',
     recordType: 'Groups & Fellowships',
     recordId: '#MIN-0244',
-    deletedBy: 'Elder Marcus Brody',
+    deletedBy: 'Elder Marcus Omondi',
     daysRemaining: 21,
-    expiryDate: 'Dec 08',
+    expiryDate: 'Mar 02',
     isExpiringSoon: false,
     rationale: 'Re-assigned volunteer slotting table merged into master youth event ledger.',
   },
@@ -64,9 +65,9 @@ const INITIAL_TRASH_ITEMS: TrashItem[] = [
     name: 'Certificate of Child Dedication (Misspelled)',
     recordType: 'Reports & Certificates',
     recordId: '#CERT-912',
-    deletedBy: 'Deaconess Clara Oswald',
+    deletedBy: 'Clara Wambui',
     daysRemaining: 2,
-    expiryDate: 'Nov 19',
+    expiryDate: 'Feb 11',
     isExpiringSoon: true,
     rationale: 'Typographical error in middle surname; correct certificate re-issued under #CERT-913.',
   },
@@ -89,48 +90,48 @@ interface AuditBlock {
 const AUDIT_BLOCKS: AuditBlock[] = [
   {
     height: 48192,
-    timestamp: 'Nov 17, 2024 • 11:42:15 AM EST',
+    timestamp: 'Feb 07, 2025 • 11:42:15 AM EAT',
     title: 'Sunday Loose Plate Reconciled',
     type: 'Offering Audit',
     amount: '+KSh 3,410.50',
     isCredit: true,
     fund: 'General Operating Fund #101',
-    officer: 'Deaconess Clara Oswald',
+    officer: 'Clara Wambui',
     dualWitness: 'Bishop Sammy (2 Signatures Confirmed)',
     hash: '0x7a8b...39fc',
     fullHash: '0x7a8b8c2d91ef45a8b7c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a139fc',
   },
   {
     height: 48191,
-    timestamp: 'Nov 17, 2024 • 09:15:02 AM EST',
+    timestamp: 'Feb 07, 2025 • 09:15:02 AM EAT',
     title: 'Welfare Disbursement Approved',
     type: 'Benevolence Voucher',
     amount: '-KSh 850.00',
     isCredit: false,
     fund: 'Benevolence Escrow #402',
-    officer: 'Elder Marcus Jenkins',
-    dualWitness: 'Treasurer Sarah Lin (2 Signatures Confirmed)',
+    officer: 'Elder Marcus Kamau',
+    dualWitness: 'Treasurer Sarah Wanjiku (2 Signatures Confirmed)',
     hash: '0x992f...e412',
     fullHash: '0x992fe412b189cc372a884ef90123cbfa91448bca1209774619d8213ba9741e412',
   },
   {
     height: 48190,
-    timestamp: 'Nov 16, 2024 • 04:30:19 PM EST',
+    timestamp: 'Feb 06, 2025 • 04:30:19 PM EAT',
     title: 'Sanctuary Capital Escrow Wire',
     type: 'Trustee Wire',
     amount: '-KSh 50,000.00',
     isCredit: false,
     fund: 'Building Expansion Fund #610',
-    officer: 'Treasurer Sarah Lin',
-    dualWitness: '3 Tri-Key Attestation (Bishop Sammy, A. Miller, S. Lin)',
+    officer: 'Treasurer Sarah Wanjiku',
+    dualWitness: '3 Tri-Key Attestation (Bishop Sammy, A. Wanjala, S. Wanjiku)',
     hash: '0x4e88...77ca',
     fullHash: '0x4e8877ca918823ddbf992147ae55341299abceef87625100aa762149bb4477ca',
   },
   {
     height: 48189,
-    timestamp: 'Nov 16, 2024 • 01:12:44 PM EST',
+    timestamp: 'Feb 06, 2025 • 01:12:44 PM EAT',
     title: 'Tithe Batch Ingestion',
-    type: 'Automated ACH Clearing',
+    type: 'Automated Bank Clearing',
     amount: '+KSh 14,280.00',
     isCredit: true,
     fund: 'General Operating Fund #101',
@@ -141,18 +142,38 @@ const AUDIT_BLOCKS: AuditBlock[] = [
   },
   {
     height: 48188,
-    timestamp: 'Nov 15, 2024 • 05:22:10 PM EST',
+    timestamp: 'Feb 05, 2025 • 05:22:10 PM EAT',
     title: 'Inter-Fund Reallocation',
     type: 'Council Approved Rebalance',
     amount: 'KSh 12,000.00 Rebalance',
     isCredit: true,
     fund: '#101 → Missions Reserve #204',
     officer: 'Bishop Sammy',
-    dualWitness: 'Elder Marcus Jenkins (Council Resolution RES-2024-039)',
+    dualWitness: 'Elder Marcus Kamau (Council Resolution RES-2025-039)',
     hash: '0x38bf...884d',
     fullHash: '0x38bf884deca1190227bbfa99142388019ab9872134567890abcdef123456884d',
   },
 ];
+
+const ALL_RECORD_TYPES = 'All Record Types';
+const ALL_EVENT_TYPES = 'All Event Types';
+
+/** Event types are read off the ledger itself, so every option matches at least one block. */
+const AUDIT_TYPES = [...new Set(AUDIT_BLOCKS.map((block) => block.type))];
+
+const FISCAL_PERIODS = ['Fiscal Q1 2025', 'Fiscal Q4 2025', 'Fiscal Year 2025 YTD'] as const;
+type FiscalPeriod = (typeof FISCAL_PERIODS)[number];
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A block's commit month decides its fiscal quarter ("Feb 07, 2025 • 11:42:15 AM EAT"). */
+const blockMatchesPeriod = (timestamp: string, period: FiscalPeriod): boolean => {
+  const month = MONTHS.indexOf(timestamp.slice(0, 3));
+  if (month < 0 || !timestamp.includes('2025')) return false;
+  if (period === 'Fiscal Q1 2025') return month < 3;
+  if (period === 'Fiscal Q4 2025') return month > 8;
+  return true; // Fiscal Year 2025 YTD — every 2025 block
+};
 
 interface AdminSecurityViewProps {
   initialSubTab?: AdminSubTab;
@@ -168,12 +189,11 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
   // Users & Rights states
   const [searchRoles, setSearchRoles] = useState('');
-  const [parishUnit, setParishUnit] = useState<string>(DEFAULT_LOCATION);
   const [hasPendingChanges, setHasPendingChanges] = useState(true);
 
   // Trash states
   const [trashItems, setTrashItems] = useState<TrashItem[]>(INITIAL_TRASH_ITEMS);
-  const [trashFilter, setTrashFilter] = useState('All Record Types (14)');
+  const [trashFilter, setTrashFilter] = useState(ALL_RECORD_TYPES);
   const [searchTrash, setSearchTrash] = useState('');
   const [demoEmptyTrash, setDemoEmptyTrash] = useState(false);
   const [purgeModalItem, setPurgeModalItem] = useState<TrashItem | null>(null);
@@ -183,7 +203,8 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
   // Finance Audit states
   const [searchAudit, setSearchAudit] = useState('');
   const [selectedAuditBlock, setSelectedAuditBlock] = useState<AuditBlock | null>(null);
-  const [auditFilterType, setAuditFilterType] = useState('All Event Types');
+  const [auditFilterType, setAuditFilterType] = useState(ALL_EVENT_TYPES);
+  const [fiscalPeriod, setFiscalPeriod] = useState<FiscalPeriod>('Fiscal Q1 2025');
   const [isVerifyingChain, setIsVerifyingChain] = useState(false);
 
   const showToast = (msg: string) => {
@@ -219,6 +240,27 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
       showToast("Merkle Chain Audit Complete: 1,420 blocks verified with zero discrepancies. Root hash intact.");
     }, 1200);
   };
+
+  const matchesTerm = (fields: string[], term: string) => {
+    const needle = term.trim().toLowerCase();
+    return needle === '' || fields.some((field) => field.toLowerCase().includes(needle));
+  };
+
+  const trashTypes = [...new Set(trashItems.map((item) => item.recordType))];
+  // Restoring the last record of a type would otherwise leave this select on a value it no longer offers.
+  const activeTrashType = trashTypes.includes(trashFilter) ? trashFilter : ALL_RECORD_TYPES;
+  const filteredTrash = trashItems.filter(
+    (item) =>
+      (activeTrashType === ALL_RECORD_TYPES || item.recordType === activeTrashType) &&
+      matchesTerm([item.name, item.recordId, item.deletedBy], searchTrash),
+  );
+
+  const filteredAuditBlocks = AUDIT_BLOCKS.filter(
+    (block) =>
+      (auditFilterType === ALL_EVENT_TYPES || block.type === auditFilterType) &&
+      blockMatchesPeriod(block.timestamp, fiscalPeriod) &&
+      matchesTerm([block.title, block.type, block.officer, block.fund, block.amount, block.hash], searchAudit),
+  );
 
   return (
     <div className="flex flex-col w-full gap-6 pb-16">
@@ -385,16 +427,6 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
               />
             </div>
             <div className="flex items-center gap-3">
-              <select aria-label="Church location filter"
-                value={parishUnit}
-                onChange={(e) => setParishUnit(e.target.value)}
-                className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/40 focus:outline-none cursor-pointer"
-              >
-                {LOCATIONS.map((location) => (
-                  <option key={location}>{location}</option>
-                ))}
-                <option>All Church Locations</option>
-              </select>
               <button
                 type="button"
                 onClick={() => showToast("Opening Church RBAC Presets modal...")}
@@ -770,16 +802,16 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
               </div>
 
               <select aria-label="Trash record type filter"
-                value={trashFilter}
+                value={activeTrashType}
                 onChange={(e) => setTrashFilter(e.target.value)}
                 className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/40 focus:outline-none cursor-pointer"
               >
-                <option>All Record Types (14)</option>
-                <option>Members & Household (6)</option>
-                <option>Giving & Stewardship (4)</option>
-                <option>Church Council & Minutes (2)</option>
-                <option>Groups & Fellowships (1)</option>
-                <option>Reports & Certificates (1)</option>
+                <option value={ALL_RECORD_TYPES}>
+                  {ALL_RECORD_TYPES} ({trashItems.length})
+                </option>
+                {trashTypes.map((type) => (
+                  <option key={type}>{type}</option>
+                ))}
               </select>
 
               <button
@@ -795,6 +827,9 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
               <span>Demo Empty View:</span>
               <button
                 type="button"
+                role="switch"
+                aria-checked={demoEmptyTrash}
+                aria-label="Demo empty view"
                 onClick={() => setDemoEmptyTrash(!demoEmptyTrash)}
                 className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
                   demoEmptyTrash ? 'bg-[#006243]' : 'bg-gray-300'
@@ -842,7 +877,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#e1bfb5]/30 text-xs text-[#1e1b19]">
-                    {trashItems.map((item) => (
+                    {filteredTrash.map((item) => (
                       <tr key={item.id} className="hover:bg-[#faf2ee]/70 transition-colors">
                         <td className="py-4 px-4">
                           <div className="flex flex-col">
@@ -898,6 +933,13 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                         </td>
                       </tr>
                     ))}
+                    {filteredTrash.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-10 px-4 text-center text-[#59413a]">
+                          No quarantined records match this search or filter.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -945,7 +987,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                   Cryptographic hash chains seal every financial event into permanent church storage. Entries cannot be modified, deleted, or backdated.
                 </p>
                 <span className="text-[11px] text-[#a89c94] font-mono mt-1">
-                  Genesis block verified: Nov 17, 2024 • Latest Root Hash: 0x7a8b...39fc
+                  Genesis block verified: Feb 07, 2025 • Latest Root Hash: 0x7a8b...39fc
                 </span>
               </div>
             </div>
@@ -1022,10 +1064,14 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 />
               </div>
 
-              <select aria-label="Fiscal period filter" className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/40 focus:outline-none cursor-pointer">
-                <option>Fiscal Q4 2024</option>
-                <option>Fiscal Q3 2024</option>
-                <option>Fiscal Year 2024 YTD</option>
+              <select aria-label="Fiscal period filter"
+                value={fiscalPeriod}
+                onChange={(e) => setFiscalPeriod(e.target.value as FiscalPeriod)}
+                className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/40 focus:outline-none cursor-pointer"
+              >
+                {FISCAL_PERIODS.map((period) => (
+                  <option key={period}>{period}</option>
+                ))}
               </select>
 
               <select aria-label="Audit event type filter"
@@ -1033,12 +1079,10 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 onChange={(e) => setAuditFilterType(e.target.value)}
                 className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/40 focus:outline-none cursor-pointer"
               >
-                <option>All Event Types</option>
-                <option>Sunday Loose Plate</option>
-                <option>Benevolence Voucher</option>
-                <option>Trustee Wire</option>
-                <option>Automated ACH Tithe</option>
-                <option>Inter-Fund Rebalance</option>
+                <option value={ALL_EVENT_TYPES}>All Event Types</option>
+                {AUDIT_TYPES.map((type) => (
+                  <option key={type}>{type}</option>
+                ))}
               </select>
 
               <button
@@ -1071,7 +1115,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e1bfb5]/30 text-xs text-[#1e1b19]">
-                  {AUDIT_BLOCKS.map((block) => (
+                  {filteredAuditBlocks.map((block) => (
                     <tr key={block.height} className="hover:bg-[#faf2ee]/70 transition-colors">
                       <td className="py-4 px-4">
                         <div className="flex flex-col">
@@ -1116,6 +1160,13 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                       </td>
                     </tr>
                   ))}
+                  {filteredAuditBlocks.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-10 px-4 text-center text-[#59413a]">
+                        No ledger events in this fiscal period.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1149,7 +1200,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
       {/* Cryptographic Proof Receipt Modal */}
       {selectedAuditBlock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs" {...dialogProps(() => setSelectedAuditBlock(null), "Audit Event Detail")}>
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#e1bfb5]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#f4ece8]">
               <div className="flex items-center gap-2">
@@ -1162,7 +1213,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 type="button"
                 onClick={() => setSelectedAuditBlock(null)}
                 className="text-[#59413a] hover:text-[#1e1b19] p-1"
-              >
+             aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
@@ -1221,7 +1272,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
       {/* Dual-Key Purge Passcode Modal */}
       {purgeModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs" {...dialogProps(() => setPurgeModalItem(null), "Permanently Purge Record?")}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#e1bfb5]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#f4ece8]">
               <div className="flex items-center gap-2">
@@ -1234,7 +1285,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 type="button"
                 onClick={() => setPurgeModalItem(null)}
                 className="text-[#59413a] hover:text-[#1e1b19] p-1"
-              >
+             aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
@@ -1252,10 +1303,10 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#59413a] mb-1">
+                <label htmlFor="admin-purge-passcode" className="block text-xs font-bold text-[#59413a] mb-1">
                   Clerk Dual-Key Passcode *
                 </label>
-                <input aria-label="Clerk Dual-Key Passcode"
+                <input id="admin-purge-passcode" aria-label="Clerk Dual-Key Passcode"
                   type="password"
                   required
                   placeholder="Enter authorized credential passcode..."
@@ -1287,7 +1338,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
       {/* Trash Policies Drawer */}
       {trashPoliciesDrawer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-[#33302d]/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-[#33302d]/60 backdrop-blur-xs" {...dialogProps(() => setTrashPoliciesDrawer(false), "Canonic Trash Policies")}>
           <div className="bg-white h-full max-w-md w-full p-6 shadow-2xl border-l border-[#e1bfb5]/40 flex flex-col justify-between animate-in slide-in-from-right duration-200">
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-[#f4ece8]">
@@ -1299,17 +1350,17 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                   type="button"
                   onClick={() => setTrashPoliciesDrawer(false)}
                   className="text-[#59413a] hover:text-[#1e1b19] p-1"
-                >
+               aria-label="Close">
                   <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
 
               <div className="py-5 space-y-4 text-xs font-medium text-[#1e1b19]">
                 <div>
-                  <label className="block text-xs font-bold text-[#59413a] mb-1">
+                  <label htmlFor="admin-retention-days" className="block text-xs font-bold text-[#59413a] mb-1">
                     Retention Quarantine Duration (Days)
                   </label>
-                  <input aria-label="Retention Quarantine Duration (Days)"
+                  <input id="admin-retention-days" aria-label="Retention Quarantine Duration (Days)"
                     type="number"
                     defaultValue={30}
                     className="w-full h-10 px-3 rounded-lg bg-[#faf2ee] border border-[#e1bfb5]/50 focus:outline-none"

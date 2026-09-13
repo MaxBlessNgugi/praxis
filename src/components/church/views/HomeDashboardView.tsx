@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { ParishNavTab, MembersSubTab, ParishMember } from '../../../types';
 import { DEFAULT_LOCATION } from '../../../data/churchDomain';
-import { interactiveCard } from '../interactiveCard';
+import { dialogProps } from '../dialog';
+import { interactiveCard } from '../interactiveCard'
+;
 
 interface ActivityItem {
   id: string;
@@ -25,13 +27,13 @@ const INITIAL_ACTIVITIES: ActivityItem[] = [
     id: 'act-1',
     category: 'giving',
     categoryLabel: 'Stewardship',
-    title: 'Batch #042 Automated ACH & Tithes Reconciled',
-    description: 'Direct deposits and recurring online tithes cleared into General Operating Fund #101 with dual-signatory verification.',
+    title: 'Batch #042 Automated Bank & Tithes Reconciled',
+    description: 'Bank deposits and recurring online tithes cleared into General Operating Fund #101 with dual-signatory verification.',
     timeAgo: '12m ago',
     timestamp: 'Today, 10:48 AM',
-    actor: 'Deaconess Clara Oswald',
+    actor: 'Clara Wambui',
     actorRole: 'Church Bookkeeper',
-    avatarText: 'CO',
+    avatarText: 'CW',
     badgeColor: '#059669',
     badgeBg: '#059669/10',
     amount: '+KSh 14,280.00',
@@ -42,12 +44,12 @@ const INITIAL_ACTIVITIES: ActivityItem[] = [
     category: 'pastoral',
     categoryLabel: 'Pastoral Care',
     title: 'Home Mercy Visit & Holy Communion Logged',
-    description: 'Visited Evelyn & Thomas Miller following outpatient hip surgery. Anointed with prayer; requested floral delivery and homebound bulletin.',
+    description: 'Visited Evelyn & Thomas Wanjala following outpatient hip surgery. Anointed with prayer; requested floral delivery and homebound bulletin.',
     timeAgo: '45m ago',
     timestamp: 'Today, 10:15 AM',
     actor: 'Rev. Alice',
     actorRole: 'Co-Visionary Leader',
-    avatarText: 'DA',
+    avatarText: 'DK',
     badgeColor: '#D97706',
     badgeBg: '#D97706/10',
     icon: 'home_health',
@@ -57,7 +59,7 @@ const INITIAL_ACTIVITIES: ActivityItem[] = [
     category: 'sacraments',
     categoryLabel: 'Baptism & Communion',
     title: 'Certificate of Holy Baptism Sealed (#CERT-914)',
-    description: 'Baptismal certificate and official registry roll entry completed for infant Clara Sterling. Celebrant: Bishop Sammy.',
+    description: 'Baptismal certificate and official registry roll entry completed for infant Clara Otieno. Celebrant: Bishop Sammy.',
     timeAgo: '2h ago',
     timestamp: 'Today, 08:50 AM',
     actor: 'Eleanor Campbell',
@@ -71,13 +73,13 @@ const INITIAL_ACTIVITIES: ActivityItem[] = [
     id: 'act-4',
     category: 'ministries',
     categoryLabel: 'Ministries',
-    title: 'Autumn Youth Retreat Roster Finalized',
-    description: '38 high school students confirmed and all 6 volunteer drivers background-cleared (CPP Safeguarding Level 2).',
+    title: 'Youth Retreat Roster Finalized',
+    description: '38 secondary school students confirmed and all 6 volunteer drivers background-cleared (CPP Safeguarding Level 2).',
     timeAgo: '3h ago',
     timestamp: 'Today, 07:45 AM',
-    actor: 'Hannah Abbott',
+    actor: 'Hannah Kimani',
     actorRole: 'Youth Director',
-    avatarText: 'HA',
+    avatarText: 'HK',
     badgeColor: '#57534E',
     badgeBg: '#F8F1E9',
     icon: 'hiking',
@@ -86,13 +88,13 @@ const INITIAL_ACTIVITIES: ActivityItem[] = [
     id: 'act-5',
     category: 'governance',
     categoryLabel: 'Council Docket',
-    title: 'Council Resolution RES-2024-041 Tabled',
+    title: 'Council Resolution RES-2025-041 Tabled',
     description: 'Resolution draft submitted for Council consideration: "Sanctuary Sound Board Replacement Escrow (KSh 12,500)".',
     timeAgo: '5h ago',
     timestamp: 'Today, 05:30 AM',
-    actor: 'Elder Marcus Jenkins',
+    actor: 'Elder Marcus Kamau',
     actorRole: 'Church Elder',
-    avatarText: 'MJ',
+    avatarText: 'MK',
     badgeColor: '#C2410C',
     badgeBg: '#C2410C/10',
     icon: 'gavel',
@@ -102,12 +104,12 @@ const INITIAL_ACTIVITIES: ActivityItem[] = [
     category: 'giving',
     categoryLabel: 'Benevolence',
     title: 'Benevolence Emergency Voucher #402 Disbursed',
-    description: 'Food pantry & electric utility aid released to neighbor family in crisis under confidential Deacon escrow.',
+    description: 'Food relief & electricity aid released to a neighbour family in crisis under confidential Deacon escrow.',
     timeAgo: 'Yesterday',
     timestamp: 'Yesterday, 04:15 PM',
-    actor: 'Sarah Lin',
+    actor: 'Sarah Wanjiku',
     actorRole: 'Treasurer',
-    avatarText: 'SL',
+    avatarText: 'SW',
     badgeColor: '#059669',
     badgeBg: '#059669/10',
     amount: '-KSh 850.00',
@@ -157,11 +159,11 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [titheDonorName, setTitheDonorName] = useState('Anonymous / Plate Offering');
   const [titheAmount, setTitheAmount] = useState('500');
   const [titheFund, setTitheFund] = useState('General Operating #101');
-  const [titheMethod, setTitheMethod] = useState('ACH / Online');
+  const [titheMethod, setTitheMethod] = useState('M-PESA / Online');
 
   const [meetingTitle, setMeetingTitle] = useState('');
   const [meetingCommittee, setMeetingCommittee] = useState('Church Council');
-  const [meetingDate, setMeetingDate] = useState('2024-11-21T19:00');
+  const [meetingDate, setMeetingDate] = useState('2025-02-20T19:00');
   const [meetingLocation, setMeetingLocation] = useState('Sanctuary Council Chamber');
 
   const showToast = (msg: string) => {
@@ -240,9 +242,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       description: `Stewardship receipt confirmed for ${titheFund} via ${titheMethod}. Auto-receipted with signature seal.`,
       timeAgo: 'Just now',
       timestamp: 'Just now',
-      actor: 'Sarah Lin',
+      actor: 'Sarah Wanjiku',
       actorRole: 'Treasurer',
-      avatarText: 'SL',
+      avatarText: 'SW',
       badgeColor: '#059669',
       badgeBg: '#059669/10',
       amount: `+KSh {val.toLocaleString()}`,
@@ -316,7 +318,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2 text-xs font-bold text-[#C2410C] uppercase tracking-wider">
               <span className="w-2 h-2 rounded-full bg-[#C2410C]"></span>
-              <span>Cloud Church Console • Autumn My Year Of Dominion</span>
+              <span>Cloud Church Console • My Year Of Dominion</span>
             </div>
             <div className="flex items-baseline gap-2.5">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1C1917]">
@@ -458,7 +460,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             </div>
 
             <div className="mt-3 pt-2.5 border-t border-[#E7E5E4] flex items-center justify-between text-[11px]">
-              <span className="text-[#57534E]">12 days left in cycle</span>
+              <span className="text-[#57534E]">19 days left in cycle</span>
               <span className="font-bold text-[#C2410C] group-hover:text-[#EA580C] flex items-center gap-0.5">
                 Ledger <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_forward</span>
               </span>
@@ -717,7 +719,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       {/* MODAL 1: QUICK ADD MEMBER */}
       {/* ========================================================================= */}
       {isAddMemberOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...dialogProps(() => setIsAddMemberOpen(false), "Quick Member Intake")}>
           <div className="w-full max-w-lg bg-[#FFFFFF] rounded-[14px] p-6 shadow-2xl border border-[#E7E5E4] animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-[#E7E5E4] mb-4">
               <div className="flex items-center gap-2.5">
@@ -733,38 +735,38 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 type="button"
                 onClick={() => setIsAddMemberOpen(false)}
                 className="p-1 rounded-[9px] text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917] cursor-pointer transition-colors"
-              >
+             aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined">close</span>
               </button>
             </div>
 
             <form onSubmit={handleSaveQuickMember} className="flex flex-col gap-3.5 text-xs">
               <div>
-                <label className="font-bold text-[#1C1917] mb-1 block">Full Legal Name *</label>
-                <input aria-label="Full Legal Name"
+                <label htmlFor="home-member-name" className="font-bold text-[#1C1917] mb-1 block">Full Legal Name *</label>
+                <input id="home-member-name" aria-label="Full Legal Name"
                   type="text"
                   required
                   value={newMemberName}
                   onChange={(e) => setNewMemberName(e.target.value)}
-                  placeholder="e.g. Gabriel Vance"
+                  placeholder="e.g. Gabriel Mwangi"
                   className="w-full h-9 px-3 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/20 transition-all"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-[#1C1917] mb-1 block">Household Name</label>
-                  <input aria-label="Household Name"
+                  <label htmlFor="home-member-household" className="font-bold text-[#1C1917] mb-1 block">Household Name</label>
+                  <input id="home-member-household" aria-label="Household Name"
                     type="text"
                     value={newMemberHousehold}
                     onChange={(e) => setNewMemberHousehold(e.target.value)}
-                    placeholder="e.g. Vance Household"
+                    placeholder="e.g. Mwangi Household"
                     className="w-full h-9 px-3 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/20 transition-all"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-[#1C1917] mb-1 block">Membership Tier</label>
-                  <select aria-label="Membership Tier"
+                  <label htmlFor="home-member-tier" className="font-bold text-[#1C1917] mb-1 block">Membership Tier</label>
+                  <select id="home-member-tier" aria-label="Membership Tier"
                     value={newMemberTier}
                     onChange={(e) => setNewMemberTier(e.target.value)}
                     className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] cursor-pointer transition-all"
@@ -779,8 +781,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-[#1C1917] mb-1 block">Email Address</label>
-                  <input aria-label="Email Address"
+                  <label htmlFor="home-member-email" className="font-bold text-[#1C1917] mb-1 block">Email Address</label>
+                  <input id="home-member-email" aria-label="Email Address"
                     type="email"
                     value={newMemberEmail}
                     onChange={(e) => setNewMemberEmail(e.target.value)}
@@ -789,8 +791,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-[#1C1917] mb-1 block">Phone Number</label>
-                  <input aria-label="Phone Number"
+                  <label htmlFor="home-member-phone" className="font-bold text-[#1C1917] mb-1 block">Phone Number</label>
+                  <input id="home-member-phone" aria-label="Phone Number"
                     type="tel"
                     value={newMemberPhone}
                     onChange={(e) => setNewMemberPhone(e.target.value)}
@@ -824,7 +826,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       {/* MODAL 2: QUICK RECORD TITHE */}
       {/* ========================================================================= */}
       {isRecordTitheOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...dialogProps(() => setIsRecordTitheOpen(false), "Record Tithe & Offering")}>
           <div className="w-full max-w-lg bg-[#FFFFFF] rounded-[14px] p-6 shadow-2xl border border-[#E7E5E4] animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-[#E7E5E4] mb-4">
               <div className="flex items-center gap-2.5">
@@ -840,28 +842,28 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 type="button"
                 onClick={() => setIsRecordTitheOpen(false)}
                 className="p-1 rounded-[9px] text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917] cursor-pointer transition-colors"
-              >
+             aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined">close</span>
               </button>
             </div>
 
             <form onSubmit={handleSaveQuickTithe} className="flex flex-col gap-3.5 text-xs">
               <div>
-                <label className="font-bold text-[#1C1917] mb-1 block">Donor / Household Name</label>
-                <input aria-label="Donor / Household Name"
+                <label htmlFor="home-tithe-donor" className="font-bold text-[#1C1917] mb-1 block">Donor / Household Name</label>
+                <input id="home-tithe-donor" aria-label="Donor / Household Name"
                   type="text"
                   required
                   value={titheDonorName}
                   onChange={(e) => setTitheDonorName(e.target.value)}
-                  placeholder="e.g. Deacon Marcus Brody"
+                  placeholder="e.g. Deacon Marcus Omondi"
                   className="w-full h-9 px-3 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/20 transition-all"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-[#1C1917] mb-1 block">Offering Amount (KSh) *</label>
-                  <input aria-label="Offering Amount (KSh)"
+                  <label htmlFor="home-tithe-amount" className="font-bold text-[#1C1917] mb-1 block">Offering Amount (KSh) *</label>
+                  <input id="home-tithe-amount" aria-label="Offering Amount (KSh)"
                     type="number"
                     min="1"
                     step="0.01"
@@ -873,8 +875,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-[#1C1917] mb-1 block">Fund Allocation</label>
-                  <select aria-label="Fund Allocation"
+                  <label htmlFor="home-tithe-fund" className="font-bold text-[#1C1917] mb-1 block">Fund Allocation</label>
+                  <select id="home-tithe-fund" aria-label="Fund Allocation"
                     value={titheFund}
                     onChange={(e) => setTitheFund(e.target.value)}
                     className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] cursor-pointer transition-all"
@@ -888,9 +890,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               </div>
 
               <div>
-                <label className="font-bold text-[#1C1917] mb-1 block">Tender Method</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {['ACH / Online', 'Sunday Plate', 'Personal Check', 'Card Terminal'].map((m) => (
+                <label id="home-tithe-method-label" className="font-bold text-[#1C1917] mb-1 block">Tender Method</label>
+                <div role="group" aria-labelledby="home-tithe-method-label" className="grid grid-cols-4 gap-2">
+                  {['M-PESA / Online', 'Sunday Offering', 'Cheque', 'Card Terminal'].map((m) => (
                     <button
                       key={m}
                       type="button"
@@ -931,7 +933,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       {/* MODAL 3: QUICK SCHEDULE MEETING */}
       {/* ========================================================================= */}
       {isScheduleMeetingOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...dialogProps(() => setIsScheduleMeetingOpen(false), "Schedule Council / Committee Meeting")}>
           <div className="w-full max-w-lg bg-[#FFFFFF] rounded-[14px] p-6 shadow-2xl border border-[#E7E5E4] animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-[#E7E5E4] mb-4">
               <div className="flex items-center gap-2.5">
@@ -947,42 +949,42 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 type="button"
                 onClick={() => setIsScheduleMeetingOpen(false)}
                 className="p-1 rounded-[9px] text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917] cursor-pointer transition-colors"
-              >
+             aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined">close</span>
               </button>
             </div>
 
             <form onSubmit={handleSaveQuickMeeting} className="flex flex-col gap-3.5 text-xs">
               <div>
-                <label className="font-bold text-[#1C1917] mb-1 block">Meeting Docket Title *</label>
-                <input aria-label="Meeting Docket Title"
+                <label htmlFor="home-meeting-title" className="font-bold text-[#1C1917] mb-1 block">Meeting Docket Title *</label>
+                <input id="home-meeting-title" aria-label="Meeting Docket Title"
                   type="text"
                   required
                   value={meetingTitle}
                   onChange={(e) => setMeetingTitle(e.target.value)}
-                  placeholder="e.g. Q4 Stated Council Meeting & Budget Hearing"
+                  placeholder="e.g. Q1 Stated Council Meeting & Budget Hearing"
                   className="w-full h-9 px-3 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/20 transition-all"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-[#1C1917] mb-1 block">Governing Body / Committee</label>
-                  <select aria-label="Governing Body / Committee"
+                  <label htmlFor="home-meeting-committee" className="font-bold text-[#1C1917] mb-1 block">Governing Body / Committee</label>
+                  <select id="home-meeting-committee" aria-label="Governing Body / Committee"
                     value={meetingCommittee}
                     onChange={(e) => setMeetingCommittee(e.target.value)}
                     className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] cursor-pointer transition-all"
                   >
                     <option value="Church Council">Church Council</option>
-                    <option value="Board of Deacons">Board of Deacons</option>
+                    <option value="Missions, Mercy & Church Planting">Missions, Mercy & Church Planting</option>
                     <option value="Pastoral Care Team">Pastoral Care Team</option>
                     <option value="Trustees & Finance">Trustees & Finance</option>
-                    <option value="Youth & Family Ministry">Youth & Family Ministry</option>
+                    <option value="Destiny Youth">Destiny Youth</option>
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-[#1C1917] mb-1 block">Date & Time</label>
-                  <input aria-label="Date &amp; Time"
+                  <label htmlFor="home-meeting-datetime" className="font-bold text-[#1C1917] mb-1 block">Date & Time</label>
+                  <input id="home-meeting-datetime" aria-label="Date &amp; Time"
                     type="datetime-local"
                     value={meetingDate}
                     onChange={(e) => setMeetingDate(e.target.value)}
@@ -992,8 +994,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               </div>
 
               <div>
-                <label className="font-bold text-[#1C1917] mb-1 block">Church Location / Chamber</label>
-                <input aria-label="Church Location / Chamber"
+                <label htmlFor="home-meeting-location" className="font-bold text-[#1C1917] mb-1 block">Church Location / Chamber</label>
+                <input id="home-meeting-location" aria-label="Church Location / Chamber"
                   type="text"
                   value={meetingLocation}
                   onChange={(e) => setMeetingLocation(e.target.value)}
@@ -1026,7 +1028,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       {/* ACTIVITY DETAIL MODAL */}
       {/* ========================================================================= */}
       {selectedActivity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...dialogProps(() => setSelectedActivity(null), "Activity Detail")}>
           <div className="w-full max-w-md bg-[#FFFFFF] rounded-[14px] p-6 shadow-2xl border border-[#E7E5E4] animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4] mb-3">
               <div className="flex items-center gap-2">
@@ -1039,7 +1041,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 type="button"
                 onClick={() => setSelectedActivity(null)}
                 className="p-1 rounded-[9px] text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917] cursor-pointer transition-colors"
-              >
+             aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined">close</span>
               </button>
             </div>

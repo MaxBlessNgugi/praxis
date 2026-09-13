@@ -41,7 +41,7 @@ export const ChurchHeader: React.FC<ChurchHeaderProps> = ({
       <div className="flex items-center gap-3">
         <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] bg-[#F8F1E9] text-[#57534E] font-headline text-xs border border-[#E7E5E4] font-medium">
           <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#C2410C]">calendar_today</span>
-          <span>Sunday, Oct 20, 2024</span>
+          <span>Sunday, Feb 09, 2025</span>
         </div>
 
         <button

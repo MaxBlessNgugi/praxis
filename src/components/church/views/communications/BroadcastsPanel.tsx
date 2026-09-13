@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { BroadcastItem, BroadcastTemplate } from '../../../../types';
-import { INITIAL_BROADCAST_HISTORY, INITIAL_BROADCAST_TEMPLATES } from '../../../../data/churchMockData';
+import { dialogProps } from '../../dialog';
+import { INITIAL_BROADCAST_HISTORY, INITIAL_BROADCAST_TEMPLATES } from '../../../../data/churchMockData'
+;
 
 export const BroadcastsPanel: React.FC = () => {
   const [broadcasts, setBroadcasts] = useState<BroadcastItem[]>(INITIAL_BROADCAST_HISTORY);
@@ -13,7 +15,7 @@ export const BroadcastsPanel: React.FC = () => {
   const [subject, setSubject] = useState<string>('');
   const [messageBody, setMessageBody] = useState<string>('');
   const [targetAudience, setTargetAudience] = useState<string>('All Members & Regular Attenders (342 recipients)');
-  const [senderName, setSenderName] = useState<string>('Church Office (Carolyn Wright)');
+  const [senderName, setSenderName] = useState<string>('Church Office (Carolyn Njoki)');
 
   const handleApplyTemplate = (tmpl: BroadcastTemplate) => {
     if (tmpl.channel === 'both') {
@@ -97,7 +99,7 @@ export const BroadcastsPanel: React.FC = () => {
             <div className="text-2xl font-black text-[#2563EB] mt-0.5">78.4%</div>
             <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
               <span aria-hidden="true" className="material-symbols-outlined text-[14px]">visibility</span>
-              2.4x higher than nonprofit average
+              2.4x higher than the sector average
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#2563EB]">
@@ -280,7 +282,7 @@ export const BroadcastsPanel: React.FC = () => {
 
       {/* MODAL: Compose Broadcast */}
       {isComposing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsComposing(false), "Compose Church Broadcast")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-xl w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <div className="flex items-center gap-2">
@@ -293,7 +295,7 @@ export const BroadcastsPanel: React.FC = () => {
                 type="button"
                 onClick={() => setIsComposing(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
@@ -301,8 +303,8 @@ export const BroadcastsPanel: React.FC = () => {
             <form onSubmit={handleSendBroadcast} className="mt-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Transmission Channel</label>
-                  <select aria-label="Transmission Channel"
+                  <label htmlFor="broadcast-channel" className="block text-xs font-bold text-[#1C1917] mb-1">Transmission Channel</label>
+                  <select id="broadcast-channel" aria-label="Transmission Channel"
                     value={channel}
                     onChange={(e) => setChannel(e.target.value as any)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -312,8 +314,8 @@ export const BroadcastsPanel: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Target Recipient List</label>
-                  <select aria-label="Target Recipient List"
+                  <label htmlFor="broadcast-recipients" className="block text-xs font-bold text-[#1C1917] mb-1">Target Recipient List</label>
+                  <select id="broadcast-recipients" aria-label="Target Recipient List"
                     value={targetAudience}
                     onChange={(e) => setTargetAudience(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -336,8 +338,8 @@ export const BroadcastsPanel: React.FC = () => {
 
               {channel === 'email' && (
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Email Subject *</label>
-                  <input aria-label="Email Subject"
+                  <label htmlFor="broadcast-subject" className="block text-xs font-bold text-[#1C1917] mb-1">Email Subject *</label>
+                  <input id="broadcast-subject" aria-label="Email Subject"
                     type="text"
                     required
                     placeholder="e.g. Destiny Sanctuary Herald: Sunday Service & Fellowship"
@@ -350,12 +352,12 @@ export const BroadcastsPanel: React.FC = () => {
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-[#1C1917]">Message Body *</label>
+                  <label htmlFor="broadcast-body" className="block text-xs font-bold text-[#1C1917]">Message Body *</label>
                   <span className="text-[10px] text-[#A8A29E] font-mono">
                     {channel === 'sms' ? `${messageBody.length} / 160 chars (1 SMS segment)` : `${messageBody.length} chars`}
                   </span>
                 </div>
-                <textarea aria-label="Message Body"
+                <textarea id="broadcast-body" aria-label="Message Body"
                   rows={channel === 'sms' ? 3 : 6}
                   required
                   placeholder={channel === 'sms' ? 'Enter SMS text (use {{FirstName}} for personalization)...' : 'Write email content in Markdown or plaintext...'}
@@ -366,8 +368,8 @@ export const BroadcastsPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Sender Signature / Identity</label>
-                <input aria-label="Sender Signature / Identity"
+                <label htmlFor="broadcast-sender" className="block text-xs font-bold text-[#1C1917] mb-1">Sender Signature / Identity</label>
+                <input id="broadcast-sender" aria-label="Sender Signature / Identity"
                   type="text"
                   value={senderName}
                   onChange={(e) => setSenderName(e.target.value)}

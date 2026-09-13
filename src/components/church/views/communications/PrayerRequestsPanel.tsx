@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { PrayerRequestItem, PrayerPrivacyLevel } from '../../../../types';
-import { INITIAL_PRAYER_REQUESTS } from '../../../../data/churchMockData';
+import { dialogProps } from '../../dialog';
+import { INITIAL_PRAYER_REQUESTS } from '../../../../data/churchMockData'
+;
 
 export const PrayerRequestsPanel: React.FC = () => {
   const [prayers, setPrayers] = useState<PrayerRequestItem[]>(INITIAL_PRAYER_REQUESTS);
@@ -278,7 +280,7 @@ export const PrayerRequestsPanel: React.FC = () => {
 
       {/* MODAL: Submit Prayer Petition */}
       {isSubmittingPrayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsSubmittingPrayer(false), "Submit Prayer Petition")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Submit Prayer Petition</h3>
@@ -286,15 +288,15 @@ export const PrayerRequestsPanel: React.FC = () => {
                 type="button"
                 onClick={() => setIsSubmittingPrayer(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreatePrayer} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Petition Title / Focus *</label>
-                <input aria-label="Petition Title / Focus"
+                <label htmlFor="prayer-title" className="block text-xs font-bold text-[#1C1917] mb-1">Petition Title / Focus *</label>
+                <input id="prayer-title" aria-label="Petition Title / Focus"
                   type="text"
                   required
                   placeholder="e.g. Healing & Comfort for Brother Thomas"
@@ -306,8 +308,8 @@ export const PrayerRequestsPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Requested By</label>
-                  <input aria-label="Requested By"
+                  <label htmlFor="prayer-requested-by" className="block text-xs font-bold text-[#1C1917] mb-1">Requested By</label>
+                  <input id="prayer-requested-by" aria-label="Requested By"
                     type="text"
                     disabled={isAnonymous}
                     placeholder="Your name"
@@ -317,8 +319,8 @@ export const PrayerRequestsPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Privacy Level</label>
-                  <select aria-label="Privacy Level"
+                  <label htmlFor="prayer-privacy" className="block text-xs font-bold text-[#1C1917] mb-1">Privacy Level</label>
+                  <select id="prayer-privacy" aria-label="Privacy Level"
                     value={privacyLevel}
                     onChange={(e) => setPrivacyLevel(e.target.value as any)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -344,8 +346,8 @@ export const PrayerRequestsPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
-                <select aria-label="Category"
+                <label htmlFor="prayer-category" className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
+                <select id="prayer-category" aria-label="Category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value as any)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -360,8 +362,8 @@ export const PrayerRequestsPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Prayer Details *</label>
-                <textarea aria-label="Prayer Details"
+                <label htmlFor="prayer-details" className="block text-xs font-bold text-[#1C1917] mb-1">Prayer Details *</label>
+                <textarea id="prayer-details" aria-label="Prayer Details"
                   rows={3}
                   required
                   placeholder="Share details so intercessors can pray specifically..."
@@ -393,7 +395,7 @@ export const PrayerRequestsPanel: React.FC = () => {
 
       {/* MODAL: Record Praise / Answered Prayer */}
       {answeringPrayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setAnsweringPrayer(null), "Record Answered Prayer")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Record Answered Prayer</h3>
@@ -401,7 +403,7 @@ export const PrayerRequestsPanel: React.FC = () => {
                 type="button"
                 onClick={() => setAnsweringPrayer(null)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
@@ -413,10 +415,10 @@ export const PrayerRequestsPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">
+                <label htmlFor="praise-testimony" className="block text-xs font-bold text-[#1C1917] mb-1">
                   Praise Testimony / Answer Description
                 </label>
-                <textarea aria-label="Praise Testimony / Answer Description"
+                <textarea id="praise-testimony" aria-label="Praise Testimony / Answer Description"
                   rows={3}
                   required
                   placeholder="Share how God answered this prayer..."

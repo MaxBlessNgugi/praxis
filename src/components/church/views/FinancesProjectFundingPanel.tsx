@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { dialogProps } from '../dialog';
+import React, { useState } from 'react'
+;
 
 export const FinancesProjectFundingPanel: React.FC = () => {
   const [isPledgeModalOpen, setIsPledgeModalOpen] = useState(false);
@@ -13,7 +15,7 @@ export const FinancesProjectFundingPanel: React.FC = () => {
               <span className="px-2.5 py-0.5 rounded-full bg-[#ffdcc3] text-[#2f1500] text-xs font-bold">
                 Active Capital Project
               </span>
-              <span className="text-xs font-mono text-[#59413a]">Campaign Code: #CAP-2024-SN</span>
+              <span className="text-xs font-mono text-[#59413a]">Campaign Code: #CAP-2025-SN</span>
             </div>
             <h2 className="font-headline text-2xl font-bold text-[#1e1b19]">
               Destiny Sanctuary Renovation & Youth Annex Expansion
@@ -202,10 +204,10 @@ export const FinancesProjectFundingPanel: React.FC = () => {
             </div>
             <div className="space-y-2 text-xs">
               {[
-                { name: 'Elder Marcus Jenkins Family', pledged: 25000, fulfilled: 20000, pct: 80 },
-                { name: 'Vance Heritage Trust', pledged: 50000, fulfilled: 50000, pct: 100 },
-                { name: 'Dr. Jonathan & Martha Edwards', pledged: 12000, fulfilled: 9000, pct: 75 },
-                { name: 'Apex Youth Car Wash & Bake Drive', pledged: 6500, fulfilled: 6500, pct: 100 },
+                { name: 'Elder Marcus Kamau Family', pledged: 25000, fulfilled: 20000, pct: 80 },
+                { name: 'Mwangi Heritage Trust', pledged: 50000, fulfilled: 50000, pct: 100 },
+                { name: 'Dr. Jonathan & Martha Mwaura', pledged: 12000, fulfilled: 9000, pct: 75 },
+                { name: 'Destiny Youth Car Wash & Bake Drive', pledged: 6500, fulfilled: 6500, pct: 100 },
               ].map((p, idx) => (
                 <div key={idx} className="p-2.5 rounded-xl bg-[#faf2ee] border border-[#EAE1D7] flex items-center justify-between">
                   <div>
@@ -232,27 +234,27 @@ export const FinancesProjectFundingPanel: React.FC = () => {
 
       {/* Pledge Modal */}
       {isPledgeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...dialogProps(() => setIsPledgeModalOpen(false), "New Capital Campaign Pledge")}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[#EAE1D7] pb-3">
               <h3 className="font-headline text-base font-bold text-[#1e1b19]">New Capital Campaign Pledge</h3>
-              <button onClick={() => setIsPledgeModalOpen(false)} className="text-[#59413a] hover:text-[#1e1b19]">
+              <button onClick={() => setIsPledgeModalOpen(false)} className="text-[#59413a] hover:text-[#1e1b19]" aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold mb-1">Donor Name / Family Trust</label>
-                <input aria-label="Donor Name / Family Trust" type="text" placeholder="e.g. Deaconess Clara Oswald" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <label htmlFor="pledge-donor" className="block font-semibold mb-1">Donor Name / Family Trust</label>
+                <input id="pledge-donor" aria-label="Donor Name / Family Trust" type="text" placeholder="e.g. Clara Wambui" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold mb-1">Pledge Amount (KSh)</label>
-                  <input aria-label="Pledge Amount (KSh)" type="number" placeholder="10,000" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                  <label htmlFor="pledge-amount" className="block font-semibold mb-1">Pledge Amount (KSh)</label>
+                  <input id="pledge-amount" aria-label="Pledge Amount (KSh)" type="number" placeholder="10,000" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Pledge Term</label>
-                  <select aria-label="Pledge Term" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
+                  <label htmlFor="pledge-term" className="block font-semibold mb-1">Pledge Term</label>
+                  <select id="pledge-term" aria-label="Pledge Term" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
                     <option>12 Months</option>
                     <option>24 Months</option>
                     <option>Immediate Gift</option>

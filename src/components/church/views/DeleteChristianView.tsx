@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { SoftDeleteRecord } from '../../../types';
-import { INITIAL_SOFT_DELETE_RECORDS } from '../../../data/churchMockData';
+import { dialogProps } from '../dialog';
+import { INITIAL_SOFT_DELETE_RECORDS } from '../../../data/churchMockData'
+;
 
 interface DeleteChristianViewProps {
   onRestoreMember?: (record: SoftDeleteRecord) => void;
@@ -11,9 +13,9 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
 }) => {
   const [selectedReason, setSelectedReason] = useState<'transfer' | 'memorial' | 'inactive' | 'admin'>('transfer');
   const [destParish, setDestParish] = useState('Deliverance Church Nyahururu');
-  const [destPastor, setDestPastor] = useState('Rev. Thomas Sterling');
+  const [destPastor, setDestPastor] = useState('Rev. Peter Kariuki');
   const [rationale, setRationale] = useState(
-    'Approved via Church Council Meeting Minute #2025-10-B. Official dismissal certificate issued upon written request of member relocating to a Nyahururu church fellowship.'
+    'Approved via Church Council Meeting Minute #2025-01-B. Official dismissal certificate issued upon written request of member relocating to a Nyahururu church fellowship.'
   );
   const [filterDisposition, setFilterDisposition] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,9 +30,9 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
     setIsModalOpen(false);
     const newArchived: SoftDeleteRecord = {
       id: `sd-${Date.now()}`,
-      name: 'Elena Vance',
+      name: 'Elena Mwangi',
       memberId: '#MBR-1082',
-      initials: 'EV',
+      initials: 'EM',
       dismissalDate: 'Today',
       daysLeft: 30,
       reason: selectedReason,
@@ -40,7 +42,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
       rationale,
     };
     setRecords([newArchived, ...records]);
-    setToastMessage('Elena Vance moved to Trash. Record retained in 30-day grace vault.');
+    setToastMessage('Elena Mwangi moved to Trash. Record retained in 30-day grace vault.');
     setTimeout(() => {
       setToastMessage(null);
     }, 5000);
@@ -82,7 +84,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
                   Canon 4.12 Strict Guard
                 </span>
                 <span className="font-headline text-xs text-[#59413a] font-medium">
-                  Council Resolution #SR-2024-88
+                  Council Resolution #SR-2025-88
                 </span>
               </div>
               <h2 className="font-headline text-xl font-bold text-[#1e1b19] tracking-tight">
@@ -124,7 +126,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
             <input aria-label="Member on file"
               type="text"
               readOnly
-              value="Elena Vance (#MBR-1082)"
+              value="Elena Mwangi (#MBR-1082)"
               className="w-full h-11 pl-11 pr-16 rounded-lg bg-[#faf2ee] text-[#1e1b19] font-body text-sm placeholder:text-[#59413a]/60 focus:outline-none shadow-inner"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded bg-[#eee7e3] text-[#59413a] text-xs font-headline font-bold">
@@ -179,13 +181,13 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
                 </div>
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-headline text-xl font-bold text-[#1e1b19]">Elena Vance</h3>
+                    <h3 className="font-headline text-xl font-bold text-[#1e1b19]">Elena Mwangi</h3>
                     <span className="px-2 py-0.5 rounded bg-[#eee7e3] text-[#1e1b19] font-mono text-xs font-bold">
                       #MBR-1082
                     </span>
                   </div>
                   <span className="font-body text-xs text-[#59413a]">
-                    Member • Vance Household • Enrolled Aug 14, 2018
+                    Member • Mwangi Household • Enrolled Aug 14, 2018
                   </span>
                   <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs font-headline font-semibold">
                     <span className="inline-flex items-center gap-1 text-[#006243]">
@@ -216,16 +218,16 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#fe932c]">family_restroom</span>
                 <div className="flex flex-col">
                   <span className="font-headline text-xs font-bold text-[#1e1b19]">
-                    Household Association: Vance Family Unit (3 Active)
+                    Household Association: Mwangi Family Unit (3 Active)
                   </span>
                   <span className="font-body text-xs text-[#59413a]">
-                    Michael Vance (Spouse/Head), David Vance (Son). Elena's removal will disassociate her giving records.
+                    Michael Mwangi (Spouse/Head), David Mwangi (Son). Elena's removal will disassociate her giving records.
                   </span>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => alert('Viewing Vance Family Unit in Family Unit registry')}
+                onClick={() => alert('Viewing Mwangi Family Unit in Family Unit registry')}
                 className="font-headline text-xs text-[#9b2f00] font-bold hover:underline shrink-0 cursor-pointer"
               >
                 View Unit
@@ -238,14 +240,14 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
             {/* Step 1: Archival Category Selector */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <label className="font-headline text-xs text-[#1e1b19] font-bold flex items-center gap-1">
+                <label id="disposition-reason-label" className="font-headline text-xs text-[#1e1b19] font-bold flex items-center gap-1">
                   <span>1. Official Disposition Reason</span>
                   <span className="text-[#ba1a1a] font-bold">*</span>
                 </label>
                 <span className="font-headline text-xs text-[#59413a]">Select session category</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div role="radiogroup" aria-labelledby="disposition-reason-label" className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Option 1: Transfer */}
                 <div
                   onClick={() => setSelectedReason('transfer')}
@@ -363,14 +365,14 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
             {/* Dynamic Destination Church Field (if transfer) */}
             {selectedReason === 'transfer' && (
               <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-[#faf2ee] border border-[#e1bfb5]/40">
-                <label className="font-headline text-xs text-[#1e1b19] font-bold flex items-center justify-between">
-                  <span>Destination Church / Receiving Congregation</span>
+                <label htmlFor="disposition-destination-church" className="font-headline text-xs text-[#1e1b19] font-bold flex items-center justify-between">
+                  <span>Destination Church / Receiving Congregation</span>{' '}
                   <span className="font-headline text-[11px] text-[#006243] font-semibold">
                     Ecumenical Clearance verified
                   </span>
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-                  <input aria-label="Destination Church / Receiving Congregation Ecumenical Clearance verified"
+                  <input id="disposition-destination-church" aria-label="Destination Church / Receiving Congregation Ecumenical Clearance verified"
                     type="text"
                     value={destParish}
                     onChange={(e) => setDestParish(e.target.value)}
@@ -391,7 +393,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
             {/* Step 2: Mandatory Council Rationale Field */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="font-headline text-xs text-[#1e1b19] font-bold flex items-center gap-1">
+                <label htmlFor="disposition-rationale" className="font-headline text-xs text-[#1e1b19] font-bold flex items-center gap-1">
                   <span>2. Mandatory Removal Rationale & Council Minute #</span>
                   <span className="text-[#ba1a1a] font-bold">*</span>
                 </label>
@@ -402,7 +404,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
               <p className="font-body text-xs text-[#59413a]">
                 Document the verified official grounds, Council meeting minute designation, and official postal dispatch date for pastoral archive audit trails.
               </p>
-              <textarea aria-label="2. Mandatory Removal Rationale &amp; Council Minute #"
+              <textarea id="disposition-rationale" aria-label="2. Mandatory Removal Rationale &amp; Council Minute #"
                 rows={3}
                 value={rationale}
                 onChange={(e) => setRationale(e.target.value)}
@@ -414,30 +416,30 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
             {/* Step 3: Sign-Off Officer Authorization */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
               <div className="flex flex-col gap-1">
-                <label className="font-headline text-[11px] text-[#59413a] uppercase tracking-wider font-semibold">
+                <span className="font-headline text-[11px] text-[#59413a] uppercase tracking-wider font-semibold">
                   Authorized Sign-off Officer
-                </label>
+                </span>
                 <div className="flex items-center gap-3 p-2.5 rounded-lg bg-[#faf2ee] border border-[#e1bfb5]/40">
                   <div className="w-8 h-8 rounded-full bg-[#9b2f00] text-white flex items-center justify-center font-bold text-xs">
                     MV
                   </div>
                   <div className="flex flex-col">
                     <span className="font-headline text-xs text-[#1e1b19] font-bold">Bishop Sammy</span>
-                    <span className="font-body text-[11px] text-[#59413a]">Lead Pastor & Visionary Leader</span>
+                    <span className="font-body text-[11px] text-[#59413a]">Bishop & Visionary Leader</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="font-headline text-[11px] text-[#59413a] uppercase tracking-wider font-semibold">
+                <span className="font-headline text-[11px] text-[#59413a] uppercase tracking-wider font-semibold">
                   Church Secretary Confirmation
-                </label>
+                </span>
                 <div className="flex items-center gap-3 p-2.5 rounded-lg bg-[#faf2ee] border border-[#e1bfb5]/40">
                   <div className="w-8 h-8 rounded-full bg-[#006243] text-white flex items-center justify-center font-bold text-xs">
                     EC
                   </div>
                   <div className="flex flex-col">
-                    <span className="font-headline text-xs text-[#1e1b19] font-bold">Elder Carolyn Wright</span>
+                    <span className="font-headline text-xs text-[#1e1b19] font-bold">Elder Carolyn Njoki</span>
                     <span className="font-body text-[11px] text-[#59413a]">Church Secretary (Attested)</span>
                   </div>
                 </div>
@@ -506,7 +508,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
                 <div className="bg-[#9b2f00] h-full rounded-full" style={{ width: `${Math.min(100, (records.length / 50) * 100)}%` }}></div>
               </div>
               <div className="flex items-center justify-between text-[#59413a] font-mono text-[11px] pt-1">
-                <span>Next Automated Purge: Sunday, 23:59 CST</span>
+                <span>Next Automated Purge: Sunday, 23:59 EAT</span>
                 <span className="text-[#ba1a1a] font-bold">1 record retiring in 48h</span>
               </div>
             </div>
@@ -621,13 +623,13 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
 
       {/* Confirmation Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs" {...dialogProps(() => setIsModalOpen(false), "Confirm Soft-Delete to Trash: Elena Mwangi (#MBR-1082)")}>
           <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-200">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 p-1 rounded-lg text-[#59413a] hover:bg-[#f4ece8] cursor-pointer"
-            >
+            aria-label="Close">
               <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
             </button>
 
@@ -637,7 +639,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
               </div>
               <div className="flex flex-col">
                 <h3 className="font-headline text-base font-bold text-[#1e1b19] leading-snug">
-                  Confirm Soft-Delete to Trash: Elena Vance (#MBR-1082)
+                  Confirm Soft-Delete to Trash: Elena Mwangi (#MBR-1082)
                 </h3>
                 <span className="font-headline text-xs text-[#ba1a1a] font-bold mt-1">
                   Council Action Required • 30-Day Safe Grace Active
@@ -647,7 +649,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
 
             <div className="p-4 rounded-xl bg-[#faf2ee] mb-4 flex flex-col gap-1.5 border border-[#e1bfb5]/40 text-xs">
               <p className="font-body text-[#1e1b19] leading-relaxed">
-                Executing this action will immediately remove <strong>Elena Vance</strong> from active ministry volunteer rosters, pastoral prayer cohorts, small group directories, and automatic envelope batch numbering.
+                Executing this action will immediately remove <strong>Elena Mwangi</strong> from active ministry volunteer rosters, pastoral prayer cohorts, small group directories, and automatic envelope batch numbering.
               </p>
               <div className="flex items-center gap-2 text-[#59413a] pt-1">
                 <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#006243]">check_circle</span>

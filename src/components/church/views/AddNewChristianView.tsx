@@ -120,7 +120,7 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
               18
             </span>
-            <span className="font-headline text-xs text-[#904d00] font-medium">Q4 Oct-Dec</span>
+            <span className="font-headline text-xs text-[#904d00] font-medium">Q1 Jan-Mar</span>
           </div>
           <p className="mt-1 font-body text-xs text-[#59413a]/80">Recorded baptism & communion records</p>
         </div>
@@ -213,15 +213,15 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
                 <span className="font-headline text-xs text-[#9b2f00] uppercase tracking-wider font-bold">
                   1. Personal & Contact Details
                 </span>
-                <span className="font-mono text-xs text-[#59413a]/70">REF #GVF-2024-AUTO</span>
+                <span className="font-mono text-xs text-[#59413a]/70">REF #GVF-2025-AUTO</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
+                  <label htmlFor="member-first-name" className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
                     First Name <span className="text-[#ba1a1a]">*</span>
                   </label>
-                  <input aria-label="First Name"
+                  <input id="member-first-name" aria-label="First Name"
                     type="text"
                     required
                     value={firstName}
@@ -231,29 +231,29 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
+                  <label htmlFor="member-last-name" className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
                     Last Name <span className="text-[#ba1a1a]">*</span>
                   </label>
-                  <input aria-label="Last Name"
+                  <input id="member-last-name" aria-label="Last Name"
                     type="text"
                     required
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    placeholder="e.g. Vance"
+                    placeholder="e.g. Mwangi"
                     className="w-full h-10 px-3.5 rounded-lg bg-white border border-[#e1bfb5]/70 text-[#1e1b19] font-body text-sm placeholder:text-[#59413a]/40 focus:outline-none focus:border-[#9b2f00] focus:ring-1 focus:ring-[#9b2f00] transition-colors shadow-inner"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
+                <label htmlFor="member-phone" className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
                   Phone Number <span className="text-[#ba1a1a]">*</span>
                 </label>
                 <div className="flex rounded-lg overflow-hidden border border-[#e1bfb5]/70 bg-white">
                   <span className="inline-flex items-center px-3.5 bg-[#f4ece8] font-headline text-xs text-[#59413a] font-medium select-none border-r border-[#e1bfb5]/50">
                     🇰🇪 +254
                   </span>
-                  <input aria-label="Phone Number"
+                  <input id="member-phone" aria-label="Phone Number"
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
@@ -264,14 +264,14 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
+                <label htmlFor="member-email" className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
                   Email Address
                 </label>
                 <div className="relative">
                   <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#59413a]/60 text-[18px]">
                     alternate_email
                   </span>
-                  <input aria-label="Email Address"
+                  <input id="member-email" aria-label="Email Address"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -285,18 +285,18 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
+                <label htmlFor="member-address" className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
                   Residential Address
                 </label>
                 <div className="relative">
                   <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2.5 text-[#59413a]/60 text-[18px]">
                     home_pin
                   </span>
-                  <textarea aria-label="Residential Address"
+                  <textarea id="member-address" aria-label="Residential Address"
                     rows={3}
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Street Address, City, State, ZIP Code"
+                    placeholder="Street Address, Estate, Town"
                     className="w-full pl-10 pr-3.5 py-2 rounded-lg bg-white border border-[#e1bfb5]/70 text-[#1e1b19] font-body text-sm placeholder:text-[#59413a]/40 focus:outline-none focus:border-[#9b2f00] focus:ring-1 focus:ring-[#9b2f00] resize-none"
                   />
                 </div>
@@ -316,10 +316,10 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
+                  <label htmlFor="member-dob" className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
                     Date of Birth
                   </label>
-                  <input aria-label="Date of Birth"
+                  <input id="member-dob" aria-label="Date of Birth"
                     type="date"
                     value={dob}
                     onChange={(e) => setDob(e.target.value)}
@@ -327,10 +327,10 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
+                  <label htmlFor="member-tier" className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
                     Membership Tier <span className="text-[#ba1a1a]">*</span>
                   </label>
-                  <select aria-label="Membership Tier"
+                  <select id="member-tier" aria-label="Membership Tier"
                     value={membershipTier}
                     onChange={(e) => setMembershipTier(e.target.value as any)}
                     className="w-full h-10 px-3 rounded-lg bg-white border border-[#e1bfb5]/70 text-[#1e1b19] font-body text-sm focus:outline-none focus:border-[#9b2f00] cursor-pointer"
@@ -345,10 +345,10 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-headline text-xs text-[#1e1b19] font-bold mb-2">
+                <label id="member-baptism-status-label" className="block font-headline text-xs text-[#1e1b19] font-bold mb-2">
                   Baptism Status <span className="text-[#ba1a1a]">*</span>
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-[#f4ece8] p-1.5 rounded-xl border border-[#e1bfb5]/40">
+                <div role="group" aria-labelledby="member-baptism-status-label" className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-[#f4ece8] p-1.5 rounded-xl border border-[#e1bfb5]/40">
                   {[
                     { id: 'baptized', label: 'Baptized (Affirmed)' },
                     { id: 'dedicated', label: 'Child Dedication' },
@@ -373,12 +373,12 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block font-headline text-xs text-[#1e1b19] font-bold">
+                  <label htmlFor="member-notes" className="block font-headline text-xs text-[#1e1b19] font-bold">
                     Baptism & Membership Notes
                   </label>
                   <span className="font-headline text-xs text-[#59413a]/70">Confidential / Clergy Only</span>
                 </div>
-                <textarea aria-label="Baptism &amp; Membership Notes"
+                <textarea id="member-notes" aria-label="Baptism &amp; Membership Notes"
                   rows={4}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}

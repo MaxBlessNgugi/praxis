@@ -7,21 +7,21 @@ export const ReportsCertsView: React.FC = () => {
   const [activeCertTab, setActiveCertTab] = useState<CertificateType>('baptism');
 
   // Certificate form states
-  const [candidateName, setCandidateName] = useState('Caleb Timothy Vance (#091 • Member Youth)');
-  const [candidateDisplayName, setCandidateDisplayName] = useState('Caleb Timothy Vance');
+  const [candidateName, setCandidateName] = useState('Caleb Timothy Mwangi (#091 • Member Youth)');
+  const [candidateDisplayName, setCandidateDisplayName] = useState('Caleb Timothy Mwangi');
   const [officiatingMinister, setOfficiatingMinister] = useState('Bishop Sammy');
-  const [ceremonyDate, setCeremonyDate] = useState('November 24, 2024 (Christ the King Sunday)');
-  const [displayDate, setDisplayDate] = useState('Nov 24, 2024');
+  const [ceremonyDate, setCeremonyDate] = useState('November 23, 2025 (Christ the King Sunday)');
+  const [displayDate, setDisplayDate] = useState('Nov 23, 2025');
   const [scriptureVerse, setScriptureVerse] = useState(
     'Romans 6:4 — "We were buried therefore with him by baptism into death, in order that, just as Christ was raised..."'
   );
   const [pastoralSeal, setPastoralSeal] = useState('Embossed Gold Seal');
-  const [parishRollNo] = useState('GVF-BAP-2024-042');
-  const [witnesses, setWitnesses] = useState('Elder Marcus Jenkins & Deaconess Clara Oswald');
+  const [parishRollNo] = useState('GVF-BAP-2025-042');
+  const [witnesses, setWitnesses] = useState('Elder Marcus Kamau & Clara Wambui');
 
   // Financial report states
   const [departmentScope, setDepartmentScope] = useState('All Departments (7)');
-  const [fiscalPeriod, setFiscalPeriod] = useState('Q4 2024 (Oct – Dec)');
+  const [fiscalPeriod, setFiscalPeriod] = useState('Q1 2025 (Jan – Mar)');
   const [accountingBasis, setAccountingBasis] = useState('Cash vs Accrual (Dual Audit)');
   const [dossierOutput, setDossierOutput] = useState('PDF Audit Dossier (Sign-off Sheet)');
   const [lineItemReceipts, setLineItemReceipts] = useState(true);
@@ -44,16 +44,16 @@ export const ReportsCertsView: React.FC = () => {
   const handleCertTabChange = (type: CertificateType) => {
     setActiveCertTab(type);
     if (type === 'baptism') {
-      setCandidateName('Caleb Timothy Vance (#091 • Member Youth)');
-      setCandidateDisplayName('Caleb Timothy Vance');
+      setCandidateName('Caleb Timothy Mwangi (#091 • Member Youth)');
+      setCandidateDisplayName('Caleb Timothy Mwangi');
       setScriptureVerse('Romans 6:4 — "We were buried therefore with him by baptism into death, in order that, just as Christ was raised..."');
     } else if (type === 'dedication') {
-      setCandidateName('Hannah Joy Miller (Infant • Child Presentation)');
-      setCandidateDisplayName('Hannah Joy Miller');
+      setCandidateName('Hannah Joy Wanjala (Infant • Child Presentation)');
+      setCandidateDisplayName('Hannah Joy Wanjala');
       setScriptureVerse('1 Samuel 1:28 — "For this child I prayed, and the Lord has granted me my petition which I asked of Him."');
     } else if (type === 'matrimony') {
-      setCandidateName('Jonathan & Martha Sterling');
-      setCandidateDisplayName('Jonathan & Martha Sterling');
+      setCandidateName('Jonathan & Martha Otieno');
+      setCandidateDisplayName('Jonathan & Martha Otieno');
       setScriptureVerse('Colossians 3:14 — "And over all these virtues put on love, which binds them all together in perfect unity."');
     } else if (type === 'confirmation') {
       setCandidateName('Lucas Montgomery (#144 • New Believer)');
@@ -77,7 +77,7 @@ export const ReportsCertsView: React.FC = () => {
         <div className="space-y-1.5">
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-[#f4ece8] text-[#59413a] text-[11px] font-semibold tracking-wider uppercase">
             <span className="w-1.5 h-1.5 rounded-full bg-[#c2410c]"></span>
-            Church Documentation & Archives • Q4 Audit Compliant
+            Church Documentation & Archives • Q1 Audit Compliant
           </div>
           <h1 className="font-headline text-3xl sm:text-4xl text-[#1e1b19] font-bold tracking-tight">
             Reports & Certificates Hub
@@ -189,41 +189,41 @@ export const ReportsCertsView: React.FC = () => {
           {/* Filter Controls Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl bg-[#faf2ee] border border-[#e1bfb5]/30">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-headline text-[#59413a] font-bold uppercase tracking-wider block">
+              <label htmlFor="report-department-scope" className="text-[11px] font-headline text-[#59413a] font-bold uppercase tracking-wider block">
                 Department Scope
               </label>
               <div className="relative">
-                <select aria-label="Department Scope" 
+                <select id="report-department-scope" aria-label="Department Scope" 
                   value={departmentScope}
                   onChange={(e) => setDepartmentScope(e.target.value)}
                   className="w-full h-10 px-3 pr-8 rounded-lg bg-white text-xs font-medium text-[#1e1b19] appearance-none focus:outline-none shadow-sm cursor-pointer border border-[#e1bfb5]/50"
                 >
                   <option>All Departments (7)</option>
-                  <option>Men of Valor (Men's Fellowship)</option>
-                  <option>Daughters of Grace (Women's Circle)</option>
-                  <option>Apex Youth Ministry</option>
-                  <option>Kingdom Kids Children's Dept</option>
-                  <option>Mercy & Benevolence Fund</option>
-                  <option>Berean Bible Academy</option>
-                  <option>Church Council & Pastoral Secretariat</option>
+                  <option>Visionary Leadership & Church Council</option>
+                  <option>Worship & Word Ministry</option>
+                  <option>Women's Fellowship</option>
+                  <option>Destiny Youth</option>
+                  <option>Next Generation & Children</option>
+                  <option>Groups & Discipleship</option>
+                  <option>Missions, Mercy & Church Planting</option>
                 </select>
                 <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#59413a] text-[18px]">expand_more</span>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-headline text-[#59413a] font-bold uppercase tracking-wider block">
+              <label htmlFor="report-fiscal-period" className="text-[11px] font-headline text-[#59413a] font-bold uppercase tracking-wider block">
                 Fiscal Period
               </label>
               <div className="relative">
-                <select aria-label="Fiscal Period" 
+                <select id="report-fiscal-period" aria-label="Fiscal Period" 
                   value={fiscalPeriod}
                   onChange={(e) => setFiscalPeriod(e.target.value)}
                   className="w-full h-10 px-3 pr-8 rounded-lg bg-white text-xs font-medium text-[#1e1b19] appearance-none focus:outline-none shadow-sm cursor-pointer border border-[#e1bfb5]/50"
                 >
-                  <option>Q4 2024 (Oct – Dec)</option>
-                  <option>Q3 2024 (Jul – Sep)</option>
-                  <option>Fiscal Year 2024 YTD</option>
+                  <option>Q1 2025 (Jan – Mar)</option>
+                  <option>Q4 2025 (Oct – Dec)</option>
+                  <option>Fiscal Year 2025 YTD</option>
                   <option>Custom Date Range…</option>
                 </select>
                 <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#59413a] text-[18px]">calendar_month</span>
@@ -231,11 +231,11 @@ export const ReportsCertsView: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-headline text-[#59413a] font-bold uppercase tracking-wider block">
+              <label htmlFor="report-accounting-basis" className="text-[11px] font-headline text-[#59413a] font-bold uppercase tracking-wider block">
                 Accounting Basis
               </label>
               <div className="relative">
-                <select aria-label="Accounting Basis" 
+                <select id="report-accounting-basis" aria-label="Accounting Basis" 
                   value={accountingBasis}
                   onChange={(e) => setAccountingBasis(e.target.value)}
                   className="w-full h-10 px-3 pr-8 rounded-lg bg-white text-xs font-medium text-[#1e1b19] appearance-none focus:outline-none shadow-sm cursor-pointer border border-[#e1bfb5]/50"
@@ -249,11 +249,11 @@ export const ReportsCertsView: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-headline text-[#59413a] font-bold uppercase tracking-wider block">
+              <label htmlFor="report-dossier-output" className="text-[11px] font-headline text-[#59413a] font-bold uppercase tracking-wider block">
                 Dossier Output
               </label>
               <div className="relative">
-                <select aria-label="Dossier Output" 
+                <select id="report-dossier-output" aria-label="Dossier Output" 
                   value={dossierOutput}
                   onChange={(e) => setDossierOutput(e.target.value)}
                   className="w-full h-10 px-3 pr-8 rounded-lg bg-white text-xs font-medium text-[#1e1b19] appearance-none focus:outline-none shadow-sm cursor-pointer border border-[#e1bfb5]/50"
@@ -309,7 +309,7 @@ export const ReportsCertsView: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 text-xs text-[#59413a]">
               <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#006243]">check_circle</span>
-              <span>Last generated: Nov 14, 2024 by Pastor Michael • <strong>Sealed • 44 pages</strong></span>
+              <span>Last generated: Feb 06, 2025 by Rev. Alice • <strong>Sealed • 44 pages</strong></span>
             </div>
           </div>
 
@@ -335,11 +335,11 @@ export const ReportsCertsView: React.FC = () => {
             </div>
             <button 
               type="button"
-              onClick={() => showToast("Downloading Previous Q3 2024 Audit Report (PDF, 4.2 MB)...")}
+              onClick={() => showToast("Downloading Previous Annual Audit Report (PDF, 4.2 MB)...")}
               className="inline-flex items-center gap-1.5 text-[#c2410c] font-semibold text-xs hover:underline cursor-pointer"
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[18px]">download</span>
-              <span>Previous Q3 2024 Audit Report (PDF, 4.2 MB)</span>
+              <span>Previous Annual Audit Report (PDF, 4.2 MB)</span>
             </button>
           </div>
         </div>
@@ -431,9 +431,9 @@ export const ReportsCertsView: React.FC = () => {
 
                 {/* Candidate Lookup */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#59413a] font-headline">Candidate Lookup</label>
+                  <label htmlFor="certificate-candidate" className="text-xs font-bold text-[#59413a] font-headline">Candidate Lookup</label>
                   <div className="relative">
-                    <input aria-label="Candidate Lookup" 
+                    <input id="certificate-candidate" aria-label="Candidate Lookup" 
                       type="text" 
                       value={candidateName}
                       onChange={(e) => {
@@ -450,16 +450,16 @@ export const ReportsCertsView: React.FC = () => {
 
                 {/* Officiating Minister */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#59413a] font-headline">Officiating Minister</label>
+                  <label htmlFor="certificate-officiating-minister" className="text-xs font-bold text-[#59413a] font-headline">Officiating Minister</label>
                   <div className="relative">
-                    <select aria-label="Officiating Minister" 
+                    <select id="certificate-officiating-minister" aria-label="Officiating Minister" 
                       value={officiatingMinister}
                       onChange={(e) => setOfficiatingMinister(e.target.value)}
                       className="w-full h-10 px-3 pr-8 rounded-lg bg-white text-xs font-medium text-[#1e1b19] appearance-none shadow-sm border border-[#e1bfb5]/50 focus:outline-none cursor-pointer"
                     >
                       <option>Bishop Sammy</option>
-                      <option>Rev. Sharon Miller (Associate Pastor)</option>
-                      <option>Elder Marcus Jenkins (Church Secretary)</option>
+                      <option>Rev. Alice (Co-Visionary Leader)</option>
+                      <option>Elder Marcus Kamau (Church Secretary)</option>
                     </select>
                     <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#59413a] text-[18px]">expand_more</span>
                   </div>
@@ -467,9 +467,9 @@ export const ReportsCertsView: React.FC = () => {
 
                 {/* Date of Ceremony */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#59413a] font-headline">Date of Ordinance / Ceremony</label>
+                  <label htmlFor="certificate-ceremony-date" className="text-xs font-bold text-[#59413a] font-headline">Date of Ordinance / Ceremony</label>
                   <div className="relative">
-                    <input aria-label="Date of Ordinance / Ceremony" 
+                    <input id="certificate-ceremony-date" aria-label="Date of Ordinance / Ceremony" 
                       type="text" 
                       value={ceremonyDate}
                       onChange={(e) => {
@@ -484,8 +484,8 @@ export const ReportsCertsView: React.FC = () => {
 
                 {/* Scripture Dedication Verse */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#59413a] font-headline">Scripture Dedication Verse</label>
-                  <textarea aria-label="Scripture Dedication Verse" 
+                  <label htmlFor="certificate-scripture-verse" className="text-xs font-bold text-[#59413a] font-headline">Scripture Dedication Verse</label>
+                  <textarea id="certificate-scripture-verse" aria-label="Scripture Dedication Verse" 
                     rows={2}
                     value={scriptureVerse}
                     onChange={(e) => setScriptureVerse(e.target.value)}
@@ -496,9 +496,9 @@ export const ReportsCertsView: React.FC = () => {
                 {/* Watermark & Seal Style */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-[#59413a] font-headline">Pastoral Seal</label>
+                    <label htmlFor="certificate-pastoral-seal" className="text-xs font-bold text-[#59413a] font-headline">Pastoral Seal</label>
                     <div className="relative">
-                      <select aria-label="Pastoral Seal" 
+                      <select id="certificate-pastoral-seal" aria-label="Pastoral Seal" 
                         value={pastoralSeal}
                         onChange={(e) => setPastoralSeal(e.target.value)}
                         className="w-full h-10 px-3 pr-7 rounded-lg bg-white text-xs font-medium text-[#1e1b19] appearance-none shadow-sm border border-[#e1bfb5]/50 focus:outline-none cursor-pointer"
@@ -511,8 +511,8 @@ export const ReportsCertsView: React.FC = () => {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-[#59413a] font-headline">Members Register No.</label>
-                    <input aria-label="Members Register No." 
+                    <label htmlFor="certificate-roll-no" className="text-xs font-bold text-[#59413a] font-headline">Members Register No.</label>
+                    <input id="certificate-roll-no" aria-label="Members Register No." 
                       type="text" 
                       readOnly 
                       value={parishRollNo}
@@ -523,8 +523,8 @@ export const ReportsCertsView: React.FC = () => {
 
                 {/* Witnesses / Sponsors */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#59413a] font-headline">Witnesses & Sponsors</label>
-                  <input aria-label="Witnesses &amp; Sponsors" 
+                  <label htmlFor="certificate-witnesses" className="text-xs font-bold text-[#59413a] font-headline">Witnesses & Sponsors</label>
+                  <input id="certificate-witnesses" aria-label="Witnesses &amp; Sponsors" 
                     type="text" 
                     value={witnesses}
                     onChange={(e) => setWitnesses(e.target.value)}
@@ -592,7 +592,7 @@ export const ReportsCertsView: React.FC = () => {
                     {activeCertTab === 'baptism' && 'having publicly confessed faith in the Lord and Savior Jesus Christ, was baptized with water in the Name of the Father, and of the Son, and of the Holy Spirit.'}
                     {activeCertTab === 'dedication' && 'was solemnly dedicated unto the Lord with prayer and member vows by faithful parents and church sponsors.'}
                     {activeCertTab === 'matrimony' && 'were united in the holy member of Christian marriage according to the ordinance of God and the official Book of Order.'}
-                    {activeCertTab === 'confirmation' && 'having completed the Berean Discipleship Class and examined by the Council, is received as a full member.'}
+                    {activeCertTab === 'confirmation' && 'having completed the Church Discipleship Class and examined by the Council, is received as a full member.'}
                   </p>
 
                   {/* Scripture Dedication Quote Box */}
@@ -694,7 +694,7 @@ export const ReportsCertsView: React.FC = () => {
             </div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#007d57]/10 text-[#006243] text-xs font-bold font-headline border border-[#007d57]/20">
               <span className="w-2 h-2 rounded-full bg-[#006243]"></span>
-              <span>Target Assembly: Dec 15, 2024</span>
+              <span>Target Assembly: Apr 16, 2025</span>
             </div>
           </div>
 
@@ -706,7 +706,7 @@ export const ReportsCertsView: React.FC = () => {
               </div>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-base font-bold font-headline text-[#1e1b19]">2024 AGM Annual Report Book</span>
+                  <span className="text-base font-bold font-headline text-[#1e1b19]">2025 AGM Annual Report Book</span>
                   <span className="px-2 py-0.5 rounded-full bg-[#007d57]/20 text-[#006243] text-[11px] font-bold">
                     Ready to Compile
                   </span>
@@ -871,7 +871,7 @@ export const ReportsCertsView: React.FC = () => {
             <div className="flex flex-wrap items-center gap-3">
               <button 
                 type="button"
-                onClick={() => showToast("Compiling full 72-page 2024 AGM Annual Report Dossier (PDF)...")}
+                onClick={() => showToast("Compiling full 72-page 2025 AGM Annual Report Dossier (PDF)...")}
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#c2410c] text-white font-bold text-xs hover:bg-[#9b2f00] transition-all shadow-[0_4px_16px_rgba(194,65,12,0.3)] cursor-pointer"
               >
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px]">file_download</span>

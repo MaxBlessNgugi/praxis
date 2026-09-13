@@ -1,15 +1,129 @@
-import React, { useState } from 'react';
+import { dialogProps } from '../dialog';
+import React, { useState } from 'react'
+;
+
+type ResolutionStage = 'Proposed' | 'Voted & Approved' | 'Implementing' | 'Closed';
+
+interface Resolution {
+  id: string;
+  idClass: string;
+  title: string;
+  sponsor: string;
+  sponsorOfficer: string;
+  councilDate: string;
+  vote: { text: string; tone: 'credited' | 'muted' };
+  stage: ResolutionStage;
+  stageNote: string;
+  stageNoteClass?: string;
+  lead: string;
+  leadNote: string;
+  rowClass?: string;
+  action: { label: string; className: string; toast: string };
+  moreToast: string;
+}
+
+const STAGE_STYLES: Record<ResolutionStage, { chip: string; glyph?: string; ping?: boolean }> = {
+  Proposed: { chip: 'text-[#59413a] bg-[#eee7e3]', glyph: 'schedule' },
+  'Voted & Approved': { chip: 'text-[#006243] bg-[#85f8c4]/60', glyph: 'done_all' },
+  Implementing: { chip: 'text-[#9b2f00] bg-[#ffdbd0]/50', ping: true },
+  Closed: { chip: 'text-[#59413a] bg-[#eee7e3]', glyph: 'archive' },
+};
+
+const ALL_SPONSORS = 'All Sponsors & Boards';
+const ALL_STAGES = 'All Stages';
+
+const RESOLUTIONS: Resolution[] = [
+  {
+    id: 'RES-2025-042',
+    idClass: 'text-[#9b2f00]',
+    title: 'Sanctuary HVAC & Acoustic Tech Contract',
+    sponsor: 'Trustee Board',
+    sponsorOfficer: 'Arthur Wanjala',
+    councilDate: 'Feb 06, 2025',
+    vote: { text: '13 Yea • 0 Nay', tone: 'credited' },
+    stage: 'Implementing',
+    stageNote: '2 of 4 Milestones',
+    lead: 'Elder Marcus Kamau',
+    leadNote: 'Due Dec 31, 2025',
+    action: {
+      label: 'Track',
+      className: 'bg-[#ffdbd0]/40 text-[#9b2f00] hover:bg-[#ffdbd0] text-xs font-bold',
+      toast: 'Opening milestone tracker for HVAC Contract (Phase 2 underway)...',
+    },
+    moreToast: 'Options: Assign Trustee Deputy, Export Docket Extract.',
+  },
+  {
+    id: 'RES-2025-043',
+    idClass: 'text-[#9b2f00]',
+    title: '2025 General Church Operating Budget',
+    sponsor: 'Finance Committee',
+    sponsorOfficer: 'Clara Wambui',
+    councilDate: 'Feb 06, 2025',
+    vote: { text: '12 Yea • 1 Abstain', tone: 'credited' },
+    stage: 'Voted & Approved',
+    stageNote: 'Awaiting Council',
+    lead: 'Bishop Sammy',
+    leadNote: 'Enactment Jan 01, 2025',
+    rowClass: 'bg-[#faf2ee]/30',
+    action: {
+      label: 'Signatures',
+      className: 'bg-[#eee7e3] text-[#1e1b19] hover:bg-[#e9e1dd] text-xs font-semibold',
+      toast: 'Reviewing 12 Elder voting signatures and certification stamp.',
+    },
+    moreToast: 'Options: Forward to Church Council, Generate Ledger Projection.',
+  },
+  {
+    id: 'RES-2025-045',
+    idClass: 'text-[#904d00]',
+    title: 'Youth Ministry Bus Fleet Replacement Grant',
+    sponsor: 'Destiny Youth',
+    sponsorOfficer: 'Bishop Sammy',
+    councilDate: 'Feb 13, 2025',
+    vote: { text: 'Pending Feb 27', tone: 'muted' },
+    stage: 'Proposed',
+    stageNote: '14-Day Elder Review',
+    lead: 'Bishop Sammy',
+    leadNote: 'Conclave Target Feb 27',
+    action: {
+      label: 'Review Draft',
+      className: 'bg-[#ffdcc3]/50 text-[#904d00] hover:bg-[#ffdcc3] text-xs font-bold',
+      toast: 'Opening draft text for Bus Fleet Replacement Grant...',
+    },
+    moreToast: 'Options: Add Elder Sponsor, Attach Mechanic Estimate.',
+  },
+  {
+    id: 'RES-2025-039',
+    idClass: 'text-[#8d7168]',
+    title: 'Benevolence Fund Operating Cap to KSh 50,000',
+    sponsor: 'Missions, Mercy & Church Planting',
+    sponsorOfficer: 'Clara Wambui',
+    councilDate: 'Jan 15, 2025',
+    vote: { text: '14 Yea • 0 Nay', tone: 'credited' },
+    stage: 'Closed',
+    stageNote: 'Fully Audited',
+    stageNoteClass: 'text-[#006243] font-bold',
+    lead: 'Clara Wambui',
+    leadNote: 'Completed Jan 30, 2025',
+    rowClass: 'bg-[#faf2ee]/30',
+    action: {
+      label: 'Archive Dossier',
+      className: 'bg-[#eee7e3] text-[#1e1b19] hover:bg-[#e9e1dd] text-xs font-semibold',
+      toast: 'Opening Archived Dossier for Benevolence Fund cap adjustment...',
+    },
+    moreToast: 'Options: Print Official Excerpt, Verify Auditor Signature.',
+  },
+];
 
 export const GovernanceView: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [meetingFilter, setMeetingFilter] = useState<'all' | 'stated' | 'executive' | 'emergency'>('all');
   const [searchMeeting, setSearchMeeting] = useState('');
-  const [selectedDay, setSelectedDay] = useState<number>(28);
+  const [selectedDay, setSelectedDay] = useState<number>(27);
 
   // Legislative tracker filter
   const [searchResolution, setSearchResolution] = useState('');
-  const [selectedSponsor, setSelectedSponsor] = useState('All Sponsors & Boards');
-  const [selectedStage, setSelectedStage] = useState('All Stages');
+  const [selectedSponsor, setSelectedSponsor] = useState(ALL_SPONSORS);
+  const [selectedStage, setSelectedStage] = useState(ALL_STAGES);
 
   // Policy category filter
   const [policyCategory, setPolicyCategory] = useState<'all' | 'constitution' | 'hr' | 'cpp' | 'financial'>('all');
@@ -37,6 +151,18 @@ export const GovernanceView: React.FC = () => {
     setResolutionSummary('');
   };
 
+  const filteredResolutions = RESOLUTIONS.filter((resolution) => {
+    const needle = searchResolution.trim().toLowerCase();
+    const matchesSearch =
+      needle === '' ||
+      [resolution.id, resolution.title, resolution.sponsor, resolution.sponsorOfficer, resolution.lead].some(
+        (field) => field.toLowerCase().includes(needle),
+      );
+    const matchesSponsor = selectedSponsor === ALL_SPONSORS || resolution.sponsor === selectedSponsor;
+    const matchesStage = selectedStage === ALL_STAGES || resolution.stage === selectedStage;
+    return matchesSearch && matchesSponsor && matchesStage;
+  });
+
   return (
     <div className="flex flex-col w-full gap-8 pb-16">
       {/* Toast Notification */}
@@ -57,7 +183,7 @@ export const GovernanceView: React.FC = () => {
               <span>•</span>
               <span>Book of Order Compliance</span>
               <span>•</span>
-              <span className="text-[#9b2f00] font-bold">Service Year 2026</span>
+              <span className="text-[#9b2f00] font-bold">Service Year 2025</span>
             </div>
             <h1 className="font-headline text-3xl sm:text-4xl text-[#1e1b19] font-bold tracking-tight">
               Church Council & Council Records
@@ -125,7 +251,7 @@ export const GovernanceView: React.FC = () => {
             <div className="flex items-start justify-between">
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-headline uppercase tracking-wider text-[#59413a] font-bold">
-                  Passed Resolutions (2024)
+                  Passed Resolutions (2025)
                 </span>
                 <span className="text-xl font-headline text-[#1e1b19] font-bold">32 Enacted</span>
               </div>
@@ -148,7 +274,7 @@ export const GovernanceView: React.FC = () => {
                 <span className="text-[11px] font-headline uppercase tracking-wider text-[#59413a] font-bold">
                   Next Stated Meeting
                 </span>
-                <span className="text-xl font-headline text-[#9b2f00] font-bold">Nov 28, 2024</span>
+                <span className="text-xl font-headline text-[#9b2f00] font-bold">Feb 27, 2025</span>
               </div>
               <div className="w-10 h-10 rounded-lg bg-[#ffdbd0] flex items-center justify-center text-[#9b2f00] shrink-0">
                 <span aria-hidden="true" className="material-symbols-outlined text-[22px]">event_upcoming</span>
@@ -156,7 +282,7 @@ export const GovernanceView: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#9b2f00] font-bold bg-[#ffdbd0]/60 px-2 py-0.5 rounded-md">
-                In 11 Days
+                In 18 Days
               </span>
               <span className="text-xs text-[#59413a]">Ordinary Council Conclave</span>
             </div>
@@ -179,7 +305,7 @@ export const GovernanceView: React.FC = () => {
               <span className="text-xs text-[#006243] font-bold bg-[#007d57]/10 px-2 py-0.5 rounded-md">
                 Church Council Audit Ratified
               </span>
-              <span className="text-xs text-[#59413a]">Archived 2024</span>
+              <span className="text-xs text-[#59413a]">Archived 2025</span>
             </div>
           </div>
         </div>
@@ -225,7 +351,7 @@ export const GovernanceView: React.FC = () => {
             <div className="bg-white rounded-xl p-5 shadow-sm border border-[#e1bfb5]/40 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-base font-headline font-bold text-[#1e1b19]">November 2024</span>
+                  <span className="text-base font-headline font-bold text-[#1e1b19]">February 2025</span>
                   <span className="text-[11px] font-semibold text-[#59413a] bg-[#eee7e3] px-2 py-0.5 rounded">
                     Council Schedule
                   </span>
@@ -234,7 +360,7 @@ export const GovernanceView: React.FC = () => {
                   <button 
                     type="button"
                     aria-label="Previous Month"
-                    onClick={() => showToast("Viewing October 2024 archive schedule.")}
+                    onClick={() => showToast("Viewing January 2025 archive schedule.")}
                     className="w-8 h-8 rounded-lg hover:bg-[#f4ece8] flex items-center justify-center text-[#59413a] cursor-pointer"
                   >
                     <span aria-hidden="true" className="material-symbols-outlined text-[18px]">chevron_left</span>
@@ -242,7 +368,7 @@ export const GovernanceView: React.FC = () => {
                   <button 
                     type="button"
                     aria-label="Next Month"
-                    onClick={() => showToast("Viewing December 2024 scheduled stated assembly.")}
+                    onClick={() => showToast("Viewing March 2025 scheduled stated assembly.")}
                     className="w-8 h-8 rounded-lg hover:bg-[#f4ece8] flex items-center justify-center text-[#59413a] cursor-pointer"
                   >
                     <span aria-hidden="true" className="material-symbols-outlined text-[18px]">chevron_right</span>
@@ -261,16 +387,33 @@ export const GovernanceView: React.FC = () => {
                 <div className="py-1">Sa</div>
 
                 {/* Days */}
+                <div className="py-2 text-[#59413a]/40">26</div>
                 <div className="py-2 text-[#59413a]/40">27</div>
                 <div className="py-2 text-[#59413a]/40">28</div>
                 <div className="py-2 text-[#59413a]/40">29</div>
                 <div className="py-2 text-[#59413a]/40">30</div>
+                <div className="py-2 text-[#59413a]/40">31</div>
                 <div className="py-2 text-[#1e1b19]">1</div>
                 <div className="py-2 text-[#1e1b19]">2</div>
                 <div className="py-2 text-[#1e1b19]">3</div>
                 <div className="py-2 text-[#1e1b19]">4</div>
                 <div className="py-2 text-[#1e1b19]">5</div>
-                <div className="py-2 text-[#1e1b19]">6</div>
+
+                {/* Meeting Day 6 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDay(6);
+                    showToast("Feb 6: Q1 Stated Council Meeting #2025-02 (Ratified).");
+                  }}
+                  className={`py-2 relative font-bold flex flex-col items-center justify-center cursor-pointer rounded-lg transition-colors ${
+                    selectedDay === 6 ? 'bg-[#ffdbd0]/80' : 'hover:bg-[#ffdbd0]/40'
+                  }`}
+                >
+                  <span className="w-7 h-7 rounded-full bg-[#ffdbd0] text-[#9b2f00] flex items-center justify-center">6</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#9b2f00] mt-0.5"></span>
+                </button>
+
                 <div className="py-2 text-[#1e1b19]">7</div>
                 <div className="py-2 text-[#1e1b19]">8</div>
                 <div className="py-2 text-[#1e1b19]">9</div>
@@ -278,68 +421,51 @@ export const GovernanceView: React.FC = () => {
                 <div className="py-2 text-[#1e1b19]">11</div>
                 <div className="py-2 text-[#1e1b19]">12</div>
                 <div className="py-2 text-[#1e1b19]">13</div>
-
-                {/* Meeting Day 14 */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedDay(14);
-                    showToast("Nov 14: Q4 Stated Council Meeting #2024-11 (Ratified).");
-                  }}
-                  className={`py-2 relative font-bold flex flex-col items-center justify-center cursor-pointer rounded-lg transition-colors ${
-                    selectedDay === 14 ? 'bg-[#ffdbd0]/80' : 'hover:bg-[#ffdbd0]/40'
-                  }`}
-                >
-                  <span className="w-7 h-7 rounded-full bg-[#ffdbd0] text-[#9b2f00] flex items-center justify-center">14</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#9b2f00] mt-0.5"></span>
-                </button>
-
+                <div className="py-2 text-[#1e1b19]">14</div>
                 <div className="py-2 text-[#1e1b19]">15</div>
                 <div className="py-2 text-[#1e1b19]">16</div>
                 <div className="py-2 text-[#1e1b19]">17</div>
                 <div className="py-2 text-[#1e1b19]">18</div>
                 <div className="py-2 text-[#1e1b19]">19</div>
-                <div className="py-2 text-[#1e1b19]">20</div>
 
-                {/* Meeting Day 21 */}
+                {/* Meeting Day 20 */}
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedDay(21);
-                    showToast("Nov 21: Finance Subcom Preparation (6:30 PM).");
+                    setSelectedDay(20);
+                    showToast("Feb 20: Finance Subcom Preparation (6:30 PM).");
                   }}
                   className={`py-2 relative font-bold flex flex-col items-center justify-center cursor-pointer rounded-lg transition-colors ${
-                    selectedDay === 21 ? 'bg-[#ffdcc3]/80' : 'hover:bg-[#ffdcc3]/40'
+                    selectedDay === 20 ? 'bg-[#ffdcc3]/80' : 'hover:bg-[#ffdcc3]/40'
                   }`}
                 >
-                  <span className="w-7 h-7 rounded-full bg-[#ffdcc3]/70 text-[#904d00] flex items-center justify-center">21</span>
+                  <span className="w-7 h-7 rounded-full bg-[#ffdcc3]/70 text-[#904d00] flex items-center justify-center">20</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-[#904d00] mt-0.5"></span>
                 </button>
 
+                <div className="py-2 text-[#1e1b19]">21</div>
                 <div className="py-2 text-[#1e1b19]">22</div>
                 <div className="py-2 text-[#1e1b19]">23</div>
                 <div className="py-2 text-[#1e1b19]">24</div>
                 <div className="py-2 text-[#1e1b19]">25</div>
                 <div className="py-2 text-[#1e1b19]">26</div>
-                <div className="py-2 text-[#1e1b19]">27</div>
 
-                {/* Upcoming Meeting 28 */}
+                {/* Upcoming Meeting 27 */}
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedDay(28);
-                    showToast("Nov 28: Ordinary Council Conclave (7:00 PM).");
+                    setSelectedDay(27);
+                    showToast("Feb 27: Ordinary Council Conclave (7:00 PM).");
                   }}
                   className={`py-2 relative font-bold flex flex-col items-center justify-center cursor-pointer rounded-lg transition-colors ${
-                    selectedDay === 28 ? 'ring-2 ring-[#c2410c]' : 'hover:bg-[#c2410c]/20'
+                    selectedDay === 27 ? 'ring-2 ring-[#c2410c]' : 'hover:bg-[#c2410c]/20'
                   }`}
                 >
-                  <span className="w-7 h-7 rounded-full bg-[#c2410c] text-white shadow-sm flex items-center justify-center">28</span>
+                  <span className="w-7 h-7 rounded-full bg-[#c2410c] text-white shadow-sm flex items-center justify-center">27</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-[#c2410c] mt-0.5 animate-pulse"></span>
                 </button>
 
-                <div className="py-2 text-[#1e1b19]">29</div>
-                <div className="py-2 text-[#1e1b19]">30</div>
+                <div className="py-2 text-[#1e1b19]">28</div>
                 <div className="py-2 text-[#59413a]/40">1</div>
               </div>
 
@@ -347,15 +473,15 @@ export const GovernanceView: React.FC = () => {
               <div className="flex flex-wrap items-center gap-4 pt-1 text-[#59413a] text-xs font-semibold">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#9b2f00]"></span>
-                  <span>Nov 14: Stated Conclave</span>
+                  <span>Feb 6: Stated Conclave</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#904d00]"></span>
-                  <span>Nov 21: Finance Subcom</span>
+                  <span>Feb 20: Finance Subcom</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#c2410c] animate-pulse"></span>
-                  <span>Nov 28: Stated Council</span>
+                  <span>Feb 27: Stated Council</span>
                 </div>
               </div>
             </div>
@@ -368,16 +494,16 @@ export const GovernanceView: React.FC = () => {
                 </span>
                 <div className="flex items-center gap-1 text-xs font-bold text-[#9b2f00]">
                   <span aria-hidden="true" className="material-symbols-outlined text-[16px]">schedule</span>
-                  <span>In 11 Days</span>
+                  <span>In 18 Days</span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1">
                 <h3 className="font-headline text-lg font-bold text-[#1e1b19]">
-                  Q4 Stated Council Conclave #2024-12
+                  Q1 Stated Council Conclave #2025-03
                 </h3>
                 <p className="text-xs text-[#59413a]">
-                  Comprehensive year-end operational audit, 2025 general ministry budget finalization, and pastoral review.
+                  Comprehensive operational audit, 2025 general ministry budget finalization, and pastoral review.
                 </p>
               </div>
 
@@ -386,7 +512,7 @@ export const GovernanceView: React.FC = () => {
                   <span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[20px]">calendar_today</span>
                   <div className="flex flex-col min-w-0">
                     <span className="text-[10px] uppercase font-bold text-[#59413a]">Date & Time</span>
-                    <span className="text-xs font-bold text-[#1e1b19] truncate">Nov 28 • 7:00 PM</span>
+                    <span className="text-xs font-bold text-[#1e1b19] truncate">Feb 27 • 7:00 PM</span>
                   </div>
                 </div>
 
@@ -427,7 +553,7 @@ export const GovernanceView: React.FC = () => {
                 </div>
                 <button 
                   type="button"
-                  onClick={() => showToast("Opening Q4 Conclave Order of Business & Agenda Docket...")}
+                  onClick={() => showToast("Opening Q1 Conclave Order of Business & Agenda Docket...")}
                   className="px-4 py-1.5 rounded-lg bg-[#c2410c] text-white hover:bg-[#9b2f00] text-xs font-headline font-bold transition-colors cursor-pointer"
                 >
                   Council Docket →
@@ -479,10 +605,10 @@ export const GovernanceView: React.FC = () => {
                       <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span>
                       Sealed & Ratified
                     </span>
-                    <span className="text-xs text-[#59413a]">Nov 14, 2024 • 7:30 PM EST</span>
+                    <span className="text-xs text-[#59413a]">Feb 06, 2025 • 7:30 PM EAT</span>
                   </div>
                   <h3 className="font-headline text-lg font-bold text-[#1e1b19] mt-1">
-                    Q4 Stated Council Meeting #2024-11
+                    Q1 Stated Council Meeting #2025-02
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
@@ -490,20 +616,20 @@ export const GovernanceView: React.FC = () => {
                     Quorum: 13/14 Present
                   </span>
                   <span className="px-2.5 py-1 rounded-full text-xs bg-[#ffdbd0]/50 text-[#9b2f00] font-bold">
-                    Clerk: Elder Marcus Jenkins
+                    Clerk: Elder Marcus Kamau
                   </span>
                 </div>
               </div>
 
               <p className="text-xs text-[#59413a]">
-                Deliberation and formal approval of the Sanctuary HVAC and acoustic enhancement contract, initial reading of the 2025 church operating budget, and Deaconess court expansion report.
+                Deliberation and formal approval of the Sanctuary HVAC and acoustic enhancement contract, initial reading of the 2025 church operating budget, and Mercy Ministry expansion report.
               </p>
 
               {/* Attached Documents Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <button 
                   type="button"
-                  onClick={() => showToast("Downloading Agenda_Nov14.pdf...")}
+                  onClick={() => showToast("Downloading Agenda_Feb06.pdf...")}
                   className="flex items-center justify-between p-2.5 bg-[#faf2ee] rounded-lg hover:bg-[#f4ece8] transition-colors text-left border border-[#e1bfb5]/30 cursor-pointer"
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -515,12 +641,12 @@ export const GovernanceView: React.FC = () => {
 
                 <button 
                   type="button"
-                  onClick={() => showToast("Downloading Minutes_Signed_Nov14.pdf (Pastoral seal attached)...")}
+                  onClick={() => showToast("Downloading Minutes_Signed_Feb06.pdf (Pastoral seal attached)...")}
                   className="flex items-center justify-between p-2.5 bg-[#faf2ee] rounded-lg hover:bg-[#f4ece8] transition-colors text-left border border-[#e1bfb5]/30 cursor-pointer"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[18px]">verified</span>
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Minutes_Signed_Nov14.pdf</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Minutes_Signed_Feb06.pdf</span>
                   </div>
                   <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#59413a]">download</span>
                 </button>
@@ -553,7 +679,7 @@ export const GovernanceView: React.FC = () => {
                   </button>
                   <button 
                     type="button"
-                    onClick={() => showToast("Downloading complete November 14 session packet...")}
+                    onClick={() => showToast("Downloading complete February 6 session packet...")}
                     className="px-3 py-1.5 rounded-lg bg-[#eee7e3] text-[#1e1b19] hover:bg-[#e9e1dd] text-xs font-semibold cursor-pointer"
                   >
                     Download Packet
@@ -571,10 +697,10 @@ export const GovernanceView: React.FC = () => {
                       <span aria-hidden="true" className="material-symbols-outlined text-[14px]">account_balance</span>
                       Escrow Ratification
                     </span>
-                    <span className="text-xs text-[#59413a]">Oct 24, 2024 • 6:00 PM EST</span>
+                    <span className="text-xs text-[#59413a]">Jan 16, 2025 • 6:00 PM EAT</span>
                   </div>
                   <h3 className="font-headline text-lg font-bold text-[#1e1b19] mt-1">
-                    Trustee Board Extraordinary Council #2024-10
+                    Trustee Board Extraordinary Council #2025-01
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
@@ -582,7 +708,7 @@ export const GovernanceView: React.FC = () => {
                     Quorum: 7/7 Trustees
                   </span>
                   <span className="px-2.5 py-1 rounded-full text-xs bg-[#eee7e3] text-[#1e1b19] font-semibold">
-                    Clerk: Arthur Miller (Trustee)
+                    Clerk: Arthur Wanjala (Trustee)
                   </span>
                 </div>
               </div>
@@ -650,10 +776,10 @@ export const GovernanceView: React.FC = () => {
                       <span aria-hidden="true" className="material-symbols-outlined text-[14px]">church</span>
                       Ordination Review
                     </span>
-                    <span className="text-xs text-[#59413a]">Sep 18, 2024 • 8:00 PM EST</span>
+                    <span className="text-xs text-[#59413a]">Jan 10, 2025 • 8:00 PM EAT</span>
                   </div>
                   <h3 className="font-headline text-lg font-bold text-[#1e1b19] mt-1">
-                    Joint Church Council Advisory #2026-09
+                    Joint Church Council Advisory #2025-01
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
@@ -699,7 +825,7 @@ export const GovernanceView: React.FC = () => {
               <div className="flex items-center justify-between pt-2 border-t border-[#e1bfb5]/30">
                 <div className="flex items-center gap-1.5 text-xs text-[#59413a]">
                   <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#006243]">check_circle</span>
-                  <span>Ratified by Church Council Visionary Leader Dr. Alistair Ross</span>
+                  <span>Ratified by Bishop Sammy · Visionary Leader</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <button 
@@ -811,18 +937,18 @@ export const GovernanceView: React.FC = () => {
               onChange={(e) => setSelectedSponsor(e.target.value)}
               className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] focus:outline-none border border-[#e1bfb5]/40 cursor-pointer"
             >
-              <option>All Sponsors & Boards</option>
+              <option>{ALL_SPONSORS}</option>
               <option>Trustee Board</option>
               <option>Finance Committee</option>
-              <option>NextGen & Youth Ministry</option>
-              <option>Board of Deacons</option>
+              <option>Destiny Youth</option>
+              <option>Missions, Mercy & Church Planting</option>
             </select>
             <select aria-label="Resolution stage filter" 
               value={selectedStage}
               onChange={(e) => setSelectedStage(e.target.value)}
               className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] focus:outline-none border border-[#e1bfb5]/40 cursor-pointer"
             >
-              <option>All Stages</option>
+              <option>{ALL_STAGES}</option>
               <option>Proposed</option>
               <option>Voted & Approved</option>
               <option>Implementing</option>
@@ -830,7 +956,7 @@ export const GovernanceView: React.FC = () => {
             </select>
           </div>
           <div className="text-xs text-[#59413a]">
-            <span>Showing 4 of 36 resolutions</span>
+            <span>Showing {filteredResolutions.length} of 36 resolutions</span>
           </div>
         </div>
 
@@ -850,241 +976,95 @@ export const GovernanceView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e1bfb5]/30 text-xs text-[#1e1b19]">
-                {/* Row 1 */}
-                <tr className="hover:bg-[#faf2ee]/70 transition-colors">
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-mono text-xs font-bold text-[#9b2f00]">RES-2024-042</span>
-                      <span className="font-headline text-sm font-bold text-[#1e1b19] max-w-sm">
-                        Sanctuary HVAC & Acoustic Tech Contract
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-[#1e1b19]">Trustee Board</span>
-                      <span className="text-[#59413a] text-[11px]">Arthur Miller</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-[#59413a]">Nov 14, 2024</td>
-                  <td className="py-4 px-4">
-                    <span className="inline-flex items-center gap-1 text-[#006243] font-bold text-xs bg-[#007d57]/10 px-2 py-0.5 rounded">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">how_to_vote</span>
-                      13 Yea • 0 Nay
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col gap-1">
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-[#9b2f00] bg-[#ffdbd0]/50 px-2 py-0.5 rounded-full w-max">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#9b2f00] animate-ping"></span>
-                        Implementing
-                      </span>
-                      <span className="text-[10px] text-[#59413a]">2 of 4 Milestones</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-medium text-[#1e1b19]">Elder Marcus Jenkins</span>
-                      <span className="text-[#59413a] text-[11px]">Due Dec 31, 2024</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button 
-                        type="button"
-                        onClick={() => showToast("Opening milestone tracker for HVAC Contract (Phase 2 underway)...")}
-                        className="px-2.5 py-1 rounded bg-[#ffdbd0]/40 text-[#9b2f00] hover:bg-[#ffdbd0] text-xs font-bold cursor-pointer"
-                      >
-                        Track
-                      </button>
-                      <button 
-                        type="button"
-                        aria-label="More actions" 
-                        onClick={() => showToast("Options: Assign Trustee Deputy, Export Docket Extract.")}
-                        className="p-1 rounded text-[#59413a] hover:text-[#1e1b19] cursor-pointer"
-                      >
-                        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">more_vert</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                {filteredResolutions.map((resolution) => {
+                  const stage = STAGE_STYLES[resolution.stage];
+                  return (
+                    <tr
+                      key={resolution.id}
+                      className={`hover:bg-[#faf2ee]/70 transition-colors ${resolution.rowClass ?? ''}`}
+                    >
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col">
+                          <span className={`font-mono text-xs font-bold ${resolution.idClass}`}>{resolution.id}</span>
+                          <span className="font-headline text-sm font-bold text-[#1e1b19] max-w-sm">
+                            {resolution.title}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-[#1e1b19]">{resolution.sponsor}</span>
+                          <span className="text-[#59413a] text-[11px]">{resolution.sponsorOfficer}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-[#59413a]">{resolution.councilDate}</td>
+                      <td className="py-4 px-4">
+                        <span
+                          className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${
+                            resolution.vote.tone === 'credited'
+                              ? 'text-[#006243] font-bold bg-[#007d57]/10'
+                              : 'text-[#59413a] font-semibold bg-[#eee7e3]'
+                          }`}
+                        >
+                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">
+                            {resolution.vote.tone === 'credited' ? 'how_to_vote' : 'pending'}
+                          </span>
+                          {resolution.vote.text}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full w-max ${stage.chip}`}>
+                            {stage.ping ? (
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#9b2f00] animate-ping"></span>
+                            ) : (
+                              <span aria-hidden="true" className="material-symbols-outlined text-[12px]">
+                                {stage.glyph}
+                              </span>
+                            )}
+                            {resolution.stage}
+                          </span>
+                          <span className={`text-[10px] ${resolution.stageNoteClass ?? 'text-[#59413a]'}`}>
+                            {resolution.stageNote}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-[#1e1b19]">{resolution.lead}</span>
+                          <span className="text-[#59413a] text-[11px]">{resolution.leadNote}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => showToast(resolution.action.toast)}
+                            className={`px-2.5 py-1 rounded cursor-pointer ${resolution.action.className}`}
+                          >
+                            {resolution.action.label}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="More actions"
+                            onClick={() => showToast(resolution.moreToast)}
+                            className="p-1 rounded text-[#59413a] hover:text-[#1e1b19] cursor-pointer"
+                          >
+                            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">more_vert</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
 
-                {/* Row 2 */}
-                <tr className="hover:bg-[#faf2ee]/70 transition-colors bg-[#faf2ee]/30">
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-mono text-xs font-bold text-[#9b2f00]">RES-2024-043</span>
-                      <span className="font-headline text-sm font-bold text-[#1e1b19] max-w-sm">
-                        2025 General Church Operating Budget
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-[#1e1b19]">Finance Committee</span>
-                      <span className="text-[#59413a] text-[11px]">Deaconess Clara Oswald</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-[#59413a]">Nov 14, 2024</td>
-                  <td className="py-4 px-4">
-                    <span className="inline-flex items-center gap-1 text-[#006243] font-bold text-xs bg-[#007d57]/10 px-2 py-0.5 rounded">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">how_to_vote</span>
-                      12 Yea • 1 Abstain
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col gap-1">
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-[#006243] bg-[#85f8c4]/60 px-2 py-0.5 rounded-full w-max">
-                        <span aria-hidden="true" className="material-symbols-outlined text-[12px]">done_all</span>
-                        Voted & Approved
-                      </span>
-                      <span className="text-[10px] text-[#59413a]">Awaiting Council</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-medium text-[#1e1b19]">Bishop Sammy</span>
-                      <span className="text-[#59413a] text-[11px]">Enactment Jan 01, 2025</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button 
-                        type="button"
-                        onClick={() => showToast("Reviewing 12 Elder voting signatures and certification stamp.")}
-                        className="px-2.5 py-1 rounded bg-[#eee7e3] text-[#1e1b19] hover:bg-[#e9e1dd] text-xs font-semibold cursor-pointer"
-                      >
-                        Signatures
-                      </button>
-                      <button 
-                        type="button"
-                        aria-label="More actions" 
-                        onClick={() => showToast("Options: Forward to Church Council, Generate Ledger Projection.")}
-                        className="p-1 rounded text-[#59413a] hover:text-[#1e1b19] cursor-pointer"
-                      >
-                        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">more_vert</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-
-                {/* Row 3 */}
-                <tr className="hover:bg-[#faf2ee]/70 transition-colors">
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-mono text-xs font-bold text-[#904d00]">RES-2024-045</span>
-                      <span className="font-headline text-sm font-bold text-[#1e1b19] max-w-sm">
-                        Youth Ministry Bus Fleet Replacement Grant
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-[#1e1b19]">NextGen Ministry</span>
-                      <span className="text-[#59413a] text-[11px]">Bishop Sammy</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-[#59413a]">Nov 20, 2024</td>
-                  <td className="py-4 px-4">
-                    <span className="inline-flex items-center gap-1 text-[#59413a] font-semibold text-xs bg-[#eee7e3] px-2 py-0.5 rounded">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">pending</span>
-                      Pending Nov 28
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col gap-1">
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-[#59413a] bg-[#eee7e3] px-2 py-0.5 rounded-full w-max">
-                        <span aria-hidden="true" className="material-symbols-outlined text-[12px]">schedule</span>
-                        Proposed
-                      </span>
-                      <span className="text-[10px] text-[#59413a]">14-Day Elder Review</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-medium text-[#1e1b19]">Bishop Sammy</span>
-                      <span className="text-[#59413a] text-[11px]">Conclave Target Nov 28</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button 
-                        type="button"
-                        onClick={() => showToast("Opening draft text for Bus Fleet Replacement Grant...")}
-                        className="px-2.5 py-1 rounded bg-[#ffdcc3]/50 text-[#904d00] hover:bg-[#ffdcc3] text-xs font-bold cursor-pointer"
-                      >
-                        Review Draft
-                      </button>
-                      <button 
-                        type="button"
-                        aria-label="More actions" 
-                        onClick={() => showToast("Options: Add Elder Sponsor, Attach Mechanic Estimate.")}
-                        className="p-1 rounded text-[#59413a] hover:text-[#1e1b19] cursor-pointer"
-                      >
-                        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">more_vert</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-
-                {/* Row 4 */}
-                <tr className="hover:bg-[#faf2ee]/70 transition-colors bg-[#faf2ee]/30">
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-mono text-xs font-bold text-[#8d7168]">RES-2024-039</span>
-                      <span className="font-headline text-sm font-bold text-[#1e1b19] max-w-sm">
-                        Benevolence Fund Operating Cap to KSh 50,000
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-[#1e1b19]">Board of Deacons</span>
-                      <span className="text-[#59413a] text-[11px]">Deaconess Clara Oswald</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-[#59413a]">Oct 10, 2024</td>
-                  <td className="py-4 px-4">
-                    <span className="inline-flex items-center gap-1 text-[#006243] font-bold text-xs bg-[#007d57]/10 px-2 py-0.5 rounded">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">how_to_vote</span>
-                      14 Yea • 0 Nay
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col gap-1">
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-[#59413a] bg-[#eee7e3] px-2 py-0.5 rounded-full w-max">
-                        <span aria-hidden="true" className="material-symbols-outlined text-[12px]">archive</span>
-                        Closed
-                      </span>
-                      <span className="text-[10px] text-[#006243] font-bold">Fully Audited</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-medium text-[#1e1b19]">Clara Oswald</span>
-                      <span className="text-[#59413a] text-[11px]">Completed Oct 28, 2024</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button 
-                        type="button"
-                        onClick={() => showToast("Opening Archived Dossier for Benevolence Fund cap adjustment...")}
-                        className="px-2.5 py-1 rounded bg-[#eee7e3] text-[#1e1b19] hover:bg-[#e9e1dd] text-xs font-semibold cursor-pointer"
-                      >
-                        Archive Dossier
-                      </button>
-                      <button 
-                        type="button"
-                        aria-label="More actions" 
-                        onClick={() => showToast("Options: Print Official Excerpt, Verify Auditor Signature.")}
-                        className="p-1 rounded text-[#59413a] hover:text-[#1e1b19] cursor-pointer"
-                      >
-                        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">more_vert</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                {filteredResolutions.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-10 px-4 text-center text-[#59413a]">
+                      No resolutions match this search or filter.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1204,7 +1184,7 @@ export const GovernanceView: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-[#59413a]">
-                Ratified by General Council Roll #2024. Church doctrine, elder election tenure, trustee limits, and confessional fidelity tenets.
+                Ratified by General Council Roll #2025. Church doctrine, elder election tenure, trustee limits, and confessional fidelity tenets.
               </p>
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="px-2 py-0.5 rounded-md bg-[#f4ece8] text-[#59413a] text-xs font-medium">48 pages</span>
@@ -1215,7 +1195,7 @@ export const GovernanceView: React.FC = () => {
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-[#e1bfb5]/30">
-              <span className="text-xs text-[#59413a]">Next Review: Jan 2026</span>
+              <span className="text-xs text-[#59413a]">Next Review: Jul 2025</span>
               <div className="flex items-center gap-2">
                 <button 
                   type="button"
@@ -1252,7 +1232,7 @@ export const GovernanceView: React.FC = () => {
                   </div>
                 </div>
                 <span className="px-2.5 py-1 rounded text-xs font-bold bg-[#007d57]/15 text-[#006243] shrink-0">
-                  v5.0 (Updated Oct 2024)
+                  v5.0 (Updated Jan 2025)
                 </span>
               </div>
               <p className="text-xs text-[#59413a]">
@@ -1366,12 +1346,12 @@ export const GovernanceView: React.FC = () => {
                 <span className="px-2 py-0.5 rounded-md bg-[#f4ece8] text-[#59413a] text-xs font-medium">14 pages</span>
                 <span className="px-2 py-0.5 rounded-md bg-[#f4ece8] text-[#59413a] text-xs font-medium">Clergy Care</span>
                 <span className="px-2 py-0.5 rounded-md bg-[#f4ece8] text-[#59413a] text-xs font-medium">Church Council Benchmarks</span>
-                <span className="px-2 py-0.5 rounded-md bg-[#ffdcc3]/50 text-[#904d00] text-xs font-bold">Renewal Dec 2024</span>
+                <span className="px-2 py-0.5 rounded-md bg-[#ffdcc3]/50 text-[#904d00] text-xs font-bold">Renewal Jun 2025</span>
               </div>
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-[#e1bfb5]/30">
-              <span className="text-xs text-[#904d00] font-bold">Renewal Due: Dec 2024</span>
+              <span className="text-xs text-[#904d00] font-bold">Renewal Due: Jun 2025</span>
               <div className="flex items-center gap-2">
                 <button 
                   type="button"
@@ -1407,7 +1387,7 @@ export const GovernanceView: React.FC = () => {
                 All minutes and official resolutions are cryptographically hashed and lodged with the Regional Church Council Stated Clerk.
               </span>
               <span className="font-mono text-[11px] text-[#8d7168] font-medium mt-0.5">
-                Sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 • Certified Nov 14, 2024
+                Sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 • Certified Feb 06, 2025
               </span>
             </div>
           </div>
@@ -1425,7 +1405,7 @@ export const GovernanceView: React.FC = () => {
 
       {/* New Resolution Submission Modal */}
       {newResolutionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs" {...dialogProps(() => setNewResolutionModal(false), "Submit New Legislative Bill")}>
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#e1bfb5]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#f4ece8]">
               <div className="flex items-center gap-2">
@@ -1436,17 +1416,17 @@ export const GovernanceView: React.FC = () => {
                 type="button"
                 onClick={() => setNewResolutionModal(false)}
                 className="text-[#59413a] hover:text-[#1e1b19] p-1"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateResolution} className="py-4 space-y-4 text-xs font-headline">
               <div>
-                <label className="block text-xs font-bold text-[#59413a] mb-1">
+                <label htmlFor="resolution-bill-title" className="block text-xs font-bold text-[#59413a] mb-1">
                   Resolution Bill Title *
                 </label>
-                <input aria-label="Resolution Bill Title"
+                <input id="resolution-bill-title" aria-label="Resolution Bill Title"
                   type="text"
                   required
                   placeholder="e.g. Parsonage Roof Refurbishment & Solar Allocation"
@@ -1457,27 +1437,26 @@ export const GovernanceView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#59413a] mb-1">
+                <label htmlFor="resolution-sponsor" className="block text-xs font-bold text-[#59413a] mb-1">
                   Sponsoring Department / Board *
                 </label>
-                <select aria-label="Sponsoring Department / Board"
+                <select id="resolution-sponsor" aria-label="Sponsoring Department / Board"
                   value={resolutionSponsor}
                   onChange={(e) => setResolutionSponsor(e.target.value)}
                   className="w-full h-10 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/50 focus:outline-none cursor-pointer"
                 >
                   <option>Trustee Board</option>
                   <option>Finance Committee</option>
-                  <option>Board of Deacons</option>
-                  <option>NextGen & Youth Ministry</option>
-                  <option>Missions & Outreach Council</option>
+                  <option>Destiny Youth</option>
+                  <option>Missions, Mercy & Church Planting</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#59413a] mb-1">
+                <label htmlFor="resolution-rationale" className="block text-xs font-bold text-[#59413a] mb-1">
                   Legislative Purpose & Official Rationale
                 </label>
-                <textarea aria-label="Legislative Purpose &amp; Official Rationale"
+                <textarea id="resolution-rationale" aria-label="Legislative Purpose &amp; Official Rationale"
                   rows={3}
                   placeholder="Detail the justification, fiscal impact, and proposed enactment schedule for Council review..."
                   value={resolutionSummary}

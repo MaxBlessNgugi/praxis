@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { dialogProps } from '../dialog';
+import React, { useState } from 'react'
+;
 
 interface CharityExp {
   id: string;
@@ -16,9 +18,9 @@ const EXPENSES: CharityExp[] = [
     id: 'ch-1',
     code: '#CH-882',
     item: 'Fresh Produce Wholesale Pallets (3 Tons)',
-    initiative: 'Community Food Pantry',
+    initiative: 'Community Food Drive',
     amount: 1840.00,
-    date: 'Oct 21, 2024',
+    date: 'Feb 06, 2025',
     vendor: 'Valley Harvest Co-Op',
     status: 'Audited & Cleared',
   },
@@ -28,7 +30,7 @@ const EXPENSES: CharityExp[] = [
     item: 'Solar Submersible Well Pump & Rig',
     initiative: 'Kenya Water Borehole Project',
     amount: 3200.00,
-    date: 'Oct 17, 2024',
+    date: 'Feb 03, 2025',
     vendor: 'Nairobi Water Works Ltd',
     status: 'Audited & Cleared',
   },
@@ -38,18 +40,18 @@ const EXPENSES: CharityExp[] = [
     item: 'Blood Glucose Testing Strips & Cuffs',
     initiative: 'Free Medical Screening Clinic',
     amount: 950.00,
-    date: 'Oct 14, 2024',
-    vendor: 'MedSupply Direct LLC',
+    date: 'Jan 30, 2025',
+    vendor: 'MedSupply Kenya Ltd',
     status: 'Audited & Cleared',
   },
   {
     id: 'ch-4',
     code: '#CH-879',
-    item: '80 Frozen Holiday Turkeys & Baskets',
-    initiative: 'Thanksgiving Outreach Drive',
+    item: '80 Festive Food Hampers',
+    initiative: 'Festive Season Outreach Drive',
     amount: 1440.00,
-    date: 'Oct 11, 2024',
-    vendor: 'Maple Grocery Dist.',
+    date: 'Jan 27, 2025',
+    vendor: 'Nyahururu Grocers Ltd',
     status: 'Audited & Cleared',
   },
 ];
@@ -115,10 +117,10 @@ export const FinancesCharityPanel: React.FC = () => {
             </span>
           </div>
           <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19]">8,640 lbs</div>
+            <div className="font-headline text-3xl font-bold text-[#1e1b19]">3,920 kg</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">eco</span>
-              <span>Distributed via Food Pantry</span>
+              <span>Distributed via Food Drive</span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
@@ -161,7 +163,12 @@ export const FinancesCharityPanel: React.FC = () => {
 
           {/* SVG Donut Chart */}
           <div className="relative w-44 h-44 my-4 flex items-center justify-center">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+            <svg
+              role="img"
+              aria-label="Annual charity budget utilization: 72.1% disbursed — KSh 118,965 released year to date of the KSh 165,000 total allocation."
+              className="w-full h-full transform -rotate-90"
+              viewBox="0 0 100 100"
+            >
               <circle cx="50" cy="50" r="40" stroke="#f4ece8" strokeWidth="12" fill="none" />
               <circle
                 cx="50"
@@ -212,7 +219,7 @@ export const FinancesCharityPanel: React.FC = () => {
             {/* Initiative 1 */}
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs">
-                <span className="font-semibold text-[#1e1b19]">Community Food Pantry Annex</span>
+                <span className="font-semibold text-[#1e1b19]">Community Food Drive Annex</span>
                 <span className="font-mono text-[#9b2f00] font-bold">KSh 42,000 / KSh 48,000 (87.5%)</span>
               </div>
               <div className="w-full bg-[#EAE1D7] h-2 rounded-full overflow-hidden">
@@ -245,7 +252,7 @@ export const FinancesCharityPanel: React.FC = () => {
             {/* Initiative 4 */}
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs">
-                <span className="font-semibold text-[#1e1b19]">Thanksgiving Turkey & Grocery Drive</span>
+                <span className="font-semibold text-[#1e1b19]">Festive Food & Grocery Drive</span>
                 <span className="font-mono text-[#c2410c] font-bold">KSh 8,465 / KSh 12,000 (70.5%)</span>
               </div>
               <div className="w-full bg-[#EAE1D7] h-2 rounded-full overflow-hidden">
@@ -271,10 +278,10 @@ export const FinancesCharityPanel: React.FC = () => {
               Food Security
             </span>
             <h4 className="font-headline text-sm font-bold text-[#1e1b19] mt-2">
-              Saturday Food Pantry Drive
+              Saturday Food Distribution Drive
             </h4>
             <p className="text-xs text-[#59413a] mt-1 leading-relaxed">
-              140 family vehicles served with fresh produce, dry goods, and encouraging pastoral prayer at South parking lot.
+              140 families served with fresh produce, dry goods and pastoral prayer at the church grounds.
             </p>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-[11px] font-mono text-[#59413a]">
@@ -288,14 +295,14 @@ export const FinancesCharityPanel: React.FC = () => {
               Community Health
             </span>
             <h4 className="font-headline text-sm font-bold text-[#1e1b19] mt-2">
-              Berean Free Health Screening
+              Community Free Health Screening
             </h4>
             <p className="text-xs text-[#59413a] mt-1 leading-relaxed">
               52 local residents screened for diabetes and hypertension with free prescriptions and physician consultations.
             </p>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-[11px] font-mono text-[#59413a]">
-            Lead: Dr. Jonathan Edwards
+            Lead: Dr. Jonathan Mwaura
           </div>
         </div>
 
@@ -377,7 +384,7 @@ export const FinancesCharityPanel: React.FC = () => {
           </div>
           <div>
             <h4 className="font-headline text-xs font-bold text-[#1e1b19]">
-              Q3 Charity & Benevolence Audit Certified
+              Q4 Charity & Benevolence Audit Certified
             </h4>
             <p className="text-xs text-[#59413a]">
               100% of benevolence disbursements reconciled with receipts by external certified auditor Thomas & Co. LLP.
@@ -391,37 +398,37 @@ export const FinancesCharityPanel: React.FC = () => {
 
       {/* Record Expense Modal */}
       {isExpenseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...dialogProps(() => setIsExpenseModalOpen(false), "Record Charity Disbursement")}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[#EAE1D7] pb-3">
               <h3 className="font-headline text-base font-bold text-[#1e1b19]">Record Charity Disbursement</h3>
-              <button onClick={() => setIsExpenseModalOpen(false)} className="text-[#59413a] hover:text-[#1e1b19]">
+              <button onClick={() => setIsExpenseModalOpen(false)} className="text-[#59413a] hover:text-[#1e1b19]" aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold mb-1">Item / Description</label>
-                <input aria-label="Item / Description" type="text" placeholder="e.g. Winter Coats for Youth Drive" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <label htmlFor="charity-item" className="block font-semibold mb-1">Item / Description</label>
+                <input id="charity-item" aria-label="Item / Description" type="text" placeholder="e.g. School Shoes for Youth Drive" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold mb-1">Amount (KSh)</label>
-                  <input aria-label="Amount (KSh)" type="number" placeholder="850.00" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                  <label htmlFor="charity-amount" className="block font-semibold mb-1">Amount (KSh)</label>
+                  <input id="charity-amount" aria-label="Amount (KSh)" type="number" placeholder="850.00" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Initiative</label>
-                  <select aria-label="Initiative" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
-                    <option>Community Food Pantry</option>
+                  <label htmlFor="charity-initiative" className="block font-semibold mb-1">Initiative</label>
+                  <select id="charity-initiative" aria-label="Initiative" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
+                    <option>Community Food Drive</option>
                     <option>Regional Free Medical Clinic</option>
                     <option>Kenya Water Borehole</option>
-                    <option>Thanksgiving Outreach</option>
+                    <option>Festive Season Outreach</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="block font-semibold mb-1">Vendor / Payee</label>
-                <input aria-label="Vendor / Payee" type="text" placeholder="e.g. Burlington Coat Direct" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <label htmlFor="charity-vendor" className="block font-semibold mb-1">Vendor / Payee</label>
+                <input id="charity-vendor" aria-label="Vendor / Payee" type="text" placeholder="e.g. Nyahururu Grocers Ltd" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EAE1D7]">

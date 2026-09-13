@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { ParishMember } from '../../../types';
 import { LOCATIONS } from '../../../data/churchDomain';
-import { interactiveCard } from '../interactiveCard';
+import { dialogProps } from '../dialog';
+import { interactiveCard } from '../interactiveCard'
+;
 
 interface FindChristianViewProps {
   members: ParishMember[];
@@ -130,7 +132,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
             <span>Next Membership Class</span>
-            <span className="font-bold text-[#1e1b19]">Nov 14</span>
+            <span className="font-bold text-[#1e1b19]">Feb 13</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
             <div className="h-1.5 rounded-full bg-[#006243]" style={{ width: '44%' }}></div>
@@ -276,7 +278,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             </div>
 
             <span className="ml-2 hidden lg:inline-flex items-center gap-1 rounded-md bg-[#ffdcc3]/40 px-2 py-0.5 font-mono text-xs text-[#6e3900]">
-              Showing: Destiny Sanctuary Roll 2024
+              Showing: Destiny Sanctuary Roll 2025
             </span>
           </div>
 
@@ -460,7 +462,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                           {member.baptismType === 'baptized' ? 'Baptized (Believer)' : member.baptismType === 'dedicated' ? 'Child Dedication' : 'Baptism & Communion Pending'}
                         </span>
                         <span className="text-[#59413a] font-mono text-[11px]">
-                          {member.baptismDate || 'Nov 12, 2024'} • {member.baptismOfficiant || 'Bishop Sammy'}
+                          {member.baptismDate || 'Jan 12, 2025'} • {member.baptismOfficiant || 'Bishop Sammy'}
                         </span>
                       </div>
                     </td>
@@ -624,13 +626,13 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
 
       {/* Quick Care Log View Modal */}
       {activeCareModalMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs" {...dialogProps(() => setActiveCareModalMember(null), "Member Care Record")}>
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-150">
             <button
               type="button"
               onClick={() => setActiveCareModalMember(null)}
               className="absolute top-4 right-4 p-1 rounded-lg text-[#59413a] hover:bg-[#f4ece8] cursor-pointer"
-            >
+           aria-label="Close">
               <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
             </button>
             <div className="flex items-center gap-3 mb-4">
@@ -654,7 +656,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               </div>
               <div className="flex items-center justify-between text-[#59413a]">
                 <span>Membership Date:</span>
-                <span className="font-bold text-[#1e1b19]">{activeCareModalMember.baptismDate || 'Nov 12, 2024'}</span>
+                <span className="font-bold text-[#1e1b19]">{activeCareModalMember.baptismDate || 'Jan 12, 2025'}</span>
               </div>
               <div className="flex items-center justify-between text-[#59413a]">
                 <span>Household Unit:</span>

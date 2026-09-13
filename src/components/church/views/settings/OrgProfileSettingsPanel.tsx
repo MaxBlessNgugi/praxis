@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
 import { ChurchOrgProfile } from '../../../../types';
 import { INITIAL_ORG_PROFILE } from '../../../../data/churchMockData';
+import { CHURCH, SERVICE_TIMES } from '../../../../data/churchDomain';
+
+/**
+ * The form's editable draft: the church record every screen reads (`CHURCH`), merged with
+ * the facts only this screen carries, so no fact is stored twice. Nothing is persisted —
+ * there is no backend behind the mock.
+ */
+type ProfileDraft = Record<keyof typeof CHURCH, string> & ChurchOrgProfile;
 
 export const OrgProfileSettingsPanel: React.FC = () => {
-  const [profile, setProfile] = useState<ChurchOrgProfile>(INITIAL_ORG_PROFILE);
+  const [profile, setProfile] = useState<ProfileDraft>({ ...CHURCH, ...INITIAL_ORG_PROFILE });
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
   const handleSave = (e: React.FormEvent) => {
@@ -42,8 +50,8 @@ export const OrgProfileSettingsPanel: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Church Name *</label>
-              <input aria-label="Church Name"
+              <label htmlFor="church-name" className="block text-xs font-bold text-[#1C1917] mb-1">Church Name *</label>
+              <input id="church-name" aria-label="Church Name"
                 type="text"
                 required
                 value={profile.name}
@@ -53,8 +61,8 @@ export const OrgProfileSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Denomination / Affiliation</label>
-              <input aria-label="Denomination / Affiliation"
+              <label htmlFor="church-denomination" className="block text-xs font-bold text-[#1C1917] mb-1">Denomination / Affiliation</label>
+              <input id="church-denomination" aria-label="Denomination / Affiliation"
                 type="text"
                 value={profile.denomination}
                 onChange={(e) => setProfile({ ...profile, denomination: e.target.value })}
@@ -65,8 +73,8 @@ export const OrgProfileSettingsPanel: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Established Year</label>
-              <input aria-label="Established Year"
+              <label htmlFor="church-established-year" className="block text-xs font-bold text-[#1C1917] mb-1">Established Year</label>
+              <input id="church-established-year" aria-label="Established Year"
                 type="number"
                 value={profile.establishedYear}
                 onChange={(e) => setProfile({ ...profile, establishedYear: Number(e.target.value) })}
@@ -75,18 +83,18 @@ export const OrgProfileSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Tax ID / EIN</label>
-              <input aria-label="Tax ID / EIN"
+              <label htmlFor="church-registration" className="block text-xs font-bold text-[#1C1917] mb-1">Registration</label>
+              <input id="church-registration" aria-label="Registration"
                 type="text"
-                value={profile.taxId}
-                onChange={(e) => setProfile({ ...profile, taxId: e.target.value })}
+                value={profile.registration}
+                onChange={(e) => setProfile({ ...profile, registration: e.target.value })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Nonprofit Classification</label>
-              <input aria-label="Nonprofit Classification"
+              <label htmlFor="church-registration-type" className="block text-xs font-bold text-[#1C1917] mb-1">Registration Type</label>
+              <input id="church-registration-type" aria-label="Registration Type"
                 type="text"
                 value={profile.nonprofitStatus}
                 onChange={(e) => setProfile({ ...profile, nonprofitStatus: e.target.value })}
@@ -104,19 +112,19 @@ export const OrgProfileSettingsPanel: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Street Address</label>
-              <input aria-label="Street Address"
+              <label htmlFor="church-street" className="block text-xs font-bold text-[#1C1917] mb-1">Street Address</label>
+              <input id="church-street" aria-label="Street Address"
                 type="text"
-                value={profile.address}
-                onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                value={profile.street}
+                onChange={(e) => setProfile({ ...profile, street: e.target.value })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
               />
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">City</label>
-                <input aria-label="City"
+                <label htmlFor="church-city" className="block text-xs font-bold text-[#1C1917] mb-1">City</label>
+                <input id="church-city" aria-label="City"
                   type="text"
                   value={profile.city}
                   onChange={(e) => setProfile({ ...profile, city: e.target.value })}
@@ -124,20 +132,20 @@ export const OrgProfileSettingsPanel: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">State</label>
-                <input aria-label="State"
+                <label htmlFor="church-county" className="block text-xs font-bold text-[#1C1917] mb-1">County</label>
+                <input id="church-county" aria-label="County"
                   type="text"
-                  value={profile.state}
-                  onChange={(e) => setProfile({ ...profile, state: e.target.value })}
+                  value={profile.county}
+                  onChange={(e) => setProfile({ ...profile, county: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Zip Code</label>
-                <input aria-label="Zip Code"
+                <label htmlFor="church-postal-code" className="block text-xs font-bold text-[#1C1917] mb-1">Postal Code</label>
+                <input id="church-postal-code" aria-label="Postal Code"
                   type="text"
-                  value={profile.zipCode}
-                  onChange={(e) => setProfile({ ...profile, zipCode: e.target.value })}
+                  value={profile.postalCode}
+                  onChange={(e) => setProfile({ ...profile, postalCode: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono"
                 />
               </div>
@@ -146,8 +154,8 @@ export const OrgProfileSettingsPanel: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Primary Phone</label>
-              <input aria-label="Primary Phone"
+              <label htmlFor="church-phone" className="block text-xs font-bold text-[#1C1917] mb-1">Primary Phone</label>
+              <input id="church-phone" aria-label="Primary Phone"
                 type="tel"
                 value={profile.phone}
                 onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
@@ -156,8 +164,8 @@ export const OrgProfileSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Office Email</label>
-              <input aria-label="Office Email"
+              <label htmlFor="church-email" className="block text-xs font-bold text-[#1C1917] mb-1">Office Email</label>
+              <input id="church-email" aria-label="Office Email"
                 type="email"
                 value={profile.email}
                 onChange={(e) => setProfile({ ...profile, email: e.target.value })}
@@ -166,8 +174,8 @@ export const OrgProfileSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Church Website</label>
-              <input aria-label="Church Website"
+              <label htmlFor="church-website" className="block text-xs font-bold text-[#1C1917] mb-1">Church Website</label>
+              <input id="church-website" aria-label="Church Website"
                 type="url"
                 value={profile.website}
                 onChange={(e) => setProfile({ ...profile, website: e.target.value })}
@@ -185,18 +193,18 @@ export const OrgProfileSettingsPanel: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Bishop / Visionary Leader</label>
-              <input aria-label="Bishop / Visionary Leader"
+              <label htmlFor="church-visionary-leader" className="block text-xs font-bold text-[#1C1917] mb-1">Bishop / Visionary Leader</label>
+              <input id="church-visionary-leader" aria-label="Bishop / Visionary Leader"
                 type="text"
-                value={profile.seniorPastor}
-                onChange={(e) => setProfile({ ...profile, seniorPastor: e.target.value })}
+                value={profile.visionaryLeader}
+                onChange={(e) => setProfile({ ...profile, visionaryLeader: e.target.value })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Church Administrator</label>
-              <input aria-label="Church Administrator"
+              <label htmlFor="church-administrator" className="block text-xs font-bold text-[#1C1917] mb-1">Church Administrator</label>
+              <input id="church-administrator" aria-label="Church Administrator"
                 type="text"
                 value={profile.administrator}
                 onChange={(e) => setProfile({ ...profile, administrator: e.target.value })}
@@ -212,7 +220,7 @@ export const OrgProfileSettingsPanel: React.FC = () => {
             Service Times & Office Hours
           </h4>
           <p className="text-[11px] text-[#57534E]">
-            Office open {profile.officeHours} · {profile.address}
+            Office open {profile.officeHours} · {profile.street}
           </p>
           <div className="rounded-[10px] border border-[#E7E5E4] overflow-hidden">
             <table className="w-full text-xs">
@@ -223,7 +231,7 @@ export const OrgProfileSettingsPanel: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {profile.serviceTimes.map((slot) => (
+                {SERVICE_TIMES.map((slot) => (
                   <tr key={slot.name} className="border-t border-[#E7E5E4]/70">
                     <td className="px-3 py-2 font-medium text-[#1C1917]">{slot.name}</td>
                     <td className="px-3 py-2 text-[#57534E]">{slot.time}</td>

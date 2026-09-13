@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { WorshipService, LiturgyItem, ServiceRoleAssignment, ServiceType } from '../../../../types';
 import { INITIAL_SERVICES } from '../../../../data/churchMockData';
 import { DEFAULT_LOCATION, LOCATIONS, SUNDAY_WINDOW, sundayLiturgy } from '../../../../data/churchDomain';
-import { interactiveCard } from '../../interactiveCard';
+import { dialogProps } from '../../dialog';
+import { interactiveCard } from '../../interactiveCard'
+;
 
 export const ServicePlannerPanel: React.FC = () => {
   const [services, setServices] = useState<WorshipService[]>(INITIAL_SERVICES);
@@ -15,19 +17,19 @@ export const ServicePlannerPanel: React.FC = () => {
   // New Service Form State
   const [newServiceTitle, setNewServiceTitle] = useState('');
   const [newServiceType, setNewServiceType] = useState<ServiceType>('sunday-morning');
-  const [newServiceDate, setNewServiceDate] = useState('2026-09-27');
+  const [newServiceDate, setNewServiceDate] = useState('2025-02-16');
   const [newServiceTime, setNewServiceTime] = useState<string>(SUNDAY_WINDOW);
   const [newServiceCampus, setNewServiceCampus] = useState<string>(DEFAULT_LOCATION);
   const [newServiceTheme, setNewServiceTheme] = useState('');
   const [newServiceScripture, setNewServiceScripture] = useState('');
   const [newServicePreacher, setNewServicePreacher] = useState('Bishop Sammy');
-  const [newServiceWorshipLead, setNewServiceWorshipLead] = useState('Caleb Timothy Vance');
+  const [newServiceWorshipLead, setNewServiceWorshipLead] = useState('Caleb Timothy Mwangi');
 
   // New Service Item Form State
   const [newLiturgyType, setNewLiturgyType] = useState<LiturgyItem['type']>('worship-praise');
   const [newLiturgyTitle, setNewLiturgyTitle] = useState('');
   const [newLiturgyDuration, setNewLiturgyDuration] = useState<number>(10);
-  const [newLiturgyLeader, setNewLiturgyLeader] = useState('Caleb Timothy Vance');
+  const [newLiturgyLeader, setNewLiturgyLeader] = useState('Caleb Timothy Mwangi');
   const [newLiturgyNotes, setNewLiturgyNotes] = useState('');
   const [newLiturgyScripture, setNewLiturgyScripture] = useState('');
 
@@ -58,10 +60,10 @@ export const ServicePlannerPanel: React.FC = () => {
       keyRoles: [
         { role: 'preacher', roleName: 'Minister of the Word', assignedMemberId: 'mbr-1', assignedMemberName: newServicePreacher, status: 'confirmed' },
         { role: 'worship-lead', roleName: 'Music Director', assignedMemberId: 'mbr-1', assignedMemberName: newServiceWorshipLead, status: 'confirmed' },
-        { role: 'presiding-elder', roleName: 'Elder on Duty', assignedMemberId: 'mbr-2', assignedMemberName: 'Marcus Jenkins', status: 'confirmed' },
-        { role: 'scripture-reader', roleName: 'Scripture Reader', assignedMemberId: 'mbr-3', assignedMemberName: 'Clara Oswald', status: 'pending' },
-        { role: 'sound-av', roleName: 'Sound Desk Tech', assignedMemberId: 'mbr-7', assignedMemberName: 'David Alistair', status: 'confirmed' },
-        { role: 'head-usher', roleName: 'Chief Usher', assignedMemberId: 'mbr-5', assignedMemberName: 'Arthur Miller', status: 'confirmed' },
+        { role: 'presiding-elder', roleName: 'Elder on Duty', assignedMemberId: 'mbr-2', assignedMemberName: 'Marcus Kamau', status: 'confirmed' },
+        { role: 'scripture-reader', roleName: 'Scripture Reader', assignedMemberId: 'mbr-3', assignedMemberName: 'Clara Wambui', status: 'pending' },
+        { role: 'sound-av', roleName: 'Sound Desk Tech', assignedMemberId: 'mbr-7', assignedMemberName: 'David Kimani', status: 'confirmed' },
+        { role: 'head-usher', roleName: 'Chief Usher', assignedMemberId: 'mbr-5', assignedMemberName: 'Arthur Wanjala', status: 'confirmed' },
       ],
       liturgyOrder: sundayLiturgy(`lit-${Date.now()}-`, {
         2: { leader: newServiceWorshipLead },
@@ -503,7 +505,7 @@ export const ServicePlannerPanel: React.FC = () => {
 
       {/* MODAL: Create New Service */}
       {isCreatingService && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreatingService(false), "Schedule New Worship Service")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <div className="flex items-center gap-2">
@@ -516,15 +518,15 @@ export const ServicePlannerPanel: React.FC = () => {
                 type="button"
                 onClick={() => setIsCreatingService(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateService} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Service Title *</label>
-                <input aria-label="Service Title"
+                <label htmlFor="service-title" className="block text-xs font-bold text-[#1C1917] mb-1">Service Title *</label>
+                <input id="service-title" aria-label="Service Title"
                   type="text"
                   required
                   placeholder="e.g. Lord’s Day Morning Worship & Holy Communion"
@@ -536,8 +538,8 @@ export const ServicePlannerPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Service Type</label>
-                  <select aria-label="Service Type"
+                  <label htmlFor="service-type" className="block text-xs font-bold text-[#1C1917] mb-1">Service Type</label>
+                  <select id="service-type" aria-label="Service Type"
                     value={newServiceType}
                     onChange={(e) => setNewServiceType(e.target.value as ServiceType)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -551,8 +553,8 @@ export const ServicePlannerPanel: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Date</label>
-                  <input aria-label="Date"
+                  <label htmlFor="service-date" className="block text-xs font-bold text-[#1C1917] mb-1">Date</label>
+                  <input id="service-date" aria-label="Date"
                     type="date"
                     value={newServiceDate}
                     onChange={(e) => setNewServiceDate(e.target.value)}
@@ -563,8 +565,8 @@ export const ServicePlannerPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Time Window</label>
-                  <input aria-label="Time Window"
+                  <label htmlFor="service-time-window" className="block text-xs font-bold text-[#1C1917] mb-1">Time Window</label>
+                  <input id="service-time-window" aria-label="Time Window"
                     type="text"
                     placeholder={SUNDAY_WINDOW}
                     value={newServiceTime}
@@ -573,8 +575,8 @@ export const ServicePlannerPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Campus / Hall</label>
-                  <select aria-label="Campus / Hall"
+                  <label htmlFor="service-campus" className="block text-xs font-bold text-[#1C1917] mb-1">Campus / Hall</label>
+                  <select id="service-campus" aria-label="Campus / Hall"
                     value={newServiceCampus}
                     onChange={(e) => setNewServiceCampus(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -590,8 +592,8 @@ export const ServicePlannerPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Homily / Sermon Theme</label>
-                  <input aria-label="Homily / Sermon Theme"
+                  <label htmlFor="service-theme" className="block text-xs font-bold text-[#1C1917] mb-1">Homily / Sermon Theme</label>
+                  <input id="service-theme" aria-label="Homily / Sermon Theme"
                     type="text"
                     placeholder="e.g. The Righteous Shall Live by Faith"
                     value={newServiceTheme}
@@ -600,8 +602,8 @@ export const ServicePlannerPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Scripture Text</label>
-                  <input aria-label="Scripture Text"
+                  <label htmlFor="service-scripture" className="block text-xs font-bold text-[#1C1917] mb-1">Scripture Text</label>
+                  <input id="service-scripture" aria-label="Scripture Text"
                     type="text"
                     placeholder="e.g. Romans 1:16-17; Psalm 103"
                     value={newServiceScripture}
@@ -613,28 +615,27 @@ export const ServicePlannerPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Preacher / Minister</label>
-                  <select aria-label="Preacher / Minister"
+                  <label htmlFor="service-preacher" className="block text-xs font-bold text-[#1C1917] mb-1">Preacher / Minister</label>
+                  <select id="service-preacher" aria-label="Preacher / Minister"
                     value={newServicePreacher}
                     onChange={(e) => setNewServicePreacher(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                   >
                     <option value="Bishop Sammy">Bishop Sammy</option>
-                    <option value="David Alistair">David Alistair (Youth Pastor)</option>
-                    <option value="Arthur Miller">Arthur Miller (Elder Emeritus)</option>
+                    <option value="Rev. Alice">Rev. Alice (Co-Visionary Leader)</option>
                     <option value="Guest Preacher">Guest Preacher</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Worship Leader</label>
-                  <select aria-label="Worship Leader"
+                  <label htmlFor="service-worship-leader" className="block text-xs font-bold text-[#1C1917] mb-1">Worship Leader</label>
+                  <select id="service-worship-leader" aria-label="Worship Leader"
                     value={newServiceWorshipLead}
                     onChange={(e) => setNewServiceWorshipLead(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                   >
-                    <option value="Caleb Timothy Vance">Caleb Timothy Vance</option>
-                    <option value="Sarah Jenkins">Sarah Jenkins</option>
-                    <option value="Maya Jenkins">Maya Jenkins</option>
+                    <option value="Caleb Timothy Mwangi">Caleb Timothy Mwangi</option>
+                    <option value="Sarah Kamau">Sarah Kamau</option>
+                    <option value="Maya Kamau">Maya Kamau</option>
                   </select>
                 </div>
               </div>
@@ -661,7 +662,7 @@ export const ServicePlannerPanel: React.FC = () => {
 
       {/* MODAL: Add Service Item */}
       {isAddingLiturgyItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsAddingLiturgyItem(false), "Add Service Element")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Add Service Element</h3>
@@ -669,15 +670,15 @@ export const ServicePlannerPanel: React.FC = () => {
                 type="button"
                 onClick={() => setIsAddingLiturgyItem(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleAddLiturgyItem} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Service Element Type</label>
-                <select aria-label="Service Element Type"
+                <label htmlFor="liturgy-type" className="block text-xs font-bold text-[#1C1917] mb-1">Service Element Type</label>
+                <select id="liturgy-type" aria-label="Service Element Type"
                   value={newLiturgyType}
                   onChange={(e) => setNewLiturgyType(e.target.value as LiturgyItem['type'])}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -697,8 +698,8 @@ export const ServicePlannerPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Title / Hymn Name *</label>
-                <input aria-label="Title / Hymn Name"
+                <label htmlFor="liturgy-title" className="block text-xs font-bold text-[#1C1917] mb-1">Title / Hymn Name *</label>
+                <input id="liturgy-title" aria-label="Title / Hymn Name"
                   type="text"
                   required
                   placeholder="e.g. Hymn of Dedication: 'Be Thou My Vision'"
@@ -710,8 +711,8 @@ export const ServicePlannerPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Duration (Minutes)</label>
-                  <input aria-label="Duration (Minutes)"
+                  <label htmlFor="liturgy-duration" className="block text-xs font-bold text-[#1C1917] mb-1">Duration (Minutes)</label>
+                  <input id="liturgy-duration" aria-label="Duration (Minutes)"
                     type="number"
                     min={1}
                     max={60}
@@ -721,8 +722,8 @@ export const ServicePlannerPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Presiding Leader</label>
-                  <input aria-label="Presiding Leader"
+                  <label htmlFor="liturgy-leader" className="block text-xs font-bold text-[#1C1917] mb-1">Presiding Leader</label>
+                  <input id="liturgy-leader" aria-label="Presiding Leader"
                     type="text"
                     value={newLiturgyLeader}
                     onChange={(e) => setNewLiturgyLeader(e.target.value)}
@@ -732,8 +733,8 @@ export const ServicePlannerPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Scripture Reference (Optional)</label>
-                <input aria-label="Scripture Reference (Optional)"
+                <label htmlFor="liturgy-scripture" className="block text-xs font-bold text-[#1C1917] mb-1">Scripture Reference (Optional)</label>
+                <input id="liturgy-scripture" aria-label="Scripture Reference (Optional)"
                   type="text"
                   placeholder="e.g. 1 Peter 2:9-10"
                   value={newLiturgyScripture}
@@ -743,8 +744,8 @@ export const ServicePlannerPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Notes / Instructions</label>
-                <textarea aria-label="Notes / Instructions"
+                <label htmlFor="liturgy-notes" className="block text-xs font-bold text-[#1C1917] mb-1">Notes / Instructions</label>
+                <textarea id="liturgy-notes" aria-label="Notes / Instructions"
                   rows={2}
                   placeholder="e.g. Congregation stands; band transitions to acoustic chords"
                   value={newLiturgyNotes}
@@ -775,7 +776,7 @@ export const ServicePlannerPanel: React.FC = () => {
 
       {/* MODAL: Printable Service Bulletin Preview */}
       {previewBulletinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setPreviewBulletinModal(false), "Order of Divine Service")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-2xl w-full p-8 shadow-2xl border border-[#E7E5E4] max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in duration-150 font-serif">
             <div className="flex items-center justify-between pb-4 border-b-2 border-[#1C1917]">
               <div>
@@ -791,7 +792,7 @@ export const ServicePlannerPanel: React.FC = () => {
                 type="button"
                 onClick={() => setPreviewBulletinModal(false)}
                 className="font-sans text-[#57534E] hover:text-[#1C1917] p-1.5 rounded-md border border-[#E7E5E4]"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>

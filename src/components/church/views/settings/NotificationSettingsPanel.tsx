@@ -56,8 +56,8 @@ export const NotificationSettingsPanel: React.FC = () => {
           {settings.smsAlertsEnabled && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#E7E5E4]/80">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">SMS Sender ID</label>
-                <input aria-label="SMS Sender ID"
+                <label htmlFor="notifications-sms-sender" className="block text-xs font-bold text-[#1C1917] mb-1">SMS Sender ID</label>
+                <input id="notifications-sms-sender" aria-label="SMS Sender ID"
                   type="text"
                   value={settings.smsSenderId}
                   onChange={(e) => setSettings({ ...settings, smsSenderId: e.target.value })}
@@ -66,8 +66,8 @@ export const NotificationSettingsPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Carrier Provider</label>
-                <select aria-label="Carrier Provider"
+                <label htmlFor="notifications-sms-provider" className="block text-xs font-bold text-[#1C1917] mb-1">Carrier Provider</label>
+                <select id="notifications-sms-provider" aria-label="Carrier Provider"
                   value={settings.smsProvider}
                   onChange={(e) => setSettings({ ...settings, smsProvider: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FFFFFF]"
@@ -103,8 +103,8 @@ export const NotificationSettingsPanel: React.FC = () => {
           {settings.emailDigestEnabled && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#E7E5E4]/80">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Digest Frequency</label>
-                <select aria-label="Digest Frequency"
+                <label htmlFor="notifications-email-frequency" className="block text-xs font-bold text-[#1C1917] mb-1">Digest Frequency</label>
+                <select id="notifications-email-frequency" aria-label="Digest Frequency"
                   value={settings.emailFrequency}
                   onChange={(e) => setSettings({ ...settings, emailFrequency: e.target.value as any })}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FFFFFF]"
@@ -116,8 +116,8 @@ export const NotificationSettingsPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Email Relay Provider</label>
-                <select aria-label="Email Relay Provider"
+                <label htmlFor="notifications-email-provider" className="block text-xs font-bold text-[#1C1917] mb-1">Email Relay Provider</label>
+                <select id="notifications-email-provider" aria-label="Email Relay Provider"
                   value={settings.emailProvider}
                   onChange={(e) => setSettings({ ...settings, emailProvider: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FFFFFF]"

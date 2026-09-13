@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { AnnouncementItem, AnnouncementAudience } from '../../../../types';
-import { INITIAL_ANNOUNCEMENTS } from '../../../../data/churchMockData';
+import { dialogProps } from '../../dialog';
+import { INITIAL_ANNOUNCEMENTS } from '../../../../data/churchMockData'
+;
 
 export const AnnouncementsPanel: React.FC = () => {
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(INITIAL_ANNOUNCEMENTS);
@@ -14,7 +16,7 @@ export const AnnouncementsPanel: React.FC = () => {
   const [priority, setPriority] = useState<AnnouncementItem['priority']>('normal');
   const [isPinned, setIsPinned] = useState<boolean>(false);
   const [category, setCategory] = useState<AnnouncementItem['category']>('worship');
-  const [expiryDate, setExpiryDate] = useState('Oct 30, 2026');
+  const [expiryDate, setExpiryDate] = useState('Mar 09, 2025');
   const [author, setAuthor] = useState('Church Office Staff');
 
   const filteredAnnouncements = announcements.filter((ann) => {
@@ -245,7 +247,7 @@ export const AnnouncementsPanel: React.FC = () => {
 
       {/* MODAL: Publish Announcement */}
       {isCreating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreating(false), "Publish Announcement")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Publish Announcement</h3>
@@ -253,15 +255,15 @@ export const AnnouncementsPanel: React.FC = () => {
                 type="button"
                 onClick={() => setIsCreating(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateAnnouncement} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Headline / Title *</label>
-                <input aria-label="Headline / Title"
+                <label htmlFor="announcement-title" className="block text-xs font-bold text-[#1C1917] mb-1">Headline / Title *</label>
+                <input id="announcement-title" aria-label="Headline / Title"
                   type="text"
                   required
                   placeholder="e.g. Reformation Heritage Dinner & Hymn Sing"
@@ -273,8 +275,8 @@ export const AnnouncementsPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Target Audience</label>
-                  <select aria-label="Target Audience"
+                  <label htmlFor="announcement-audience" className="block text-xs font-bold text-[#1C1917] mb-1">Target Audience</label>
+                  <select id="announcement-audience" aria-label="Target Audience"
                     value={audience}
                     onChange={(e) => setAudience(e.target.value as AnnouncementAudience)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -287,8 +289,8 @@ export const AnnouncementsPanel: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Priority</label>
-                  <select aria-label="Priority"
+                  <label htmlFor="announcement-priority" className="block text-xs font-bold text-[#1C1917] mb-1">Priority</label>
+                  <select id="announcement-priority" aria-label="Priority"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as any)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -301,8 +303,8 @@ export const AnnouncementsPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Notice Content *</label>
-                <textarea aria-label="Notice Content"
+                <label htmlFor="announcement-content" className="block text-xs font-bold text-[#1C1917] mb-1">Notice Content *</label>
+                <textarea id="announcement-content" aria-label="Notice Content"
                   rows={4}
                   required
                   placeholder="Full bulletin notice body..."
@@ -314,8 +316,8 @@ export const AnnouncementsPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
-                  <select aria-label="Category"
+                  <label htmlFor="announcement-category" className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
+                  <select id="announcement-category" aria-label="Category"
                     value={category}
                     onChange={(e) => setCategory(e.target.value as any)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -328,8 +330,8 @@ export const AnnouncementsPanel: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Author / Sign-off</label>
-                  <input aria-label="Author / Sign-off"
+                  <label htmlFor="announcement-author" className="block text-xs font-bold text-[#1C1917] mb-1">Author / Sign-off</label>
+                  <input id="announcement-author" aria-label="Author / Sign-off"
                     type="text"
                     value={author}
                     onChange={(e) => setAuthor(e.target.value)}

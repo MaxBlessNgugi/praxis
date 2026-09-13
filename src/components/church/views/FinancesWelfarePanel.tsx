@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { dialogProps } from '../dialog';
+import React, { useState } from 'react'
+;
 
 interface WelfareCase {
   id: string;
@@ -22,23 +24,23 @@ const CASES: WelfareCase[] = [
     category: 'Emergency Rental',
     categoryColor: 'bg-[#ffdbd0] text-[#9b2f00]',
     amount: 1200.00,
-    caseworker: 'Deaconess Clara Oswald',
-    date: 'Oct 22, 2024',
+    caseworker: 'Clara Wambui',
+    date: 'Feb 05, 2025',
     status: 'Disbursed',
-    confidentialNotes: 'Household faced 3-day notice due to temporary layoff. Direct payment remitted to Maple Ridge Properties LLC. Case worker scheduled 2nd pastoral check-in next week.',
+    confidentialNotes: 'Household faced a 3-day eviction notice after the breadwinner lost work. Direct payment remitted to Nyahururu Properties Ltd. Case worker scheduled a second pastoral check-in next week.',
     householdDetails: '3 Children (Ages 4, 7, 11) · Church Member since 2021',
   },
   {
     id: 'w-2',
     caseNo: '#WEL-2411',
-    description: 'Winter Heating Oil Tank Relief',
+    description: 'Household Utility Bill Relief',
     category: 'Fuel & Utility',
     categoryColor: 'bg-[#ffdcc3] text-[#2f1500]',
     amount: 650.00,
-    caseworker: 'Elder Marcus Jenkins',
-    date: 'Oct 19, 2024',
+    caseworker: 'Elder Marcus Kamau',
+    date: 'Feb 02, 2025',
     status: 'Disbursed',
-    confidentialNotes: '150 gallons fuel oil delivery voucher issued to Valley Energy Services for elderly widow home.',
+    confidentialNotes: '200 litre LPG refill voucher issued to Valley Energy Services for an elderly widow’s home.',
     householdDetails: 'Senior Visitor · Living alone',
   },
   {
@@ -48,10 +50,10 @@ const CASES: WelfareCase[] = [
     category: 'Medical Grant',
     categoryColor: 'bg-[#85f8c4]/40 text-[#005137]',
     amount: 450.00,
-    caseworker: 'Rev. Sarah Alistair',
-    date: 'Oct 18, 2024',
+    caseworker: 'Sarah Kimani',
+    date: 'Feb 01, 2025',
     status: 'Disbursed',
-    confidentialNotes: 'Emergency abscess treatment copay. Directly paid to County Dental Clinic.',
+    confidentialNotes: 'Emergency dental treatment bill, settled directly with the Laikipia County Dental Clinic.',
     householdDetails: 'College student & part-time nursery volunteer',
   },
   {
@@ -61,10 +63,10 @@ const CASES: WelfareCase[] = [
     category: 'Food Voucher',
     categoryColor: 'bg-[#ffdad6] text-[#ba1a1a]',
     amount: 350.00,
-    caseworker: 'Deaconess Clara Oswald',
-    date: 'Oct 15, 2024',
+    caseworker: 'Clara Wambui',
+    date: 'Jan 29, 2025',
     status: 'Disbursed',
-    confidentialNotes: 'Provided 2 weeks of grocery store digital scrip following sudden loss of spouse.',
+    confidentialNotes: 'Provided two weeks of grocery vouchers following the sudden loss of a spouse.',
     householdDetails: 'Family of 4 · Deacon meal train also organized',
   },
   {
@@ -74,11 +76,11 @@ const CASES: WelfareCase[] = [
     category: 'Pharmacy Care',
     categoryColor: 'bg-[#e9e1dd] text-[#59413a]',
     amount: 280.00,
-    caseworker: 'Arthur Miller',
-    date: 'Oct 12, 2024',
+    caseworker: 'Arthur Wanjala',
+    date: 'Jan 27, 2025',
     status: 'Disbursed',
-    confidentialNotes: 'Assisted with Medicare Part D coverage gap shortfall for heart medication.',
-    householdDetails: 'Elderly couple on fixed social security pension',
+    confidentialNotes: 'Assisted with the NHIF coverage gap shortfall for heart medication.',
+    householdDetails: 'Elderly couple on a fixed pension',
   },
 ];
 
@@ -182,9 +184,9 @@ export const FinancesWelfarePanel: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div>
             <h3 className="font-headline text-base font-bold text-[#1e1b19]">
-              October Benevolence Disbursement by Need
+              February Benevolence Disbursement by Need
             </h3>
-            <p className="text-xs text-[#59413a]">Distribution of relief funds approved by the Board of Deacons</p>
+            <p className="text-xs text-[#59413a]">Distribution of relief funds approved by the Missions, Mercy & Church Planting ministry</p>
           </div>
           <button
             onClick={() => setIsDisbursementModalOpen(true)}
@@ -291,7 +293,7 @@ export const FinancesWelfarePanel: React.FC = () => {
 
       {/* Confidential Notes Slide-Out Drawer */}
       {selectedCase && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs" {...dialogProps(() => setSelectedCase(null), "Welfare Case Detail")}>
           <div className="w-full max-w-md bg-white h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200">
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-[#EAE1D7]">
@@ -301,7 +303,7 @@ export const FinancesWelfarePanel: React.FC = () => {
                     Case Notes ({selectedCase.caseNo})
                   </h3>
                 </div>
-                <button onClick={() => setSelectedCase(null)} className="text-[#59413a] hover:text-[#1e1b19]">
+                <button onClick={() => setSelectedCase(null)} className="text-[#59413a] hover:text-[#1e1b19]" aria-label="Close">
                   <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
@@ -360,27 +362,27 @@ export const FinancesWelfarePanel: React.FC = () => {
 
       {/* New Disbursement Modal */}
       {isDisbursementModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...dialogProps(() => setIsDisbursementModalOpen(false), "New Welfare Relief Disbursement")}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[#EAE1D7] pb-3">
               <h3 className="font-headline text-base font-bold text-[#1e1b19]">New Welfare Relief Disbursement</h3>
-              <button onClick={() => setIsDisbursementModalOpen(false)} className="text-[#59413a] hover:text-[#1e1b19]">
+              <button onClick={() => setIsDisbursementModalOpen(false)} className="text-[#59413a] hover:text-[#1e1b19]" aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold mb-1">Beneficiary Family / Case Subject</label>
-                <input aria-label="Beneficiary Family / Case Subject" type="text" placeholder="e.g. Miller Family" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <label htmlFor="welfare-beneficiary" className="block font-semibold mb-1">Beneficiary Family / Case Subject</label>
+                <input id="welfare-beneficiary" aria-label="Beneficiary Family / Case Subject" type="text" placeholder="e.g. Wanjala Family" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold mb-1">Amount (KSh)</label>
-                  <input aria-label="Amount (KSh)" type="number" placeholder="600.00" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                  <label htmlFor="welfare-amount" className="block font-semibold mb-1">Amount (KSh)</label>
+                  <input id="welfare-amount" aria-label="Amount (KSh)" type="number" placeholder="600.00" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Category</label>
-                  <select aria-label="Category" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
+                  <label htmlFor="welfare-category" className="block font-semibold mb-1">Category</label>
+                  <select id="welfare-category" aria-label="Category" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
                     <option>Emergency Rental</option>
                     <option>Fuel & Utility</option>
                     <option>Medical Grant</option>
@@ -389,12 +391,12 @@ export const FinancesWelfarePanel: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block font-semibold mb-1">Direct Payee / Vendor</label>
-                <input aria-label="Direct Payee / Vendor" type="text" placeholder="e.g. Valley Power Authority" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <label htmlFor="welfare-payee" className="block font-semibold mb-1">Direct Payee / Vendor</label>
+                <input id="welfare-payee" aria-label="Direct Payee / Vendor" type="text" placeholder="e.g. Valley Power Authority" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
               </div>
               <div>
-                <label className="block font-semibold mb-1">Deacon Assessment Notes</label>
-                <textarea aria-label="Deacon Assessment Notes" rows={3} placeholder="Provide concise justification..." className="w-full p-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"></textarea>
+                <label htmlFor="welfare-notes" className="block font-semibold mb-1">Deacon Assessment Notes</label>
+                <textarea id="welfare-notes" aria-label="Deacon Assessment Notes" rows={3} placeholder="Provide concise justification..." className="w-full p-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"></textarea>
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EAE1D7]">

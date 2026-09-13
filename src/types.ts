@@ -1,5 +1,3 @@
-export type StudioViewMode = 'prototype' | 'figma-canvas' | 'design-system' | 'inspect-mode';
-
 export type ParishNavTab = 
   | 'home' 
   | 'find-christian' 
@@ -199,6 +197,8 @@ export interface ChurchEventItem {
   category: 'worship' | 'fellowship' | 'youth' | 'outreach' | 'governance' | 'training';
   ministry: string;
   date: string;
+  /** Last day of a multi-day conference; the card renders the published range from the two. */
+  endDate?: string;
   startTime: string;
   endTime: string;
   location: string;
@@ -263,34 +263,14 @@ export interface BirthdayAnniversaryItem {
 // ==================== SETTINGS TYPES ====================
 
 /**
- * One field per fact. The profile used to carry mirror pairs (`churchName` + `name`,
- * `foundingYear` + `establishedYear`, `taxExemptNumber` + `taxId`, `physicalAddress` +
- * `mailingAddress` + `address`, `campuses` + LOCATIONS) where only one half was ever
- * read and nothing kept the other honest. The church's own identity and location facts
- * live in `src/data/churchDomain.ts`; this type only carries what the profile screen
- * edits.
+ * One field per fact. The church's identity, contact, location, leadership and
+ * service-time facts are **not** stored again here: they live once in
+ * `src/data/churchDomain.ts` (`CHURCH`, `SUNDAY_ORDER` / `SERVICE_TIMES`) and the Church
+ * Profile form reads them from that record. What is left is the content no other screen
+ * reads, so every fact has exactly one home to drift from.
  */
 export interface ChurchOrgProfile {
-  name?: string;
-  denomination?: string;
-  tagline?: string;
-  taxId?: string;
-  nonprofitStatus?: string;
   establishedYear?: number;
-  phone: string;
-  email: string;
-  website: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  timezone?: string;
-  currency?: string;
-  fiscalYearStart?: string;
-  seniorPastor?: string;
-  administrator?: string;
-  officeHours: string;
-  serviceTimes: { name: string; time: string }[];
   socials: { platform: string; handle: string; url: string }[];
   vision: string;
   mission: string[];
@@ -441,7 +421,7 @@ export interface HouseholdDependent {
 
 export interface HouseholdUnit {
   id: string;
-  name: string; // e.g. The Vance Household
+  name: string; // e.g. The Mwangi Household
   unitNumber: string; // #108
   campus: string;
   statusBadge: string;
@@ -469,109 +449,4 @@ export interface SoftDeleteRecord {
   destinationPastor?: string;
   rationale: string;
   isUrgent?: boolean;
-}
-
-export interface CanvasComment {
-  id: string;
-  x: number;
-  y: number;
-  frame: string;
-  author: string;
-  avatar: string;
-  text: string;
-  time: string;
-  resolved: boolean;
-}
-
-export interface InspectedElementInfo {
-  id: string;
-  name: string;
-  category: string;
-  tailwindClasses: string;
-  cssProps: {
-    display: string;
-    padding: string;
-    margin: string;
-    borderRadius: string;
-    backgroundColor: string;
-    border: string;
-    color: string;
-    fontFamily: string;
-    fontSize: string;
-  };
-  dimensions: {
-    width: number;
-    height: number;
-  };
-}
-
-// Legacy Compatibility Types (for previous sandbox mock components)
-export type SystemTab = 'dashboard' | 'services' | 'clusters' | 'deployments' | 'security' | 'team' | 'logs' | 'settings';
-
-export interface Microservice {
-  id: string;
-  name: string;
-  slug?: string;
-  category: string;
-  status: 'healthy' | 'degraded' | 'error' | 'deploying';
-  region: string;
-  instances?: number;
-  replicas?: number;
-  cpuUsage: number;
-  memoryUsage?: number;
-  memUsage?: number;
-  latencyMs?: number;
-  version: string;
-  uptime: string;
-  port?: number;
-  lastDeployed?: string;
-  environment?: string;
-}
-
-export interface TelemetryPoint {
-  time: string;
-  cpu?: number;
-  memory?: number;
-  requests: number;
-  latency: number;
-  errors?: number;
-}
-
-export interface AuditEvent {
-  id: string;
-  timestamp: string;
-  user?: any;
-  actor?: any;
-  avatar?: string;
-  action: string;
-  resource?: string;
-  target?: string;
-  severity?: string;
-  status?: 'success' | 'warning' | 'error';
-  ipAddress?: string;
-}
-
-export interface TeamMember {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  avatar: string;
-  status: 'active' | 'away' | 'offline' | 'invited';
-  lastActive: string;
-  mfaEnabled?: boolean;
-  twoFactorEnabled?: boolean;
-}
-
-export interface ApiKey {
-  id: string;
-  name: string;
-  keyPrefix?: string;
-  prefix?: string;
-  scopes?: string[];
-  environment?: string;
-  created: string;
-  lastUsed: string;
-  expires: string;
-  status?: 'active' | 'revoked';
 }

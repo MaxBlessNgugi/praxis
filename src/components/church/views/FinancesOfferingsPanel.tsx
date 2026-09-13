@@ -21,7 +21,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
             <div className="font-headline text-3xl font-bold text-[#1e1b19]">KSh 38,420</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">trending_up</span>
-              <span>Oct 20 across 3 worship services</span>
+              <span>Feb 02 across 3 worship services</span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
@@ -108,7 +108,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
               12-Week Sunday Offering Inflow & Target Variance
             </h3>
             <p className="text-xs text-[#59413a]">
-              Plate collections, numbered envelopes, and kiosk contactless giving across Q3/Q4.
+              Plate collections, numbered envelopes, and kiosk contactless giving across Q1/Q2.
             </p>
           </div>
           <div className="flex items-center gap-4 text-xs font-medium">
@@ -167,7 +167,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
           <div className="flex items-center gap-2">
             <span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[20px]">table_chart</span>
             <h3 className="font-headline text-sm font-bold text-[#1e1b19]">
-              October 20 Service Collections Tally
+              February 02 Service Collections Tally
             </h3>
           </div>
           <button
@@ -289,7 +289,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
             <span aria-hidden="true" className="material-symbols-outlined text-[18px]">lock</span>
           </div>
           <p className="text-xs text-[#59413a]">
-            <strong>Cash Count Dual-Custody Verification:</strong> Safe Deposit Bag <strong className="text-[#1e1b19]">#B-902</strong> sealed with tamper-evident strip #TX-7814 at 1:45 PM by Elder Marcus Jenkins and Deaconess Clara Oswald.
+            <strong>Cash Count Dual-Custody Verification:</strong> Safe Deposit Bag <strong className="text-[#1e1b19]">#B-902</strong> sealed with tamper-evident strip #TX-7814 at 1:45 PM by Elder Marcus Kamau and Clara Wambui.
           </p>
         </div>
         <button className="h-8 px-3 rounded-lg bg-white border border-[#EAE1D7] text-xs font-bold text-[#1e1b19] hover:bg-[#f4ece8] shrink-0">

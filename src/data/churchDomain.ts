@@ -17,14 +17,14 @@ export const CHURCH = {
   visionaryLeader: 'Bishop Sammy',
   administrator: 'Rev. Alice',
   registration: 'Registered religious organisation — Kenya',
-  nonprofitStatus: 'Faith-based non-profit (Kenya)',
+  nonprofitStatus: 'Faith-based society (Kenya)',
   phone: '+254 721 338 928',
   email: 'sachemwa@yahoo.com',
   website: 'https://destinysanctuary.co.ke',
   givingUrl: 'https://destinysanctuary.co.ke/give.html',
   street: "Destiny Sanctuary Int'L, Nyahururu, Laikipia, Kenya",
   city: 'Nyahururu',
-  county: 'Laikipia County',
+  county: 'Laikipia',
   postalCode: '20300',
   timezone: 'Africa/Nairobi (East Africa Time UTC+3)',
   currency: 'KES (KSh)',
@@ -45,11 +45,21 @@ export const SUNDAY_ORDER: ReadonlyArray<
   Pick<LiturgyItem, 'type' | 'title' | 'durationMinutes' | 'leader' | 'notes'>
 > = [
   { type: 'call-to-worship', title: 'First Service', durationMinutes: 120, leader: CHURCH.visionaryLeader, notes: '8:00 AM – 10:00 AM' },
-  { type: 'worship-praise', title: 'Praise & Worship', durationMinutes: 60, leader: 'Caleb Timothy Vance', notes: '10:00 AM – 11:00 AM' },
-  { type: 'announcements', title: 'Presentation / Visitors', durationMinutes: 30, leader: 'Marcus Jenkins', notes: '11:00 AM – 11:30 AM' },
+  { type: 'worship-praise', title: 'Praise & Worship', durationMinutes: 60, leader: 'Caleb Timothy Mwangi', notes: '10:00 AM – 11:00 AM' },
+  { type: 'announcements', title: 'Presentation / Visitors', durationMinutes: 30, leader: 'Marcus Kamau', notes: '11:00 AM – 11:30 AM' },
   { type: 'sermon', title: 'Sermon / Word Ministry', durationMinutes: 75, leader: CHURCH.visionaryLeader, notes: '11:30 AM – 12:45 PM' },
   { type: 'benediction', title: 'Congregation Dismissed', durationMinutes: 5, leader: CHURCH.visionaryLeader, notes: '12:50 PM' },
   { type: 'fellowship', title: 'Groups Meetings & Fellowship', durationMinutes: 30, leader: CHURCH.administrator, notes: '1:30 PM – 2:00 PM' },
+];
+
+/**
+ * The service-time table Settings → Organization Profile lists: the Sunday order above
+ * plus their Wednesday block. Derived from `SUNDAY_ORDER` so a renamed element cannot
+ * leave the settings screen listing the old title.
+ */
+export const SERVICE_TIMES: ReadonlyArray<{ name: string; time: string }> = [
+  ...SUNDAY_ORDER.map(({ title, notes }) => ({ name: title, time: notes ?? '' })),
+  { name: 'Wednesdays (Counseling, Prayers & Midweek Services)', time: '9:00 AM – 5:00 PM' },
 ];
 
 /** The Sunday window the six elements add up to: 8:00 AM – 2:00 PM. */

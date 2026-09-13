@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
+import { dialogProps } from '../dialog';
+import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain'
+;
 import { 
   Building2, 
   Users, 
@@ -27,7 +29,8 @@ interface Department {
   subtitle: string;
   category: string;
   statusBadge: string;
-  cohortCount: string;
+  cohortSize: number;
+  cohortUnit: string;
   cohortLabel: string;
   icon: string;
   director: string;
@@ -41,175 +44,180 @@ interface Department {
   tags: string[];
   budgetDisbursed: number;
   budgetTotal: number;
-  remainingText: string;
 }
 
 const DEPARTMENTS: Department[] = [
   {
-    id: 'mv-01',
-    code: 'MV-01',
-    name: 'Men of Valor',
-    subtitle: 'Brotherhood & Discipleship',
-    category: 'Men',
-    statusBadge: 'Chartered',
-    cohortCount: '184 Men',
-    cohortLabel: 'Active Cohort',
-    icon: 'shield',
-    director: 'Elder Marcus Jenkins',
-    directorRole: 'Director',
-    directorInitials: 'MJ',
-    directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
-    associate: 'Assoc: Timothy Vance',
-    schedule: 'Meets: Alternate Saturdays · 7:30 AM',
-    email: 'marcus.j@destinysanctuary.co.ke',
-    phone: '+254 734 567 120',
-    tags: ["Men's Retreat", "Saturday Breakfast", "Mentorship"],
-    budgetDisbursed: 31500,
-    budgetTotal: 42000,
-    remainingText: 'KSh 10,500 Remaining',
-  },
-  {
-    id: 'dg-02',
-    code: 'DG-02',
-    name: 'Daughters of Grace',
-    subtitle: "Women's Fellowship",
-    category: 'Women',
-    statusBadge: 'Chartered',
-    cohortCount: '226 Women',
-    cohortLabel: 'Active Cohort',
-    icon: 'spa',
-    director: 'Rev. Sarah Alistair',
-    directorRole: 'Director',
-    directorInitials: 'SA',
-    directorColor: 'bg-[#ffdcc3] text-[#904d00]',
-    associate: 'Counselor: Martha Miller',
-    schedule: 'Meets: Thursdays · 7:00 PM',
-    email: 'sarah.a@destinysanctuary.co.ke',
-    phone: '+254 778 901 230',
-    tags: ["Sisterhood Circles", "Annual Conference", "Benevolence Quilt"],
-    budgetDisbursed: 46480,
-    budgetTotal: 56000,
-    remainingText: 'KSh 9,520 Remaining',
-  },
-  {
-    id: 'ay-03',
-    code: 'AY-03',
-    name: 'Apex Youth Ministry',
-    subtitle: 'Teens & High School',
-    category: 'Youth',
-    statusBadge: 'High Activity',
-    cohortCount: '112 Teens',
-    cohortLabel: 'Active Cohort',
-    icon: 'local_fire_department',
-    director: 'Hannah Abbott',
-    directorRole: 'Youth Pastor',
-    directorInitials: 'HA',
-    directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
-    associate: 'Campus Youth Loft Wing',
-    schedule: 'Meets: Fridays · 6:30 PM (Youth Loft)',
-    email: 'david.a@destinysanctuary.co.ke',
-    phone: '+254 756 789 340',
-    tags: ["Friday Live Worship", "Summer Camp", "Confirmation Class"],
-    budgetDisbursed: 57800,
-    budgetTotal: 68000,
-    remainingText: 'KSh 10,200 Remaining',
-  },
-  {
-    id: 'kk-04',
-    code: 'KK-04',
-    name: 'Kingdom Kids',
-    subtitle: 'Children & Nursery (Ages 0–12)',
-    category: 'Children',
-    statusBadge: 'CPP Verified',
-    cohortCount: '148 Kids',
-    cohortLabel: 'Enrolled Children',
-    icon: 'toys',
-    director: 'Elena Vance',
-    directorRole: "Children's Director",
-    directorInitials: 'EV',
-    directorColor: 'bg-[#ffdcc3] text-[#904d00]',
-    associate: '28 Vetted Background Staff',
-    schedule: 'Meets: Sundays · 9:00 & 11:00 AM',
-    email: 'elena.vance@destinysanctuary.co.ke',
-    phone: '+254 767 890 450',
-    tags: ["KidCheck Secure Wing", "VBS Summer", "Nursery Care"],
-    budgetDisbursed: 39000,
-    budgetTotal: 52000,
-    remainingText: 'KSh 13,000 Remaining',
-  },
-  {
-    id: 'mb-05',
-    code: 'MB-05',
-    name: 'Mercy & Benevolence',
-    subtitle: 'Community Welfare & Outreach',
-    category: 'Outreach',
-    statusBadge: 'Community Core',
-    cohortCount: '52 Volunteers',
-    cohortLabel: 'Volunteer Corps',
-    icon: 'volunteer_activism',
-    director: 'Deaconess Clara Oswald',
-    directorRole: 'Almoner',
-    directorInitials: 'CO',
-    directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
-    associate: 'Assoc: Arthur Miller · 38 Fam/Mo',
-    schedule: 'HQ: Food Pantry Annex · Tue & Sat',
-    email: 'clara.oswald@destinysanctuary.co.ke',
-    phone: '+254 778 901 560',
-    tags: ["Food Bank", "Emergency Fuel", "Senior Visitation"],
-    budgetDisbursed: 32980,
-    budgetTotal: 48500,
-    remainingText: 'KSh 15,520 Remaining',
-  },
-  {
-    id: 'ba-06',
-    code: 'BA-06',
-    name: 'Berean Academy',
-    subtitle: 'Bible School & Discipleship',
-    category: 'Education',
-    statusBadge: 'Academic',
-    cohortCount: '76 Students',
-    cohortLabel: 'Enrolled Students',
-    icon: 'menu_book',
-    director: 'Dr. Jonathan Edwards',
-    directorRole: 'Dean',
-    directorInitials: 'JE',
-    directorColor: 'bg-[#ffdcc3] text-[#904d00]',
-    associate: '5 Residential & Guest Faculty',
-    schedule: 'Location: Seminars Hall A · Mon/Wed Eve',
-    email: 'j.edwards@berean.destinysanctuary.co.ke',
-    phone: '+254 745 678 230',
-    tags: ["Hermeneutics", "Systematic Theology", "Catechism"],
-    budgetDisbursed: 21760,
-    budgetTotal: 34000,
-    remainingText: 'KSh 12,240 Remaining',
-  },
-  {
-    id: 'pc-07',
-    code: 'PC-07',
-    name: 'Clergy & Pastoral Team',
-    subtitle: 'Clergy & Council Oversight',
+    id: 'vc-01',
+    code: 'VC-01',
+    name: 'Visionary Leadership & Church Council',
+    subtitle: 'Bishop, Clergy & Council Oversight',
     category: 'Church Council',
-    statusBadge: 'Pastoral Team',
-    cohortCount: '14 Clergy & Elders',
+    statusBadge: 'Chartered',
+    cohortSize: 14,
+    cohortUnit: 'Clergy & Elders',
     cohortLabel: 'Church Council Bench',
     icon: 'account_balance',
     director: 'Bishop Sammy',
-    directorRole: 'Bishop & Visionary Leader',
+    directorRole: 'Visionary Leader & Bishop',
     directorInitials: 'BS',
     directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
-    associate: 'Rev. Alice · Church Administrator',
+    associate: 'Rev. Alice · Co-Visionary Leader & Church Administrator',
     schedule: 'Meets: 1st Tuesday · Council Room',
-    email: 'bishop@destinysanctuary.co.ke',
+    email: 'office@destinysanctuary.co.ke',
     phone: CHURCH.phone,
-    tags: ["Counseling", "Pulpit Supply", "Doctrinal Oversight"],
+    tags: ["Doctrinal Oversight", "Pulpit Supply", "Pastoral Counseling"],
     budgetDisbursed: 12280,
     budgetTotal: 24000,
-    remainingText: 'KSh 11,720 Remaining',
+  },
+  {
+    id: 'wm-02',
+    code: 'WM-02',
+    name: 'Worship & Word Ministry',
+    subtitle: 'Praise, Worship & Pulpit Ministry',
+    category: 'Worship',
+    statusBadge: 'Chartered',
+    cohortSize: 96,
+    cohortUnit: 'Ministers',
+    cohortLabel: 'Choir, Band & Pulpit Team',
+    icon: 'music_note',
+    director: 'Bishop Sammy',
+    directorRole: 'Visionary Leader & Bishop',
+    directorInitials: 'BS',
+    directorColor: 'bg-[#ffdcc3] text-[#904d00]',
+    associate: 'Assoc: Caleb Timothy Mwangi · Director of Music & Service',
+    schedule: 'Sundays · 10:00 AM Praise & Worship · 11:30 AM Word Ministry',
+    email: 'worship@destinysanctuary.co.ke',
+    phone: '+254 745 678 230',
+    tags: ["Praise & Worship", "Sermon / Word Ministry", "Choir & Band"],
+    budgetDisbursed: 26400,
+    budgetTotal: 38000,
+  },
+  {
+    id: 'wf-03',
+    code: 'WF-03',
+    name: "Women's Fellowship",
+    subtitle: 'National Women’s Conference Host',
+    category: 'Women',
+    statusBadge: 'Conference Host',
+    cohortSize: 226,
+    cohortUnit: 'Women',
+    cohortLabel: 'Active Cohort',
+    icon: 'spa',
+    director: 'Rev. Alice',
+    directorRole: 'Co-Visionary Leader & Church Administrator',
+    directorInitials: 'RA',
+    directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
+    associate: 'Assoc: Sarah Kimani · Women’s Ministry Coordinator',
+    schedule: 'Meets: Thursdays · 7:00 PM · Fellowship Hall',
+    email: 'women@destinysanctuary.co.ke',
+    phone: '+254 778 901 230',
+    tags: ["National Women’s Conference", "Sisterhood Circles", "Benevolence"],
+    budgetDisbursed: 46480,
+    budgetTotal: 56000,
+  },
+  {
+    id: 'dy-04',
+    code: 'DY-04',
+    name: 'Destiny Youth',
+    subtitle: 'Teens & Young Adults',
+    category: 'Youth',
+    statusBadge: 'High Activity',
+    cohortSize: 112,
+    cohortUnit: 'Youth',
+    cohortLabel: 'Active Cohort',
+    icon: 'local_fire_department',
+    director: 'Rev. Alice',
+    directorRole: 'Co-Visionary Leader & Church Administrator',
+    directorInitials: 'RA',
+    directorColor: 'bg-[#ffdcc3] text-[#904d00]',
+    associate: 'Assoc: Hannah Kimani · Youth Coordinator',
+    schedule: 'Meets: Fridays · 6:30 PM · Youth Hall',
+    email: 'youth@destinysanctuary.co.ke',
+    phone: '+254 756 789 340',
+    tags: ["National Youth Conference", "Youth Retreats", "Mentorship"],
+    budgetDisbursed: 57800,
+    budgetTotal: 68000,
+  },
+  {
+    id: 'ng-05',
+    code: 'NG-05',
+    name: 'Next Generation & Children',
+    subtitle: 'Raising a Generation · Ages 0–12',
+    category: 'Children',
+    statusBadge: 'CPP Verified',
+    cohortSize: 148,
+    cohortUnit: 'Kids',
+    cohortLabel: 'Enrolled Children',
+    icon: 'toys',
+    director: 'Rev. Alice',
+    directorRole: 'Co-Visionary Leader & Church Administrator',
+    directorInitials: 'RA',
+    directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
+    associate: 'Assoc: Elena Mwangi · Children’s Director',
+    schedule: 'Meets: Sundays · 9:00 AM · Children’s Wing',
+    email: 'children@destinysanctuary.co.ke',
+    phone: '+254 767 890 450',
+    tags: ["Kids Church", "VBS Holiday Club", "Nursery Care"],
+    budgetDisbursed: 39000,
+    budgetTotal: 52000,
+  },
+  {
+    id: 'gd-06',
+    code: 'GD-06',
+    name: 'Groups & Discipleship',
+    subtitle: 'Small Groups, Classes & Equipping',
+    category: 'Discipleship',
+    statusBadge: 'Equipping',
+    cohortSize: 176,
+    cohortUnit: 'Members',
+    cohortLabel: 'Group Members',
+    icon: 'groups',
+    director: 'Bishop Sammy',
+    directorRole: 'Visionary Leader & Bishop',
+    directorInitials: 'BS',
+    directorColor: 'bg-[#ffdcc3] text-[#904d00]',
+    associate: 'Assoc: Dr. Jonathan Mwaura · Discipleship & Bible Study Dean',
+    schedule: 'Meets: Sundays · 1:30 PM Groups Meetings & Fellowship',
+    email: 'groups@destinysanctuary.co.ke',
+    phone: '+254 734 567 120',
+    tags: ["Small Groups", "Membership Class", "Bible Study"],
+    budgetDisbursed: 31500,
+    budgetTotal: 42000,
+  },
+  {
+    id: 'mm-07',
+    code: 'MM-07',
+    name: 'Missions, Mercy & Church Planting',
+    subtitle: 'Community Outreach & Church Planting',
+    category: 'Outreach',
+    statusBadge: 'Community Core',
+    cohortSize: 52,
+    cohortUnit: 'Volunteers',
+    cohortLabel: 'Volunteer Corps',
+    icon: 'volunteer_activism',
+    director: 'Bishop Sammy',
+    directorRole: 'Visionary Leader & Bishop',
+    directorInitials: 'BS',
+    directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
+    associate: 'Assoc: Clara Wambui · Outreach Almoner',
+    schedule: 'Desk: Tuesdays & Saturdays · Outreach Office',
+    email: 'missions@destinysanctuary.co.ke',
+    phone: '+254 778 901 560',
+    tags: ["Church Planting", "Mercy Drives", "Community Engagement"],
+    budgetDisbursed: 32980,
+    budgetTotal: 48500,
   },
 ];
 
 /** Roster size, so the Ministries tab badge can't drift from the grid it counts. */
 export const DEPARTMENT_COUNT = DEPARTMENTS.length;
+
+/** KPI band totals, derived so the band can never disagree with the ministry cards. */
+const TOTAL_COHORT = DEPARTMENTS.reduce((total, dept) => total + dept.cohortSize, 0);
+const BUDGET_ALLOCATED = DEPARTMENTS.reduce((total, dept) => total + dept.budgetTotal, 0);
+const BUDGET_RELEASED = DEPARTMENTS.reduce((total, dept) => total + dept.budgetDisbursed, 0);
+const BUDGET_UTILISED = Math.round((BUDGET_RELEASED / BUDGET_ALLOCATED) * 100);
 
 export const MinistriesDepartmentalPanel: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -248,7 +256,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="font-headline text-3xl font-bold text-[#1e1b19]">7</span>
+            <span className="font-headline text-3xl font-bold text-[#1e1b19]">{DEPARTMENT_COUNT}</span>
             <span className="font-headline text-sm text-[#9b2f00] font-semibold">Active</span>
           </div>
           <div className="mt-3 flex items-center gap-2 pt-2 border-t border-[#f4ece8]">
@@ -271,7 +279,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="font-headline text-3xl font-bold text-[#1e1b19]">842</span>
+            <span className="font-headline text-3xl font-bold text-[#1e1b19]">{TOTAL_COHORT}</span>
             <span className="font-headline text-sm text-[#59413a]">Members</span>
           </div>
           <div className="mt-3 flex items-center justify-between pt-2 border-t border-[#f4ece8] text-xs">
@@ -291,15 +299,15 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="font-headline text-3xl font-bold text-[#1e1b19]">KSh 324,500</span>
+            <span className="font-headline text-3xl font-bold text-[#1e1b19]">KSh {BUDGET_ALLOCATED.toLocaleString()}</span>
           </div>
           <div className="mt-3 space-y-1.5 pt-2 border-t border-[#f4ece8]">
             <div className="flex justify-between text-xs font-headline">
-              <span className="text-[#59413a]">KSh 241,800 Released</span>
-              <span className="text-[#9b2f00] font-bold">74.5%</span>
+              <span className="text-[#59413a]">KSh {BUDGET_RELEASED.toLocaleString()} Released</span>
+              <span className="text-[#9b2f00] font-bold">{BUDGET_UTILISED}%</span>
             </div>
             <div className="w-full bg-[#f4ece8] h-1.5 rounded-full overflow-hidden">
-              <div className="bg-[#c2410c] h-full rounded-full transition-all duration-700" style={{ width: '74.5%' }}></div>
+              <div className="bg-[#c2410c] h-full rounded-full transition-all duration-700" style={{ width: `${BUDGET_UTILISED}%` }}></div>
             </div>
           </div>
         </div>
@@ -457,7 +465,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                       <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#9b2f00]">groups</span>
                       {dept.cohortLabel}
                     </span>
-                    <span className="font-headline text-sm font-bold text-[#1e1b19]">{dept.cohortCount}</span>
+                    <span className="font-headline text-sm font-bold text-[#1e1b19]">{dept.cohortSize} {dept.cohortUnit}</span>
                   </div>
                   <div className="flex items-center gap-2 pt-1 border-t border-[#EAE1D7]">
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${dept.directorColor}`}>
@@ -512,7 +520,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-[10px] font-mono text-[#59413a]">
                     <span>{utilPct}% Utilized</span>
-                    <span>{dept.remainingText}</span>
+                    <span>KSh {(dept.budgetTotal - dept.budgetDisbursed).toLocaleString()} Remaining</span>
                   </div>
                 </div>
               </div>
@@ -551,7 +559,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
 
       {/* Quick Department Creation Drawer / Modal (Warm Ember overlay) */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs" {...dialogProps(() => setIsDrawerOpen(false), "New Department Charter")}>
           <div className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col justify-between p-6 overflow-y-auto animate-in slide-in-from-right duration-200">
             <div>
               {/* Header */}
@@ -563,7 +571,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                 <button 
                   onClick={() => setIsDrawerOpen(false)}
                   className="p-1.5 rounded-lg text-[#59413a] hover:bg-[#f4ece8] transition-colors"
-                >
+                aria-label="Close">
                   <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
@@ -571,8 +579,8 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
               {/* Form Fields */}
               <form className="mt-5 space-y-4" onSubmit={(e) => { e.preventDefault(); setIsDrawerOpen(false); }}>
                 <div>
-                  <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Ministry Name</label>
-                  <input aria-label="Ministry Name"
+                  <label htmlFor="ministry-name" className="block text-xs font-semibold text-[#1e1b19] mb-1">Ministry Name</label>
+                  <input id="ministry-name" aria-label="Ministry Name"
                     type="text"
                     value={newDeptName}
                     onChange={(e) => setNewDeptName(e.target.value)}
@@ -584,8 +592,8 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Ministry Code</label>
-                    <input aria-label="Ministry Code"
+                    <label htmlFor="ministry-code" className="block text-xs font-semibold text-[#1e1b19] mb-1">Ministry Code</label>
+                    <input id="ministry-code" aria-label="Ministry Code"
                       type="text"
                       value={newDeptCode}
                       onChange={(e) => setNewDeptCode(e.target.value)}
@@ -594,8 +602,8 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Campus</label>
-                    <select aria-label="Campus" className="w-full h-10 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7] text-[#1e1b19] text-xs focus:outline-none">
+                    <label htmlFor="ministry-campus" className="block text-xs font-semibold text-[#1e1b19] mb-1">Campus</label>
+                    <select id="ministry-campus" aria-label="Campus" className="w-full h-10 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7] text-[#1e1b19] text-xs focus:outline-none">
                       {LOCATIONS.map((location) => (
                         <option key={location}>{location}</option>
                       ))}
@@ -604,8 +612,8 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Lead Director / Pastor</label>
-                  <input aria-label="Lead Director / Pastor"
+                  <label htmlFor="ministry-director" className="block text-xs font-semibold text-[#1e1b19] mb-1">Lead Director / Pastor</label>
+                  <input id="ministry-director" aria-label="Lead Director / Pastor"
                     type="text"
                     value={newDeptDirector}
                     onChange={(e) => setNewDeptDirector(e.target.value)}
@@ -616,8 +624,8 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Annual Allocation (KSh)</label>
-                    <input aria-label="Annual Allocation (KSh)"
+                    <label htmlFor="ministry-allocation" className="block text-xs font-semibold text-[#1e1b19] mb-1">Annual Allocation (KSh)</label>
+                    <input id="ministry-allocation" aria-label="Annual Allocation (KSh)"
                       type="number"
                       value={newDeptBudget}
                       onChange={(e) => setNewDeptBudget(e.target.value)}
@@ -626,8 +634,8 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Initial Target Cohort</label>
-                    <input aria-label="Initial Target Cohort"
+                    <label htmlFor="ministry-cohort" className="block text-xs font-semibold text-[#1e1b19] mb-1">Initial Target Cohort</label>
+                    <input id="ministry-cohort" aria-label="Initial Target Cohort"
                       type="number"
                       value={newDeptCohort}
                       onChange={(e) => setNewDeptCohort(e.target.value)}
@@ -638,8 +646,8 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Regular Meeting Rhythm</label>
-                  <input aria-label="Regular Meeting Rhythm"
+                  <label htmlFor="ministry-schedule" className="block text-xs font-semibold text-[#1e1b19] mb-1">Regular Meeting Rhythm</label>
+                  <input id="ministry-schedule" aria-label="Regular Meeting Rhythm"
                     type="text"
                     value={newDeptSchedule}
                     onChange={(e) => setNewDeptSchedule(e.target.value)}

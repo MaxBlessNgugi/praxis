@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { DataBackupSnapshot } from '../../../../types';
-import { INITIAL_BACKUP_SNAPSHOTS } from '../../../../data/churchMockData';
+import { dialogProps } from '../../dialog';
+import { INITIAL_BACKUP_SNAPSHOTS } from '../../../../data/churchMockData'
+;
 
 export const DataBackupSettingsPanel: React.FC = () => {
   const [backups, setBackups] = useState<DataBackupSnapshot[]>(INITIAL_BACKUP_SNAPSHOTS);
@@ -150,7 +152,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
 
       {/* MODAL: Create Snapshot */}
       {isCreatingSnapshot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreatingSnapshot(false), "Create Instant Data Snapshot")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Create Instant Data Snapshot</h3>
@@ -158,15 +160,15 @@ export const DataBackupSettingsPanel: React.FC = () => {
                 type="button"
                 onClick={() => setIsCreatingSnapshot(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
+              aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateBackup} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Snapshot Label / Reason *</label>
-                <input aria-label="Snapshot Label / Reason"
+                <label htmlFor="backup-snapshot-label" className="block text-xs font-bold text-[#1C1917] mb-1">Snapshot Label / Reason *</label>
+                <input id="backup-snapshot-label" aria-label="Snapshot Label / Reason"
                   type="text"
                   required
                   value={backupLabel}
@@ -201,7 +203,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
 
       {/* MODAL: Restore Snapshot Confirm */}
       {isRestoring && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsRestoring(null), "Confirm Snapshot Restoration")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#DC2626]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center gap-2 pb-3 border-b border-[#E7E5E4] text-[#DC2626]">
               <span aria-hidden="true" className="material-symbols-outlined text-[22px]">warning</span>
