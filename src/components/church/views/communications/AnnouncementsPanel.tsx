@@ -15,7 +15,7 @@ export const AnnouncementsPanel: React.FC = () => {
   const [isPinned, setIsPinned] = useState<boolean>(false);
   const [category, setCategory] = useState<AnnouncementItem['category']>('worship');
   const [expiryDate, setExpiryDate] = useState('Oct 30, 2026');
-  const [author, setAuthor] = useState('Parish Office Staff');
+  const [author, setAuthor] = useState('Church Office Staff');
 
   const filteredAnnouncements = announcements.filter((ann) => {
     if (selectedAudience !== 'all' && ann.audience !== selectedAudience) return false;
@@ -27,11 +27,11 @@ export const AnnouncementsPanel: React.FC = () => {
     if (!title.trim() || !content.trim()) return;
 
     const audienceLabels: Record<AnnouncementAudience, string> = {
-      everyone: 'All Parishioners & Guests',
-      'members-only': 'Covenant Partners & Communicants',
-      'ministry-leaders': 'Ministry Officers & Deacons',
-      'youth-roll': 'Youth & Confirmands',
-      'session-elders': 'Session of Elders Only',
+      everyone: 'All Members & Guests',
+      'members-only': 'Members & Baptized Believers',
+      'ministry-leaders': 'Group Leaders & Deacons',
+      'youth-roll': 'Youth & Discipleship Class',
+      'church-council': 'Church Council Only',
     };
 
     const newAnn: AnnouncementItem = {
@@ -74,12 +74,12 @@ export const AnnouncementsPanel: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Active Bulletins</span>
             <div className="text-2xl font-black text-[#1C1917] mt-0.5">{announcements.length} Published</div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">check_circle</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">check_circle</span>
               All channels synchronized
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span className="material-symbols-outlined text-[24px]">campaign</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">campaign</span>
           </div>
         </div>
 
@@ -90,12 +90,12 @@ export const AnnouncementsPanel: React.FC = () => {
               {announcements.filter((a) => a.isPinned).length} Featured
             </div>
             <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">push_pin</span>
-              Promoted on Parish Kiosk
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">push_pin</span>
+              Promoted on Church Notice Board
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span className="material-symbols-outlined text-[24px]">push_pin</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">push_pin</span>
           </div>
         </div>
 
@@ -106,12 +106,12 @@ export const AnnouncementsPanel: React.FC = () => {
               {announcements.filter((a) => a.priority === 'urgent').length} Alerts
             </div>
             <span className="text-xs text-[#DC2626] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">priority_high</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">priority_high</span>
               Top-of-bulletin placement
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#DC2626]">
-            <span className="material-symbols-outlined text-[24px]">notification_important</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">notification_important</span>
           </div>
         </div>
 
@@ -120,12 +120,12 @@ export const AnnouncementsPanel: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Audience Segments</span>
             <div className="text-2xl font-black text-[#1C1917] mt-0.5">5 Cohorts</div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">shield</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">shield</span>
               RBAC Role Filtered
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span className="material-symbols-outlined text-[24px]">supervised_user_circle</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">supervised_user_circle</span>
           </div>
         </div>
       </div>
@@ -136,8 +136,8 @@ export const AnnouncementsPanel: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4] mb-4">
           <div>
             <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-[#C2410C]">newspaper</span>
-              Parish Bulletin & Announcement Hub
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">newspaper</span>
+              Church Bulletin & Announcement Hub
             </h3>
             <p className="text-xs text-[#57534E] mt-0.5">
               Draft, schedule, and broadcast official news notices to targeted rolls.
@@ -145,17 +145,17 @@ export const AnnouncementsPanel: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <select aria-label="Target audience"
               value={selectedAudience}
               onChange={(e) => setSelectedAudience(e.target.value)}
               className="px-3 py-1.5 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
             >
               <option value="all">All Audiences</option>
               <option value="everyone">Public / Everyone</option>
-              <option value="members-only">Covenant Members Only</option>
+              <option value="members-only">Members Only</option>
               <option value="ministry-leaders">Ministry Leaders</option>
-              <option value="youth-roll">Youth & Confirmands</option>
-              <option value="session-elders">Session of Elders</option>
+              <option value="youth-roll">Youth & Discipleship Class</option>
+              <option value="church-council">Church Council</option>
             </select>
 
             <button
@@ -163,7 +163,7 @@ export const AnnouncementsPanel: React.FC = () => {
               onClick={() => setIsCreating(true)}
               className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">add_circle</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
               New Announcement
             </button>
           </div>
@@ -212,7 +212,7 @@ export const AnnouncementsPanel: React.FC = () => {
                     }`}
                     title={ann.isPinned ? 'Unpin' : 'Pin to top'}
                   >
-                    <span className="material-symbols-outlined text-[18px]">push_pin</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">push_pin</span>
                   </button>
                 </div>
 
@@ -235,7 +235,7 @@ export const AnnouncementsPanel: React.FC = () => {
                   className="text-[#DC2626] hover:text-[#B91C1C] p-1 rounded transition-colors cursor-pointer"
                   title="Remove Bulletin"
                 >
-                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">delete</span>
                 </button>
               </div>
             </div>
@@ -248,20 +248,20 @@ export const AnnouncementsPanel: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
-              <h3 className="font-headline text-base font-bold text-[#1C1917]">Publish Parish Announcement</h3>
+              <h3 className="font-headline text-base font-bold text-[#1C1917]">Publish Announcement</h3>
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateAnnouncement} className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Headline / Title *</label>
-                <input
+                <input aria-label="Headline / Title"
                   type="text"
                   required
                   placeholder="e.g. Reformation Heritage Dinner & Hymn Sing"
@@ -274,21 +274,21 @@ export const AnnouncementsPanel: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Target Audience</label>
-                  <select
+                  <select aria-label="Target Audience"
                     value={audience}
                     onChange={(e) => setAudience(e.target.value as AnnouncementAudience)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                   >
                     <option value="everyone">Everyone (Public)</option>
-                    <option value="members-only">Covenant Members Only</option>
+                    <option value="members-only">Members Only</option>
                     <option value="ministry-leaders">Ministry Leaders</option>
                     <option value="youth-roll">Youth Roll</option>
-                    <option value="session-elders">Session of Elders</option>
+                    <option value="church-council">Church Council</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Priority</label>
-                  <select
+                  <select aria-label="Priority"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as any)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -302,7 +302,7 @@ export const AnnouncementsPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Notice Content *</label>
-                <textarea
+                <textarea aria-label="Notice Content"
                   rows={4}
                   required
                   placeholder="Full bulletin notice body..."
@@ -315,21 +315,21 @@ export const AnnouncementsPanel: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
-                  <select
+                  <select aria-label="Category"
                     value={category}
                     onChange={(e) => setCategory(e.target.value as any)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                   >
-                    <option value="worship">Worship & Liturgy</option>
+                    <option value="worship">Worship & Service</option>
                     <option value="ministry">Ministries & Classes</option>
                     <option value="stewardship">Stewardship & Mercy</option>
-                    <option value="governance">Session Governance</option>
+                    <option value="governance">Church Council</option>
                     <option value="community">Community Fellowship</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Author / Sign-off</label>
-                  <input
+                  <input aria-label="Author / Sign-off"
                     type="text"
                     value={author}
                     onChange={(e) => setAuthor(e.target.value)}
@@ -347,7 +347,7 @@ export const AnnouncementsPanel: React.FC = () => {
                   className="rounded text-[#C2410C] focus:ring-[#C2410C]"
                 />
                 <label htmlFor="pinCheck" className="text-xs font-bold text-[#1C1917] cursor-pointer">
-                  Pin announcement to top of parish kiosk & mobile portal
+                  Pin announcement to top of church notice board & mobile portal
                 </label>
               </div>
 

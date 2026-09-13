@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
 import { 
   Building2, 
   Users, 
@@ -60,12 +61,12 @@ const DEPARTMENTS: Department[] = [
     directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
     associate: 'Assoc: Timothy Vance',
     schedule: 'Meets: Alternate Saturdays · 7:30 AM',
-    email: 'marcus.j@gracevalley.org',
-    phone: '(555) 345-6712',
+    email: 'marcus.j@destinysanctuary.co.ke',
+    phone: '+254 734 567 120',
     tags: ["Men's Retreat", "Saturday Breakfast", "Mentorship"],
     budgetDisbursed: 31500,
     budgetTotal: 42000,
-    remainingText: '$10,500 Remaining',
+    remainingText: 'KSh 10,500 Remaining',
   },
   {
     id: 'dg-02',
@@ -77,18 +78,18 @@ const DEPARTMENTS: Department[] = [
     cohortCount: '226 Women',
     cohortLabel: 'Active Cohort',
     icon: 'spa',
-    director: 'Pastor Sarah Alistair',
+    director: 'Rev. Sarah Alistair',
     directorRole: 'Director',
     directorInitials: 'SA',
     directorColor: 'bg-[#ffdcc3] text-[#904d00]',
     associate: 'Counselor: Martha Miller',
     schedule: 'Meets: Thursdays · 7:00 PM',
-    email: 'sarah.a@gracevalley.org',
-    phone: '(555) 789-0123',
+    email: 'sarah.a@destinysanctuary.co.ke',
+    phone: '+254 778 901 230',
     tags: ["Sisterhood Circles", "Annual Conference", "Benevolence Quilt"],
     budgetDisbursed: 46480,
     budgetTotal: 56000,
-    remainingText: '$9,520 Remaining',
+    remainingText: 'KSh 9,520 Remaining',
   },
   {
     id: 'ay-03',
@@ -100,18 +101,18 @@ const DEPARTMENTS: Department[] = [
     cohortCount: '112 Teens',
     cohortLabel: 'Active Cohort',
     icon: 'local_fire_department',
-    director: 'Pastor David Alistair',
+    director: 'Hannah Abbott',
     directorRole: 'Youth Pastor',
-    directorInitials: 'DA',
+    directorInitials: 'HA',
     directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
     associate: 'Campus Youth Loft Wing',
     schedule: 'Meets: Fridays · 6:30 PM (Youth Loft)',
-    email: 'david.a@gracevalley.org',
-    phone: '(555) 567-8934',
+    email: 'david.a@destinysanctuary.co.ke',
+    phone: '+254 756 789 340',
     tags: ["Friday Live Worship", "Summer Camp", "Confirmation Class"],
     budgetDisbursed: 57800,
     budgetTotal: 68000,
-    remainingText: '$10,200 Remaining',
+    remainingText: 'KSh 10,200 Remaining',
   },
   {
     id: 'kk-04',
@@ -129,12 +130,12 @@ const DEPARTMENTS: Department[] = [
     directorColor: 'bg-[#ffdcc3] text-[#904d00]',
     associate: '28 Vetted Background Staff',
     schedule: 'Meets: Sundays · 9:00 & 11:00 AM',
-    email: 'elena.vance@gracevalley.org',
-    phone: '(555) 678-9045',
+    email: 'elena.vance@destinysanctuary.co.ke',
+    phone: '+254 767 890 450',
     tags: ["KidCheck Secure Wing", "VBS Summer", "Nursery Care"],
     budgetDisbursed: 39000,
     budgetTotal: 52000,
-    remainingText: '$13,000 Remaining',
+    remainingText: 'KSh 13,000 Remaining',
   },
   {
     id: 'mb-05',
@@ -152,12 +153,12 @@ const DEPARTMENTS: Department[] = [
     directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
     associate: 'Assoc: Arthur Miller · 38 Fam/Mo',
     schedule: 'HQ: Food Pantry Annex · Tue & Sat',
-    email: 'clara.oswald@gracevalley.org',
-    phone: '(555) 789-0156',
+    email: 'clara.oswald@destinysanctuary.co.ke',
+    phone: '+254 778 901 560',
     tags: ["Food Bank", "Emergency Fuel", "Senior Visitation"],
     budgetDisbursed: 32980,
     budgetTotal: 48500,
-    remainingText: '$15,520 Remaining',
+    remainingText: 'KSh 15,520 Remaining',
   },
   {
     id: 'ba-06',
@@ -175,41 +176,44 @@ const DEPARTMENTS: Department[] = [
     directorColor: 'bg-[#ffdcc3] text-[#904d00]',
     associate: '5 Residential & Guest Faculty',
     schedule: 'Location: Seminars Hall A · Mon/Wed Eve',
-    email: 'j.edwards@berean.gracevalley.org',
-    phone: '(555) 456-7823',
+    email: 'j.edwards@berean.destinysanctuary.co.ke',
+    phone: '+254 745 678 230',
     tags: ["Hermeneutics", "Systematic Theology", "Catechism"],
     budgetDisbursed: 21760,
     budgetTotal: 34000,
-    remainingText: '$12,240 Remaining',
+    remainingText: 'KSh 12,240 Remaining',
   },
   {
     id: 'pc-07',
     code: 'PC-07',
-    name: 'Presbytery & Council',
-    subtitle: 'Clergy & Session Oversight',
-    category: 'Governance',
-    statusBadge: 'Governance',
+    name: 'Clergy & Pastoral Team',
+    subtitle: 'Clergy & Council Oversight',
+    category: 'Church Council',
+    statusBadge: 'Pastoral Team',
     cohortCount: '14 Clergy & Elders',
-    cohortLabel: 'Presbytery Bench',
+    cohortLabel: 'Church Council Bench',
     icon: 'account_balance',
-    director: 'Pastor Michael Vance',
-    directorRole: 'Moderator',
-    directorInitials: 'MV',
+    director: 'Bishop Sammy',
+    directorRole: 'Bishop & Visionary Leader',
+    directorInitials: 'BS',
     directorColor: 'bg-[#ffdbd0] text-[#9b2f00]',
-    associate: 'Session Boardroom Conclave',
-    schedule: 'Meets: 1st Tuesday · Session Room',
-    email: 'michael.v@gracevalley.org',
-    phone: '(555) 234-8901',
-    tags: ["Ordinances", "Pulpit Supply", "Doctrinal Oversight"],
+    associate: 'Rev. Alice · Church Administrator',
+    schedule: 'Meets: 1st Tuesday · Council Room',
+    email: 'bishop@destinysanctuary.co.ke',
+    phone: CHURCH.phone,
+    tags: ["Counseling", "Pulpit Supply", "Doctrinal Oversight"],
     budgetDisbursed: 12280,
     budgetTotal: 24000,
-    remainingText: '$11,720 Remaining',
+    remainingText: 'KSh 11,720 Remaining',
   },
 ];
 
+/** Roster size, so the Ministries tab badge can't drift from the grid it counts. */
+export const DEPARTMENT_COUNT = DEPARTMENTS.length;
+
 export const MinistriesDepartmentalPanel: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [campus, setCampus] = useState('Campus 1 - Main Sanctuary');
+  const [campus, setCampus] = useState<string>(DEFAULT_LOCATION);
   const [sortMode, setSortMode] = useState('Headcount (High to Low)');
   const [viewFormat, setViewFormat] = useState<'grid' | 'list'>('grid');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -240,7 +244,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
               Governed Entities
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#9b2f00] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">corporate_fare</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">corporate_fare</span>
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
@@ -249,7 +253,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
           </div>
           <div className="mt-3 flex items-center gap-2 pt-2 border-t border-[#f4ece8]">
             <span className="inline-flex items-center text-[#006243] font-headline text-xs font-semibold gap-1">
-              <span className="material-symbols-outlined text-[14px]">check_circle</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">check_circle</span>
               100% Chartered
             </span>
             <span className="text-[#59413a] text-xs">· 0 Dormant</span>
@@ -263,7 +267,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
               Total Enrolled Body
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#904d00] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">groups_3</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">groups_3</span>
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
@@ -283,15 +287,15 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
               Disbursed Stewardship
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#c2410c] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="font-headline text-3xl font-bold text-[#1e1b19]">$324,500</span>
+            <span className="font-headline text-3xl font-bold text-[#1e1b19]">KSh 324,500</span>
           </div>
           <div className="mt-3 space-y-1.5 pt-2 border-t border-[#f4ece8]">
             <div className="flex justify-between text-xs font-headline">
-              <span className="text-[#59413a]">$241,800 Released</span>
+              <span className="text-[#59413a]">KSh 241,800 Released</span>
               <span className="text-[#9b2f00] font-bold">74.5%</span>
             </div>
             <div className="w-full bg-[#f4ece8] h-1.5 rounded-full overflow-hidden">
@@ -307,7 +311,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
               Vetting & Safeguards
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#006243] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">verified_user</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">verified_user</span>
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
@@ -327,10 +331,10 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
       <div className="bg-[#faf2ee] p-3.5 rounded-2xl border border-[#EAE1D7] flex flex-col lg:flex-row items-center justify-between gap-3 shadow-sm">
         {/* Search Field */}
         <div className="relative w-full lg:w-96">
-          <span className="material-symbols-outlined absolute left-3 top-2.5 text-[#8d7168] text-[20px]">
+          <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2.5 text-[#8d7168] text-[20px]">
             manage_search
           </span>
-          <input
+          <input aria-label="Search department name, director, or code"
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -347,9 +351,9 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
               type="button" 
               className="h-10 px-3.5 rounded-xl bg-white hover:bg-[#f4ece8] text-[#1e1b19] text-xs font-semibold flex items-center gap-2 border border-[#EAE1D7] transition-colors"
             >
-              <span className="material-symbols-outlined text-[18px] text-[#9b2f00]">domain</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#9b2f00]">domain</span>
               <span>{campus}</span>
-              <span className="material-symbols-outlined text-[18px] text-[#8d7168]">keyboard_arrow_down</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#8d7168]">keyboard_arrow_down</span>
             </button>
           </div>
 
@@ -359,10 +363,10 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
               type="button"
               className="h-10 px-3.5 rounded-xl bg-white hover:bg-[#f4ece8] text-[#1e1b19] text-xs font-semibold flex items-center gap-2 border border-[#EAE1D7] transition-colors"
             >
-              <span className="material-symbols-outlined text-[18px] text-[#8d7168]">sort</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#8d7168]">sort</span>
               <span className="text-[#59413a] font-normal">Sort:</span>
               <span className="font-semibold">{sortMode}</span>
-              <span className="material-symbols-outlined text-[18px] text-[#8d7168]">keyboard_arrow_down</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#8d7168]">keyboard_arrow_down</span>
             </button>
           </div>
 
@@ -372,7 +376,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
             type="button"
             className="h-10 px-4 rounded-xl bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[20px]">add_business</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">add_business</span>
             <span>Add New Department</span>
           </button>
         </div>
@@ -386,7 +390,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
           </span>
           <span className="w-1 h-1 rounded-full bg-[#8d7168]"></span>
           <span className="text-xs font-bold text-[#9b2f00]">
-            Active Session 2024–2025
+            Active Council 2024–2025
           </span>
         </div>
         <div className="flex items-center gap-1 bg-[#faf2ee] p-1 rounded-lg border border-[#EAE1D7]">
@@ -397,7 +401,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
             }`}
             title="Grid View"
           >
-            <span className="material-symbols-outlined text-[18px]">grid_view</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">grid_view</span>
           </button>
           <button
             onClick={() => setViewFormat('list')}
@@ -406,7 +410,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
             }`}
             title="List View"
           >
-            <span className="material-symbols-outlined text-[18px]">table_rows</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">table_rows</span>
           </button>
         </div>
       </div>
@@ -426,7 +430,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-[#f4ece8] flex items-center justify-center text-[#9b2f00] group-hover:bg-[#ffdbd0] transition-colors shrink-0">
-                      <span className="material-symbols-outlined text-[26px]">{dept.icon}</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[26px]">{dept.icon}</span>
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -441,8 +445,8 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                       <p className="text-xs text-[#59413a]">{dept.subtitle}</p>
                     </div>
                   </div>
-                  <button className="text-[#8d7168] hover:text-[#1e1b19] p-1 rounded-md" type="button">
-                    <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                  <button aria-label="Department options" className="text-[#8d7168] hover:text-[#1e1b19] p-1 rounded-md" type="button">
+                    <span aria-hidden="true" className="material-symbols-outlined text-[20px]">more_vert</span>
                   </button>
                 </div>
 
@@ -450,7 +454,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                 <div className="mt-4 p-3 bg-[#faf2ee] rounded-xl space-y-2 border border-[#EAE1D7]/60">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-[#59413a] flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[18px] text-[#9b2f00]">groups</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#9b2f00]">groups</span>
                       {dept.cohortLabel}
                     </span>
                     <span className="font-headline text-sm font-bold text-[#1e1b19]">{dept.cohortCount}</span>
@@ -473,15 +477,15 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                 {/* Logistics & Contacts */}
                 <div className="mt-3 space-y-1 text-xs text-[#59413a]">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[16px] text-[#8d7168]">schedule</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#8d7168]">schedule</span>
                     <span className="truncate">{dept.schedule}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[16px] text-[#8d7168]">mail</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#8d7168]">mail</span>
                     <span className="truncate text-[#1e1b19]">{dept.email}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[16px] text-[#8d7168]">call</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#8d7168]">call</span>
                     <span className="truncate">{dept.phone}</span>
                   </div>
                 </div>
@@ -500,7 +504,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                   <div className="flex justify-between text-xs font-headline">
                     <span className="text-[#59413a]">Budget Disbursed</span>
                     <span className="text-[#9b2f00] font-bold">
-                      ${dept.budgetDisbursed.toLocaleString()} <span className="font-normal text-[#59413a]">/ ${dept.budgetTotal.toLocaleString()}</span>
+                      KSh {dept.budgetDisbursed.toLocaleString()} <span className="font-normal text-[#59413a]">/ KSh {dept.budgetTotal.toLocaleString()}</span>
                     </span>
                   </div>
                   <div className="w-full bg-[#EAE1D7] h-2 rounded-full overflow-hidden">
@@ -516,12 +520,12 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
               {/* Footer Actions */}
               <div className="mt-4 pt-3 border-t border-[#f4ece8] flex items-center justify-between">
                 <button className="text-xs text-[#59413a] hover:text-[#1e1b19] font-semibold flex items-center gap-1" type="button">
-                  <span className="material-symbols-outlined text-[16px]">badge</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">badge</span>
                   Manage Roster
                 </button>
                 <button className="text-xs text-[#9b2f00] hover:text-[#c2410c] font-semibold flex items-center gap-1" type="button">
                   <span>View Details</span>
-                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_forward</span>
                 </button>
               </div>
             </div>
@@ -532,7 +536,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
       {filteredDepts.length === 0 && (
         <div className="bg-white rounded-2xl p-10 text-center space-y-3 border border-[#EAE1D7]">
           <div className="w-12 h-12 rounded-full bg-[#f4ece8] text-[#59413a] flex items-center justify-center mx-auto">
-            <span className="material-symbols-outlined text-[24px]">search_off</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">search_off</span>
           </div>
           <h4 className="font-headline text-base font-bold text-[#1e1b19]">No ministries match your query</h4>
           <p className="text-xs text-[#59413a] max-w-sm mx-auto">Try clearing search terms or verifying spelling for department codes and leaders.</p>
@@ -553,14 +557,14 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
               {/* Header */}
               <div className="flex items-center justify-between pb-4 border-b border-[#EAE1D7]">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#9b2f00] text-[24px]">domain_add</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[24px]">domain_add</span>
                   <h2 className="font-headline text-lg font-bold text-[#1e1b19]">New Department Charter</h2>
                 </div>
                 <button 
                   onClick={() => setIsDrawerOpen(false)}
                   className="p-1.5 rounded-lg text-[#59413a] hover:bg-[#f4ece8] transition-colors"
                 >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
 
@@ -568,7 +572,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
               <form className="mt-5 space-y-4" onSubmit={(e) => { e.preventDefault(); setIsDrawerOpen(false); }}>
                 <div>
                   <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Ministry Name</label>
-                  <input
+                  <input aria-label="Ministry Name"
                     type="text"
                     value={newDeptName}
                     onChange={(e) => setNewDeptName(e.target.value)}
@@ -581,7 +585,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Ministry Code</label>
-                    <input
+                    <input aria-label="Ministry Code"
                       type="text"
                       value={newDeptCode}
                       onChange={(e) => setNewDeptCode(e.target.value)}
@@ -591,16 +595,17 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Campus</label>
-                    <select className="w-full h-10 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7] text-[#1e1b19] text-xs focus:outline-none">
-                      <option>Campus 1 - Main</option>
-                      <option>Campus 2 - North Chapel</option>
+                    <select aria-label="Campus" className="w-full h-10 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7] text-[#1e1b19] text-xs focus:outline-none">
+                      {LOCATIONS.map((location) => (
+                        <option key={location}>{location}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Lead Director / Pastor</label>
-                  <input
+                  <input aria-label="Lead Director / Pastor"
                     type="text"
                     value={newDeptDirector}
                     onChange={(e) => setNewDeptDirector(e.target.value)}
@@ -611,8 +616,8 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Annual Allocation ($)</label>
-                    <input
+                    <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Annual Allocation (KSh)</label>
+                    <input aria-label="Annual Allocation (KSh)"
                       type="number"
                       value={newDeptBudget}
                       onChange={(e) => setNewDeptBudget(e.target.value)}
@@ -622,7 +627,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Initial Target Cohort</label>
-                    <input
+                    <input aria-label="Initial Target Cohort"
                       type="number"
                       value={newDeptCohort}
                       onChange={(e) => setNewDeptCohort(e.target.value)}
@@ -634,7 +639,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-semibold text-[#1e1b19] mb-1">Regular Meeting Rhythm</label>
-                  <input
+                  <input aria-label="Regular Meeting Rhythm"
                     type="text"
                     value={newDeptSchedule}
                     onChange={(e) => setNewDeptSchedule(e.target.value)}
@@ -644,7 +649,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
                 </div>
 
                 <div className="p-3.5 bg-[#faf2ee] rounded-xl flex items-start gap-3 border border-[#EAE1D7]">
-                  <span className="material-symbols-outlined text-[#c2410c] text-[20px] mt-0.5">verified_user</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[#c2410c] text-[20px] mt-0.5">verified_user</span>
                   <div className="text-xs text-[#59413a]">
                     <span className="font-semibold text-[#1e1b19] block mb-0.5">Mandatory Child Protection Protocol</span>
                     Departments engaging minors require CPP credential registration prior to launch.

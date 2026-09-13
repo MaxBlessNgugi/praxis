@@ -19,11 +19,11 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
     setSendingBlessing(item);
     if (item.type === 'birthday') {
       setBlessingMessage(
-        `Dear ${item.memberName}, Grace Valley Parish wishes you a blessed and joyous Birthday! "The Lord bless you and keep you; the Lord make his face shine upon you." (Num 6:24) — Pastoral Staff`
+        `Dear ${item.memberName}, Destiny Sanctuary wishes you a blessed and joyous Birthday! "The Lord bless you and keep you; the Lord make his face shine upon you." (Num 6:24) — Pastoral Staff`
       );
     } else {
       setBlessingMessage(
-        `Dear ${item.memberName}, Happy Anniversary! We praise God for your ${item.yearsCount ? `${item.yearsCount} years of ` : ''}covenant marriage and witness in our church family. — Grace Valley Session & Pastors`
+        `Dear ${item.memberName}, Happy Anniversary! We praise God for your ${item.yearsCount ? `${item.yearsCount} years of ` : ''}marriage and witness in our church family. — Destiny Sanctuary Council & Pastors`
       );
     }
   };
@@ -53,12 +53,12 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
               {milestones.filter((m) => m.type === 'birthday').length} Celebrations
             </div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">cake</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">cake</span>
               Fellowship cards prepared
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span className="material-symbols-outlined text-[24px]">cake</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">cake</span>
           </div>
         </div>
 
@@ -69,12 +69,12 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
               {milestones.filter((m) => m.type === 'anniversary').length} Marriages
             </div>
             <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">favorite</span>
-              Covenant milestones celebrated
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">favorite</span>
+              Wedding milestones celebrated
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#D97706]">
-            <span className="material-symbols-outlined text-[24px]">favorite</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">favorite</span>
           </div>
         </div>
 
@@ -85,12 +85,12 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
               {milestones.filter((m) => m.greetingSent).length} Delivered
             </div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">mark_email_read</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">mark_email_read</span>
               Pastoral care touchpoints
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span className="material-symbols-outlined text-[24px]">send</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">send</span>
           </div>
         </div>
 
@@ -99,19 +99,19 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Upcoming (This Week)</span>
             <div className="text-2xl font-black text-[#C2410C] mt-0.5">3 Immediate</div>
             <span className="text-xs text-[#C2410C] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">notifications_active</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">notifications_active</span>
               Action recommended today
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span className="material-symbols-outlined text-[24px]">celebration</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">celebration</span>
           </div>
         </div>
       </div>
 
       {sentAlert && (
         <div className="p-3.5 rounded-[12px] bg-[#059669]/10 border border-[#059669]/30 text-[#059669] text-xs font-bold flex items-center gap-2">
-          <span className="material-symbols-outlined text-[18px]">check_circle</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">check_circle</span>
           Pastoral blessing card & SMS successfully sent to {sentAlert}!
         </div>
       )}
@@ -122,8 +122,8 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4] mb-4">
           <div>
             <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-[#C2410C]">cake</span>
-              Birthdays & Covenant Anniversaries
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">cake</span>
+              Birthdays & Wedding Anniversaries
             </h3>
             <p className="text-xs text-[#57534E] mt-0.5">
               Honor congregation milestones, track wedding anniversaries, and deliver pastoral blessings.
@@ -147,7 +147,7 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
               ))}
             </div>
 
-            <select
+            <select aria-label="Time range filter"
               value={timeFilter}
               onChange={(e) => setTimeFilter(e.target.value as any)}
               className="px-3 py-1.5 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -207,7 +207,7 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
                 <div>
                   {item.greetingSent ? (
                     <span className="text-[11px] text-[#059669] font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">check_circle</span>
                       Blessing Sent
                     </span>
                   ) : (
@@ -220,7 +220,7 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
                   onClick={() => handleOpenBlessing(item)}
                   className="px-2.5 py-1 rounded-[6px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                 >
-                  <span className="material-symbols-outlined text-[14px]">send</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[14px]">send</span>
                   Send Blessing
                 </button>
               </div>
@@ -242,7 +242,7 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
                 onClick={() => setSendingBlessing(null)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
@@ -259,7 +259,7 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">
                   Pastoral Scripture & Blessing Copy
                 </label>
-                <textarea
+                <textarea aria-label="Pastoral Scripture &amp; Blessing Copy"
                   rows={4}
                   required
                   value={blessingMessage}
@@ -280,7 +280,7 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[16px]">send</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">send</span>
                   Dispatch Blessing
                 </button>
               </div>

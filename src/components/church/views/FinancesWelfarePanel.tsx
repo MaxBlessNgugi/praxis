@@ -26,7 +26,7 @@ const CASES: WelfareCase[] = [
     date: 'Oct 22, 2024',
     status: 'Disbursed',
     confidentialNotes: 'Household faced 3-day notice due to temporary layoff. Direct payment remitted to Maple Ridge Properties LLC. Case worker scheduled 2nd pastoral check-in next week.',
-    householdDetails: '3 Children (Ages 4, 7, 11) · Parish Member since 2021',
+    householdDetails: '3 Children (Ages 4, 7, 11) · Church Member since 2021',
   },
   {
     id: 'w-2',
@@ -39,7 +39,7 @@ const CASES: WelfareCase[] = [
     date: 'Oct 19, 2024',
     status: 'Disbursed',
     confidentialNotes: '150 gallons fuel oil delivery voucher issued to Valley Energy Services for elderly widow home.',
-    householdDetails: 'Senior Adherent · Living alone',
+    householdDetails: 'Senior Visitor · Living alone',
   },
   {
     id: 'w-3',
@@ -48,7 +48,7 @@ const CASES: WelfareCase[] = [
     category: 'Medical Grant',
     categoryColor: 'bg-[#85f8c4]/40 text-[#005137]',
     amount: 450.00,
-    caseworker: 'Pastor Sarah Alistair',
+    caseworker: 'Rev. Sarah Alistair',
     date: 'Oct 18, 2024',
     status: 'Disbursed',
     confidentialNotes: 'Emergency abscess treatment copay. Directly paid to County Dental Clinic.',
@@ -97,13 +97,13 @@ export const FinancesWelfarePanel: React.FC = () => {
               Deacon Welfare Reserve
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#9b2f00] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">health_and_safety</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">health_and_safety</span>
             </span>
           </div>
           <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19]">$48,320</div>
+            <div className="font-headline text-3xl font-bold text-[#1e1b19]">KSh 48,320</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span className="material-symbols-outlined text-[16px]">verified_user</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">verified_user</span>
               <span>Designated Alms Treasury</span>
             </div>
           </div>
@@ -119,11 +119,11 @@ export const FinancesWelfarePanel: React.FC = () => {
               Disbursed MTD
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#c2410c] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">outbox</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">outbox</span>
             </span>
           </div>
           <div>
-            <div className="font-headline text-3xl font-bold text-[#9b2f00]">$8,650</div>
+            <div className="font-headline text-3xl font-bold text-[#9b2f00]">KSh 8,650</div>
             <div className="flex items-center gap-1 mt-1 text-[#59413a] text-xs">
               <span>Across 14 emergency cases</span>
             </div>
@@ -140,11 +140,11 @@ export const FinancesWelfarePanel: React.FC = () => {
               Avg Assistance / Case
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#904d00] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">family_restroom</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">family_restroom</span>
             </span>
           </div>
           <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19]">$617.85</div>
+            <div className="font-headline text-3xl font-bold text-[#1e1b19]">KSh 617.85</div>
             <div className="flex items-center gap-1 mt-1 text-[#59413a] text-xs">
               <span>Direct vendor remitted</span>
             </div>
@@ -161,18 +161,18 @@ export const FinancesWelfarePanel: React.FC = () => {
               Monthly Inflow
             </span>
             <span className="p-2 rounded-xl bg-[#85f8c4]/40 text-[#002114] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">move_to_inbox</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">move_to_inbox</span>
             </span>
           </div>
           <div>
-            <div className="font-headline text-3xl font-bold text-[#006243]">$11,200</div>
+            <div className="font-headline text-3xl font-bold text-[#006243]">KSh 11,200</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span className="material-symbols-outlined text-[16px]">trending_up</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">trending_up</span>
               <span>1st Sunday Alms offering</span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
-            Net Surplus: +$2,550 MTD
+            Net Surplus: +KSh 2,550 MTD
           </div>
         </div>
       </div>
@@ -190,7 +190,7 @@ export const FinancesWelfarePanel: React.FC = () => {
             onClick={() => setIsDisbursementModalOpen(true)}
             className="px-4 py-2 bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px]">add_moderator</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_moderator</span>
             <span>+ New Disbursement</span>
           </button>
         </div>
@@ -206,19 +206,19 @@ export const FinancesWelfarePanel: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs pt-1">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[#9b2f00]"></span>
-              <span className="text-[#1e1b19]">Housing & Rent: <strong>45% ($3,892)</strong></span>
+              <span className="text-[#1e1b19]">Housing & Rent: <strong>45% (KSh 3,892)</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[#fe932c]"></span>
-              <span className="text-[#1e1b19]">Utilities & Fuel: <strong>22% ($1,903)</strong></span>
+              <span className="text-[#1e1b19]">Utilities & Fuel: <strong>22% (KSh 1,903)</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[#007d57]"></span>
-              <span className="text-[#1e1b19]">Medical & Rx: <strong>18% ($1,557)</strong></span>
+              <span className="text-[#1e1b19]">Medical & Rx: <strong>18% (KSh 1,557)</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[#904d00]"></span>
-              <span className="text-[#1e1b19]">Food & Grocery: <strong>15% ($1,298)</strong></span>
+              <span className="text-[#1e1b19]">Food & Grocery: <strong>15% (KSh 1,298)</strong></span>
             </div>
           </div>
         </div>
@@ -228,7 +228,7 @@ export const FinancesWelfarePanel: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden">
         <div className="p-4 border-b border-[#EAE1D7] bg-[#faf2ee]/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#9b2f00] text-[20px]">folder_shared</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[20px]">folder_shared</span>
             <h3 className="font-headline text-sm font-bold text-[#1e1b19]">
               Confidential Welfare Casework Ledger
             </h3>
@@ -269,7 +269,7 @@ export const FinancesWelfarePanel: React.FC = () => {
                     {c.caseworker}
                   </td>
                   <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">
-                    ${c.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    KSh {c.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-3.5 px-4 text-[#59413a] font-mono text-[11px]">
                     {c.date}
@@ -296,13 +296,13 @@ export const FinancesWelfarePanel: React.FC = () => {
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-[#EAE1D7]">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#9b2f00] text-[22px]">lock</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[22px]">lock</span>
                   <h3 className="font-headline text-base font-bold text-[#1e1b19]">
                     Case Notes ({selectedCase.caseNo})
                   </h3>
                 </div>
                 <button onClick={() => setSelectedCase(null)} className="text-[#59413a] hover:text-[#1e1b19]">
-                  <span className="material-symbols-outlined text-[20px]">close</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
 
@@ -316,7 +316,7 @@ export const FinancesWelfarePanel: React.FC = () => {
                   <div>
                     <span className="text-[#59413a] block">Disbursed Amount</span>
                     <span className="font-headline font-bold text-base text-[#9b2f00]">
-                      ${selectedCase.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      KSh {selectedCase.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div>
@@ -365,22 +365,22 @@ export const FinancesWelfarePanel: React.FC = () => {
             <div className="flex items-center justify-between border-b border-[#EAE1D7] pb-3">
               <h3 className="font-headline text-base font-bold text-[#1e1b19]">New Welfare Relief Disbursement</h3>
               <button onClick={() => setIsDisbursementModalOpen(false)} className="text-[#59413a] hover:text-[#1e1b19]">
-                <span className="material-symbols-outlined text-[20px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
             <div className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold mb-1">Beneficiary Family / Case Subject</label>
-                <input type="text" placeholder="e.g. Miller Family" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <input aria-label="Beneficiary Family / Case Subject" type="text" placeholder="e.g. Miller Family" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold mb-1">Amount ($)</label>
-                  <input type="number" placeholder="600.00" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                  <label className="block font-semibold mb-1">Amount (KSh)</label>
+                  <input aria-label="Amount (KSh)" type="number" placeholder="600.00" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Category</label>
-                  <select className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
+                  <select aria-label="Category" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
                     <option>Emergency Rental</option>
                     <option>Fuel & Utility</option>
                     <option>Medical Grant</option>
@@ -390,11 +390,11 @@ export const FinancesWelfarePanel: React.FC = () => {
               </div>
               <div>
                 <label className="block font-semibold mb-1">Direct Payee / Vendor</label>
-                <input type="text" placeholder="e.g. Valley Power Authority" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <input aria-label="Direct Payee / Vendor" type="text" placeholder="e.g. Valley Power Authority" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
               </div>
               <div>
                 <label className="block font-semibold mb-1">Deacon Assessment Notes</label>
-                <textarea rows={3} placeholder="Provide concise justification..." className="w-full p-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"></textarea>
+                <textarea aria-label="Deacon Assessment Notes" rows={3} placeholder="Provide concise justification..." className="w-full p-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"></textarea>
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EAE1D7]">

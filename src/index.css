@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+/* The mockup is a light-only UI. Declaring that stops a dark-mode OS from
+   re-theming native controls and scrollbars to dark chrome around it. */
+html {
+  color-scheme: light;
+}
+
+/* Self-hosted Material Symbols icon font.
+   This was previously pulled from fonts.googleapis.com, which CSP-restricted
+   environments (style-src / font-src 'self') block — the icon font then never
+   arrived and every icon rendered as its literal ligature name (e.g. "church",
+   "cottage") instead of a glyph. Serving it locally makes the icons resolve
+   regardless of policy or connectivity.
+
+   Asset: src/assets/material-symbols-outlined.woff2
+   Full icon set, static instance (Outlined, wght 400, FILL 0, opsz 24).
+
+   The font is referenced relatively (not from public/) so the bundler emits it as
+   a hashed asset — and inlines it as a data URI in the single-file 'share' build. */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./assets/material-symbols-outlined.woff2') format('woff2');
+}
+
 @theme {
   /* Warm Ember Theme Palette */
   --color-warm-canvas: #FDF8F3;
@@ -35,10 +61,27 @@
   .glow-terracotta {
     box-shadow: 0 0 16px rgba(194, 65, 12, 0.35);
   }
-  .focus-ring-warm {
-    outline: none;
-    box-shadow: 0 0 0 2px #C2410C, 0 0 12px rgba(194, 65, 12, 0.25);
-  }
+
+}
+
+/* Focus policy — one visible keyboard indicator for every control.
+
+   Most controls here set `outline-none` and then rely on a `focus:border-*`
+   colour change that is almost invisible on a light field; a quarter of them
+   draw no indicator at all. Fixing that one class string at a time is ~180
+   edits that drift apart, so the indicator lives here instead. This block is
+   deliberately outside any cascade layer: unlayered rules beat Tailwind's
+   `outline-none` utility without needing `!important`.
+
+   `:focus-visible` keeps the ring off mouse clicks. Real <button>/<a> elements
+   keep the `focus:ring-*` utilities they already carry, and form controls no
+   longer carry any of their own (see tools/a11y-control-names.mjs). */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px solid #C2410C;
+  outline-offset: 2px;
 }
 
 /* Material Symbols configuration */
@@ -54,7 +97,24 @@
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
+  /* Icons are ligatures: the literal text (e.g. "church") must be substituted
+     with the matching glyph by the icon font above. */
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
   vertical-align: middle;
+}
+
+/* Honour the OS "reduce motion" setting for the app's transitions and
+   entrance animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 

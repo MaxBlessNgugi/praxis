@@ -37,7 +37,7 @@ export const PrayerRequestsPanel: React.FC = () => {
     const newPrayer: PrayerRequestItem = {
       id: `pr-${Date.now()}`,
       title,
-      requestedBy: isAnonymous ? 'Anonymous Parishioner' : requestedBy || 'Parishioner',
+      requestedBy: isAnonymous ? 'Anonymous Member' : requestedBy || 'Member',
       isAnonymous,
       privacyLevel,
       category,
@@ -86,12 +86,12 @@ export const PrayerRequestsPanel: React.FC = () => {
               {prayers.filter((p) => !p.isAnswered).length} Petitions
             </div>
             <span className="text-xs text-[#C2410C] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">local_fire_department</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">local_fire_department</span>
               24/7 Prayer Vigil Active
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span className="material-symbols-outlined text-[24px]">favorite</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">favorite</span>
           </div>
         </div>
 
@@ -102,12 +102,12 @@ export const PrayerRequestsPanel: React.FC = () => {
               {prayers.reduce((acc, p) => acc + p.intercessorCount, 0)} Prayers
             </div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">volunteer_activism</span>
-              Parish prayer chain lifted
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">volunteer_activism</span>
+              Church prayer chain lifted
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span className="material-symbols-outlined text-[24px]">volunteer_activism</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">volunteer_activism</span>
           </div>
         </div>
 
@@ -118,12 +118,12 @@ export const PrayerRequestsPanel: React.FC = () => {
               {prayers.filter((p) => p.isAnswered).length} Testimonies
             </div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">celebration</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">celebration</span>
               Glory to God
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#2563EB]">
-            <span className="material-symbols-outlined text-[24px]">workspace_premium</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">workspace_premium</span>
           </div>
         </div>
 
@@ -134,12 +134,12 @@ export const PrayerRequestsPanel: React.FC = () => {
               {prayers.filter((p) => p.privacyLevel === 'pastoral-confidential').length} Shepherding
             </div>
             <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">lock</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">lock</span>
               Pastors & Elders only
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#D97706]">
-            <span className="material-symbols-outlined text-[24px]">shield_person</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">shield_person</span>
           </div>
         </div>
       </div>
@@ -150,8 +150,8 @@ export const PrayerRequestsPanel: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4] mb-4">
           <div>
             <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-[#C2410C]">volunteer_activism</span>
-              Parish Prayer Chain & Intercession Wall
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">volunteer_activism</span>
+              Church Prayer Chain & Intercession Wall
             </h3>
             <p className="text-xs text-[#57534E] mt-0.5">
               Submit petitions, stand in the gap, and celebrate answered prayers with the church community.
@@ -159,7 +159,7 @@ export const PrayerRequestsPanel: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <select aria-label="Privacy level filter"
               value={selectedPrivacy}
               onChange={(e) => setSelectedPrivacy(e.target.value)}
               className="px-3 py-1.5 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -175,7 +175,7 @@ export const PrayerRequestsPanel: React.FC = () => {
               onClick={() => setIsSubmittingPrayer(true)}
               className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">add_circle</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
               Submit Petition
             </button>
           </div>
@@ -230,7 +230,7 @@ export const PrayerRequestsPanel: React.FC = () => {
                 {pr.praiseReport && (
                   <div className="p-2.5 rounded-[8px] bg-[#059669]/10 border border-[#059669]/30 text-xs text-[#059669] mb-3">
                     <div className="font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[15px]">celebration</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[15px]">celebration</span>
                       Praise Report:
                     </div>
                     <div className="mt-0.5">{pr.praiseReport}</div>
@@ -240,7 +240,7 @@ export const PrayerRequestsPanel: React.FC = () => {
 
               <div className="pt-3 border-t border-[#E7E5E4]/80 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1 text-[#C2410C] font-bold">
-                  <span className="material-symbols-outlined text-[16px]">volunteer_activism</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">volunteer_activism</span>
                   <span>{pr.intercessorCount} Standing in Prayer</span>
                 </div>
 
@@ -265,7 +265,7 @@ export const PrayerRequestsPanel: React.FC = () => {
                     </>
                   ) : (
                     <span className="text-[11px] text-[#059669] font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[15px]">check_circle</span>
                       Praise Recorded
                     </span>
                   )}
@@ -287,14 +287,14 @@ export const PrayerRequestsPanel: React.FC = () => {
                 onClick={() => setIsSubmittingPrayer(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreatePrayer} className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Petition Title / Focus *</label>
-                <input
+                <input aria-label="Petition Title / Focus"
                   type="text"
                   required
                   placeholder="e.g. Healing & Comfort for Brother Thomas"
@@ -307,7 +307,7 @@ export const PrayerRequestsPanel: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Requested By</label>
-                  <input
+                  <input aria-label="Requested By"
                     type="text"
                     disabled={isAnonymous}
                     placeholder="Your name"
@@ -318,7 +318,7 @@ export const PrayerRequestsPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Privacy Level</label>
-                  <select
+                  <select aria-label="Privacy Level"
                     value={privacyLevel}
                     onChange={(e) => setPrivacyLevel(e.target.value as any)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -345,7 +345,7 @@ export const PrayerRequestsPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
-                <select
+                <select aria-label="Category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value as any)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -361,7 +361,7 @@ export const PrayerRequestsPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Prayer Details *</label>
-                <textarea
+                <textarea aria-label="Prayer Details"
                   rows={3}
                   required
                   placeholder="Share details so intercessors can pray specifically..."
@@ -402,7 +402,7 @@ export const PrayerRequestsPanel: React.FC = () => {
                 onClick={() => setAnsweringPrayer(null)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
@@ -416,7 +416,7 @@ export const PrayerRequestsPanel: React.FC = () => {
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">
                   Praise Testimony / Answer Description
                 </label>
-                <textarea
+                <textarea aria-label="Praise Testimony / Answer Description"
                   rows={3}
                   required
                   placeholder="Share how God answered this prayer..."

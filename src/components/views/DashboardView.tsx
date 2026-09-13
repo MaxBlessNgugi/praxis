@@ -150,10 +150,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               92% budget
             </span>
           </div>
-          <div className="text-2xl font-bold text-white tracking-tight">$1,420 <span className="text-xs font-normal text-slate-400 font-mono">/ mo</span></div>
+          <div className="text-2xl font-bold text-white tracking-tight">KSh 1,420 <span className="text-xs font-normal text-slate-400 font-mono">/ mo</span></div>
           <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/60">
-            <span>Limit: $1,600/mo</span>
-            <span className="text-indigo-400 font-mono">-$85 savings</span>
+            <span>Limit: KSh 1,600/mo</span>
+            <span className="text-indigo-400 font-mono">-KSh 85 savings</span>
           </div>
         </div>
       </div>

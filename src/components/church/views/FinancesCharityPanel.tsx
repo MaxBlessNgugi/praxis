@@ -68,13 +68,13 @@ export const FinancesCharityPanel: React.FC = () => {
               Direct Aid Delivered
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#9b2f00] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">diversity_1</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">diversity_1</span>
             </span>
           </div>
           <div>
             <div className="font-headline text-3xl font-bold text-[#1e1b19]">1,420</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span className="material-symbols-outlined text-[16px]">trending_up</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">trending_up</span>
               <span>+18% families served y/y</span>
             </div>
           </div>
@@ -90,7 +90,7 @@ export const FinancesCharityPanel: React.FC = () => {
               Active Missions & Drives
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#904d00] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">flag</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">flag</span>
             </span>
           </div>
           <div>
@@ -100,7 +100,7 @@ export const FinancesCharityPanel: React.FC = () => {
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
-            100% Session sanctioned
+            100% Council sanctioned
           </div>
         </div>
 
@@ -111,13 +111,13 @@ export const FinancesCharityPanel: React.FC = () => {
               Nutritional Relief
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#c2410c] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">nutrition</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">nutrition</span>
             </span>
           </div>
           <div>
             <div className="font-headline text-3xl font-bold text-[#1e1b19]">8,640 lbs</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span className="material-symbols-outlined text-[16px]">eco</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">eco</span>
               <span>Distributed via Food Pantry</span>
             </div>
           </div>
@@ -133,7 +133,7 @@ export const FinancesCharityPanel: React.FC = () => {
               Global Outreach
             </span>
             <span className="p-2 rounded-xl bg-[#85f8c4]/40 text-[#002114] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">public</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">public</span>
             </span>
           </div>
           <div>
@@ -184,12 +184,12 @@ export const FinancesCharityPanel: React.FC = () => {
           <div className="w-full p-3.5 bg-[#faf2ee] rounded-xl flex items-center justify-between text-xs border border-[#EAE1D7]">
             <div>
               <span className="text-[#59413a] block">Released YTD</span>
-              <strong className="text-sm font-headline text-[#9b2f00]">$118,965</strong>
+              <strong className="text-sm font-headline text-[#9b2f00]">KSh 118,965</strong>
             </div>
             <div className="h-6 w-px bg-[#EAE1D7]"></div>
             <div>
               <span className="text-[#59413a] block">Total Allocation</span>
-              <strong className="text-sm font-headline text-[#1e1b19]">$165,000</strong>
+              <strong className="text-sm font-headline text-[#1e1b19]">KSh 165,000</strong>
             </div>
           </div>
         </div>
@@ -213,7 +213,7 @@ export const FinancesCharityPanel: React.FC = () => {
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs">
                 <span className="font-semibold text-[#1e1b19]">Community Food Pantry Annex</span>
-                <span className="font-mono text-[#9b2f00] font-bold">$42,000 / $48,000 (87.5%)</span>
+                <span className="font-mono text-[#9b2f00] font-bold">KSh 42,000 / KSh 48,000 (87.5%)</span>
               </div>
               <div className="w-full bg-[#EAE1D7] h-2 rounded-full overflow-hidden">
                 <div className="bg-[#9b2f00] h-full" style={{ width: '87.5%' }}></div>
@@ -224,7 +224,7 @@ export const FinancesCharityPanel: React.FC = () => {
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs">
                 <span className="font-semibold text-[#1e1b19]">Regional Free Medical Clinic</span>
-                <span className="font-mono text-[#904d00] font-bold">$28,500 / $35,000 (81.4%)</span>
+                <span className="font-mono text-[#904d00] font-bold">KSh 28,500 / KSh 35,000 (81.4%)</span>
               </div>
               <div className="w-full bg-[#EAE1D7] h-2 rounded-full overflow-hidden">
                 <div className="bg-[#fe932c] h-full" style={{ width: '81.4%' }}></div>
@@ -235,7 +235,7 @@ export const FinancesCharityPanel: React.FC = () => {
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs">
                 <span className="font-semibold text-[#1e1b19]">Kenya Clean Water Borehole Mission</span>
-                <span className="font-mono text-[#007d57] font-bold">$24,000 / $30,000 (80.0%)</span>
+                <span className="font-mono text-[#007d57] font-bold">KSh 24,000 / KSh 30,000 (80.0%)</span>
               </div>
               <div className="w-full bg-[#EAE1D7] h-2 rounded-full overflow-hidden">
                 <div className="bg-[#007d57] h-full" style={{ width: '80%' }}></div>
@@ -246,7 +246,7 @@ export const FinancesCharityPanel: React.FC = () => {
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs">
                 <span className="font-semibold text-[#1e1b19]">Thanksgiving Turkey & Grocery Drive</span>
-                <span className="font-mono text-[#c2410c] font-bold">$8,465 / $12,000 (70.5%)</span>
+                <span className="font-mono text-[#c2410c] font-bold">KSh 8,465 / KSh 12,000 (70.5%)</span>
               </div>
               <div className="w-full bg-[#EAE1D7] h-2 rounded-full overflow-hidden">
                 <div className="bg-[#c2410c] h-full" style={{ width: '70.5%' }}></div>
@@ -257,7 +257,7 @@ export const FinancesCharityPanel: React.FC = () => {
           <div className="pt-2 border-t border-[#f4ece8] flex items-center justify-between text-xs text-[#59413a]">
             <span>Next review: Annual Congregational Meeting</span>
             <span className="font-bold text-[#006243] flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px]">verified</span> Fully Funded
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">verified</span> Fully Funded
             </span>
           </div>
         </div>
@@ -321,13 +321,13 @@ export const FinancesCharityPanel: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden">
         <div className="p-4 border-b border-[#EAE1D7] bg-[#faf2ee]/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#9b2f00] text-[20px]">receipt</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[20px]">receipt</span>
             <h3 className="font-headline text-sm font-bold text-[#1e1b19]">
               Benevolence Expenditure Ledger & Verification Audit
             </h3>
           </div>
           <span className="text-xs text-[#006243] font-bold flex items-center gap-1">
-            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span>
             All Receipts Reconciled
           </span>
         </div>
@@ -353,12 +353,12 @@ export const FinancesCharityPanel: React.FC = () => {
                   <td className="py-3.5 px-4 text-[#59413a]">{exp.initiative}</td>
                   <td className="py-3.5 px-4 text-[#59413a]">{exp.vendor}</td>
                   <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">
-                    ${exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    KSh {exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-3.5 px-4 text-[#59413a] font-mono text-[11px]">{exp.date}</td>
                   <td className="py-3.5 px-4 text-right">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold">
-                      <span className="material-symbols-outlined text-[14px]">verified</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span>
                       {exp.status}
                     </span>
                   </td>
@@ -373,7 +373,7 @@ export const FinancesCharityPanel: React.FC = () => {
       <div className="p-4 rounded-2xl bg-[#faf2ee] border border-[#EAE1D7] flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#007d57] text-white flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-[20px]">workspace_premium</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">workspace_premium</span>
           </div>
           <div>
             <h4 className="font-headline text-xs font-bold text-[#1e1b19]">
@@ -396,22 +396,22 @@ export const FinancesCharityPanel: React.FC = () => {
             <div className="flex items-center justify-between border-b border-[#EAE1D7] pb-3">
               <h3 className="font-headline text-base font-bold text-[#1e1b19]">Record Charity Disbursement</h3>
               <button onClick={() => setIsExpenseModalOpen(false)} className="text-[#59413a] hover:text-[#1e1b19]">
-                <span className="material-symbols-outlined text-[20px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
             <div className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold mb-1">Item / Description</label>
-                <input type="text" placeholder="e.g. Winter Coats for Youth Drive" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <input aria-label="Item / Description" type="text" placeholder="e.g. Winter Coats for Youth Drive" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold mb-1">Amount ($)</label>
-                  <input type="number" placeholder="850.00" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                  <label className="block font-semibold mb-1">Amount (KSh)</label>
+                  <input aria-label="Amount (KSh)" type="number" placeholder="850.00" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Initiative</label>
-                  <select className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
+                  <select aria-label="Initiative" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
                     <option>Community Food Pantry</option>
                     <option>Regional Free Medical Clinic</option>
                     <option>Kenya Water Borehole</option>
@@ -421,7 +421,7 @@ export const FinancesCharityPanel: React.FC = () => {
               </div>
               <div>
                 <label className="block font-semibold mb-1">Vendor / Payee</label>
-                <input type="text" placeholder="e.g. Burlington Coat Direct" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <input aria-label="Vendor / Payee" type="text" placeholder="e.g. Burlington Coat Direct" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EAE1D7]">

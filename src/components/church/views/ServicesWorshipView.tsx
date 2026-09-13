@@ -29,7 +29,7 @@ export const ServicesWorshipView: React.FC<ServicesWorshipViewProps> = ({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="px-2 py-0.5 rounded-md bg-[#C2410C]/10 text-[#C2410C] text-[11px] font-bold uppercase tracking-wider">
-                Parish Liturgy & Census OS
+                Church Service & Census OS
               </span>
               <span className="text-xs text-[#A8A29E] font-medium">· Lord’s Day & Midweek Worship</span>
             </div>
@@ -37,7 +37,7 @@ export const ServicesWorshipView: React.FC<ServicesWorshipViewProps> = ({
               Services & Worship Administration
             </h1>
             <p className="text-xs text-[#57534E] mt-0.5">
-              Plan liturgy orders, coordinate ministerial duty rosters, monitor attendance trends, and seal post-service session reports.
+              Plan service orders, coordinate duty rosters, monitor attendance trends, and seal post-service council reports.
             </p>
           </div>
 
@@ -55,7 +55,7 @@ export const ServicesWorshipView: React.FC<ServicesWorshipViewProps> = ({
                       : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]/70'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[16px]">{tab.icon}</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">{tab.icon}</span>
                   {tab.label}
                 </button>
               );

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { AdminSubTab } from '../../../types';
+import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
 
 interface TrashItem {
   id: string;
   name: string;
-  recordType: 'Members & Pastoral Care' | 'Giving & Stewardship' | 'Governance & Council' | 'Ministries & Groups' | 'Reports & Certificates';
+  recordType: 'Members & Believers' | 'Giving & Stewardship' | 'Church Council & Council Records' | 'Groups & Fellowships' | 'Reports & Certificates';
   recordId: string;
   deletedBy: string;
   daysRemaining: number;
@@ -17,7 +18,7 @@ const INITIAL_TRASH_ITEMS: TrashItem[] = [
   {
     id: 'trash-1',
     name: 'Elena Vance',
-    recordType: 'Members & Pastoral Care',
+    recordType: 'Members & Believers',
     recordId: '#MBR-1082',
     deletedBy: 'Deaconess Clara Oswald',
     daysRemaining: 2,
@@ -38,19 +39,19 @@ const INITIAL_TRASH_ITEMS: TrashItem[] = [
   },
   {
     id: 'trash-3',
-    name: 'Q3 Session Minutes (Redacted Draft)',
-    recordType: 'Governance & Council',
+    name: 'Q3 Council Minutes (Redacted Draft)',
+    recordType: 'Church Council & Council Records',
     recordId: '#GOV-509',
-    deletedBy: 'Pastor David Alistair',
+    deletedBy: 'Bishop Sammy',
     daysRemaining: 1,
     expiryDate: 'Nov 18',
     isExpiringSoon: true,
-    rationale: 'Preliminary session working notes replaced by final ratified minutes with pastoral seal.',
+    rationale: 'Preliminary council working notes replaced by final ratified minutes with pastoral seal.',
   },
   {
     id: 'trash-4',
     name: 'High School Autumn Retreat Roster',
-    recordType: 'Ministries & Groups',
+    recordType: 'Groups & Fellowships',
     recordId: '#MIN-0244',
     deletedBy: 'Elder Marcus Brody',
     daysRemaining: 21,
@@ -60,7 +61,7 @@ const INITIAL_TRASH_ITEMS: TrashItem[] = [
   },
   {
     id: 'trash-5',
-    name: 'Certificate of Infant Dedication (Misspelled)',
+    name: 'Certificate of Child Dedication (Misspelled)',
     recordType: 'Reports & Certificates',
     recordId: '#CERT-912',
     deletedBy: 'Deaconess Clara Oswald',
@@ -91,11 +92,11 @@ const AUDIT_BLOCKS: AuditBlock[] = [
     timestamp: 'Nov 17, 2024 • 11:42:15 AM EST',
     title: 'Sunday Loose Plate Reconciled',
     type: 'Offering Audit',
-    amount: '+$3,410.50',
+    amount: '+KSh 3,410.50',
     isCredit: true,
     fund: 'General Operating Fund #101',
     officer: 'Deaconess Clara Oswald',
-    dualWitness: 'Pr. Michael Vance (2 Signatures Confirmed)',
+    dualWitness: 'Bishop Sammy (2 Signatures Confirmed)',
     hash: '0x7a8b...39fc',
     fullHash: '0x7a8b8c2d91ef45a8b7c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a139fc',
   },
@@ -104,7 +105,7 @@ const AUDIT_BLOCKS: AuditBlock[] = [
     timestamp: 'Nov 17, 2024 • 09:15:02 AM EST',
     title: 'Welfare Disbursement Approved',
     type: 'Benevolence Voucher',
-    amount: '-$850.00',
+    amount: '-KSh 850.00',
     isCredit: false,
     fund: 'Benevolence Escrow #402',
     officer: 'Elder Marcus Jenkins',
@@ -117,11 +118,11 @@ const AUDIT_BLOCKS: AuditBlock[] = [
     timestamp: 'Nov 16, 2024 • 04:30:19 PM EST',
     title: 'Sanctuary Capital Escrow Wire',
     type: 'Trustee Wire',
-    amount: '-$50,000.00',
+    amount: '-KSh 50,000.00',
     isCredit: false,
     fund: 'Building Expansion Fund #610',
     officer: 'Treasurer Sarah Lin',
-    dualWitness: '3 Tri-Key Attestation (Pr. Vance, A. Miller, S. Lin)',
+    dualWitness: '3 Tri-Key Attestation (Bishop Sammy, A. Miller, S. Lin)',
     hash: '0x4e88...77ca',
     fullHash: '0x4e8877ca918823ddbf992147ae55341299abceef87625100aa762149bb4477ca',
   },
@@ -130,7 +131,7 @@ const AUDIT_BLOCKS: AuditBlock[] = [
     timestamp: 'Nov 16, 2024 • 01:12:44 PM EST',
     title: 'Tithe Batch Ingestion',
     type: 'Automated ACH Clearing',
-    amount: '+$14,280.00',
+    amount: '+KSh 14,280.00',
     isCredit: true,
     fund: 'General Operating Fund #101',
     officer: 'System Payment Bridge',
@@ -142,12 +143,12 @@ const AUDIT_BLOCKS: AuditBlock[] = [
     height: 48188,
     timestamp: 'Nov 15, 2024 • 05:22:10 PM EST',
     title: 'Inter-Fund Reallocation',
-    type: 'Session Approved Rebalance',
-    amount: '$12,000.00 Rebalance',
+    type: 'Council Approved Rebalance',
+    amount: 'KSh 12,000.00 Rebalance',
     isCredit: true,
     fund: '#101 → Missions Reserve #204',
-    officer: 'Pr. Michael Vance',
-    dualWitness: 'Elder Marcus Jenkins (Session Resolution RES-2024-039)',
+    officer: 'Bishop Sammy',
+    dualWitness: 'Elder Marcus Jenkins (Council Resolution RES-2024-039)',
     hash: '0x38bf...884d',
     fullHash: '0x38bf884deca1190227bbfa99142388019ab9872134567890abcdef123456884d',
   },
@@ -167,7 +168,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
   // Users & Rights states
   const [searchRoles, setSearchRoles] = useState('');
-  const [parishUnit, setParishUnit] = useState('Downtown Sanctuary #01');
+  const [parishUnit, setParishUnit] = useState<string>(DEFAULT_LOCATION);
   const [hasPendingChanges, setHasPendingChanges] = useState(true);
 
   // Trash states
@@ -223,8 +224,8 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
     <div className="flex flex-col w-full gap-6 pb-16">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl bg-[#1e1b19] text-white shadow-2xl animate-in slide-in-from-bottom-5 duration-300">
-          <span className="material-symbols-outlined text-[#85f8c4] text-[20px]">check_circle</span>
+        <div role="status" aria-live="polite" className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl bg-[#1e1b19] text-white shadow-2xl animate-in slide-in-from-bottom-5 duration-300">
+          <span aria-hidden="true" className="material-symbols-outlined text-[#85f8c4] text-[20px]">check_circle</span>
           <span className="text-xs font-medium">{toastMessage}</span>
         </div>
       )}
@@ -241,7 +242,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
               Admin & System Security
             </h1>
             <p className="text-xs sm:text-sm text-[#59413a] max-w-2xl">
-              Granular ecclesiastical access governance, permission matrix, and role credential management.
+              Granular church access governance, permission matrix, and role credential management.
             </p>
           </div>
 
@@ -252,17 +253,17 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
               disabled={isVerifyingChain}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#eee7e3] text-[#1e1b19] font-semibold text-xs hover:bg-[#e9e1dd] transition-colors shadow-sm cursor-pointer"
             >
-              <span className={`material-symbols-outlined text-[19px] text-[#006243] ${isVerifyingChain ? 'animate-spin' : ''}`}>
+              <span aria-hidden="true" className={`material-symbols-outlined text-[19px] text-[#006243] ${isVerifyingChain ? 'animate-spin' : ''}`}>
                 lock
               </span>
               <span>{isVerifyingChain ? 'Verifying Hashes...' : 'Verify Merkle Root'}</span>
             </button>
             <button
               type="button"
-              onClick={() => showToast("Exporting complete Presbytery Audit Dossier (CSV/PDF bundle)...")}
+              onClick={() => showToast("Exporting complete Audit Dossier (CSV/PDF bundle)...")}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#c2410c] text-white font-semibold text-xs hover:bg-[#9b2f00] transition-all shadow-[0_2px_8px_rgba(194,65,12,0.25)] cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[19px]">file_download</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[19px]">file_download</span>
               <span>Export Audit Dossier</span>
             </button>
           </div>
@@ -279,7 +280,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 : 'bg-white text-[#59413a] hover:text-[#1e1b19] hover:bg-[#faf2ee] border border-[#e1bfb5]/40'
             }`}
           >
-            <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
             <span>Users & Rights (8 Roles)</span>
           </button>
 
@@ -292,7 +293,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 : 'bg-white text-[#59413a] hover:text-[#1e1b19] hover:bg-[#faf2ee] border border-[#e1bfb5]/40'
             }`}
           >
-            <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete_sweep</span>
             <span>Trash ({trashItems.length} Items)</span>
           </button>
 
@@ -305,7 +306,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 : 'bg-white text-[#59413a] hover:text-[#1e1b19] hover:bg-[#faf2ee] border border-[#e1bfb5]/40'
             }`}
           >
-            <span className="material-symbols-outlined text-[18px]">verified_user</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">verified_user</span>
             <span>Finance Audit (Read-Only • 1,420 Events)</span>
           </button>
         </div>
@@ -320,7 +321,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#f4ece8] flex items-center justify-center shrink-0 text-[#c2410c]">
-                <span className="material-symbols-outlined text-[22px]">manage_accounts</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">manage_accounts</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs text-[#59413a] truncate">Total Managed Accounts</span>
@@ -333,10 +334,10 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#ffdcc3]/40 flex items-center justify-center shrink-0 text-[#904d00]">
-                <span className="material-symbols-outlined text-[22px]">badge</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">badge</span>
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-xs text-[#59413a] truncate">Ecclesiastical Roles</span>
+                <span className="text-xs text-[#59413a] truncate">Church Roles</span>
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-xl font-headline text-[#1e1b19] font-bold">8 Configured</span>
                 </div>
@@ -346,10 +347,10 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#ffdbd0] flex items-center justify-center shrink-0 text-[#9b2f00]">
-                <span className="material-symbols-outlined text-[22px]">security</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">security</span>
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-xs text-[#59413a] truncate">Session Security</span>
+                <span className="text-xs text-[#59413a] truncate">Council Security</span>
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-xl font-headline text-[#1e1b19] font-bold">TLS 1.3 Strict</span>
                 </div>
@@ -359,14 +360,14 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#007d57]/15 flex items-center justify-center shrink-0 text-[#006243]">
-                <span className="material-symbols-outlined text-[22px]">verified</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">verified</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs text-[#59413a] truncate">Permission Status</span>
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-xl font-headline text-[#006243] font-bold">Audit Certified</span>
                 </div>
-                <span className="text-[10px] text-[#59413a]">Signed by Pastor M. Vance</span>
+                <span className="text-[10px] text-[#59413a]">Signed by Bishop Sammy</span>
               </div>
             </div>
           </div>
@@ -374,8 +375,8 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           {/* Matrix Filter & Search toolbar */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-[#e1bfb5]/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="relative flex-1 max-w-md">
-              <span className="material-symbols-outlined absolute left-3 top-2.5 text-[#59413a] text-[18px]">search</span>
-              <input
+              <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2.5 text-[#59413a] text-[18px]">search</span>
+              <input aria-label="Search permission names, role definitions"
                 type="text"
                 value={searchRoles}
                 onChange={(e) => setSearchRoles(e.target.value)}
@@ -384,18 +385,19 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
               />
             </div>
             <div className="flex items-center gap-3">
-              <select
+              <select aria-label="Church location filter"
                 value={parishUnit}
                 onChange={(e) => setParishUnit(e.target.value)}
                 className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/40 focus:outline-none cursor-pointer"
               >
-                <option>Downtown Sanctuary #01</option>
-                <option>Eastside Chapel #02</option>
-                <option>All Parish Campuses</option>
+                {LOCATIONS.map((location) => (
+                  <option key={location}>{location}</option>
+                ))}
+                <option>All Church Locations</option>
               </select>
               <button
                 type="button"
-                onClick={() => showToast("Opening Ecclesiastical RBAC Presets modal...")}
+                onClick={() => showToast("Opening Church RBAC Presets modal...")}
                 className="px-3.5 py-2 rounded-lg bg-[#eee7e3] text-[#1e1b19] text-xs font-bold hover:bg-[#e9e1dd] cursor-pointer"
               >
                 Presets
@@ -411,58 +413,58 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                   <tr className="bg-[#f4ece8] text-[#59413a] text-[11px] font-headline font-bold uppercase tracking-wider">
                     <th className="py-3.5 px-4 min-w-[200px]">Role Title & Scope</th>
                     <th className="py-3.5 px-3 text-center">Members & Pastoral</th>
-                    <th className="py-3.5 px-3 text-center">Worship & Liturgy</th>
+                    <th className="py-3.5 px-3 text-center">Worship & Service</th>
                     <th className="py-3.5 px-3 text-center">Stewardship & Giving</th>
-                    <th className="py-3.5 px-3 text-center">Governance & Session</th>
-                    <th className="py-3.5 px-3 text-center">Ministries & Groups</th>
+                    <th className="py-3.5 px-3 text-center">Leadership & Council</th>
+                    <th className="py-3.5 px-3 text-center">Groups & Fellowships</th>
                     <th className="py-3.5 px-3 text-center">Reports & Archives</th>
                     <th className="py-3.5 px-4 text-right">Status / Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e1bfb5]/30 text-xs text-[#1e1b19]">
-                  {/* Role 1: Senior Pastor */}
+                  {/* Role 1: Bishop */}
                   <tr className="hover:bg-[#faf2ee]/60 transition-colors">
                     <td className="py-4 px-4">
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2">
-                          <span className="font-headline font-bold text-[#1e1b19]">Senior Pastor / Lead Clergy</span>
+                          <span className="font-headline font-bold text-[#1e1b19]">Bishop / Lead Pastor</span>
                           <span className="px-1.5 py-0.5 rounded bg-[#007d57]/10 text-[#006243] text-[10px] font-bold">Immutable</span>
                         </div>
-                        <span className="text-[11px] text-[#59413a]">Full sovereign access across parish modules</span>
+                        <span className="text-[11px] text-[#59413a]">Full sovereign access across church modules</span>
                       </div>
                     </td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
                     <td className="py-4 px-4 text-right">
                       <span className="text-xs font-bold text-[#59413a] bg-[#eee7e3] px-2.5 py-1 rounded-md">Root Sovereign</span>
                     </td>
                   </tr>
 
-                  {/* Role 2: Ruling Elder / Clerk */}
+                  {/* Role 2: Church Elder / Clerk */}
                   <tr className="hover:bg-[#faf2ee]/60 transition-colors bg-[#faf2ee]/30">
                     <td className="py-4 px-4">
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2">
-                          <span className="font-headline font-bold text-[#1e1b19]">Ruling Elder / Session Clerk</span>
+                          <span className="font-headline font-bold text-[#1e1b19]">Church Elder / Church Secretary</span>
                           <span className="px-1.5 py-0.5 rounded bg-[#ffdbd0] text-[#9b2f00] text-[10px] font-bold">System Native</span>
                         </div>
-                        <span className="text-[11px] text-[#59413a]">Session meeting docket, canonical seals & minutes</span>
+                        <span className="text-[11px] text-[#59413a]">Council meeting agenda, official seals & minutes</span>
                       </div>
                     </td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
                     <td className="py-4 px-4 text-right">
                       <button 
                         type="button"
-                        onClick={() => showToast("Reviewing Ruling Elder permission cluster...")}
+                        onClick={() => showToast("Reviewing Church Elder permission cluster...")}
                         className="text-xs font-bold text-[#c2410c] hover:underline cursor-pointer"
                       >
                         Edit Cluster
@@ -475,18 +477,18 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                     <td className="py-4 px-4">
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2">
-                          <span className="font-headline font-bold text-[#1e1b19]">Deacon & Parish Treasurer</span>
+                          <span className="font-headline font-bold text-[#1e1b19]">Deacon & Church Treasurer</span>
                           <span className="px-1.5 py-0.5 rounded bg-[#ffdcc3] text-[#904d00] text-[10px] font-bold">Stewardship</span>
                         </div>
                         <span className="text-[11px] text-[#59413a]">Dual-custody treasury, disbursements, and benevolence</span>
                       </div>
                     </td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
                     <td className="py-4 px-4 text-right">
                       <button 
                         type="button"
@@ -509,11 +511,11 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                         <span className="text-[11px] text-[#59413a]">Pastoral care notes, prayer circles, and house visits</span>
                       </div>
                     </td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
                     <td className="py-4 px-4 text-right">
                       <button 
@@ -537,12 +539,12 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                         <span className="text-[11px] text-[#59413a]">Department charters, volunteer rosters, and event budgets</span>
                       </div>
                     </td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#9b2f00] text-[20px] font-bold">add_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#9b2f00] text-[20px] font-bold">add_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[20px] font-bold">add_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[20px] font-bold">add_circle</span></td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
                     <td className="py-4 px-4 text-right">
                       <button 
                         type="button"
@@ -565,12 +567,12 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                         <span className="text-[11px] text-[#59413a]">Background clearances, child safety check-in, incident audits</span>
                       </div>
                     </td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
                     <td className="py-4 px-4 text-right">
                       <button 
                         type="button"
@@ -594,10 +596,10 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                       </div>
                     </td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[20px]">check_circle</span></td>
                     <td className="py-4 px-3 text-center"><span className="text-gray-300">—</span></td>
                     <td className="py-4 px-4 text-right">
                       <button 
@@ -610,23 +612,23 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                     </td>
                   </tr>
 
-                  {/* Role 8: Presbytery Auditor */}
+                  {/* Role 8: Church Council Auditor */}
                   <tr className="hover:bg-[#faf2ee]/60 transition-colors">
                     <td className="py-4 px-4">
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2">
-                          <span className="font-headline font-bold text-[#1e1b19]">Presbytery External Auditor</span>
+                          <span className="font-headline font-bold text-[#1e1b19]">External Auditor</span>
                           <span className="px-1.5 py-0.5 rounded bg-[#eee7e3] text-[#59413a] text-[10px] font-bold">Observer</span>
                         </div>
                         <span className="text-[11px] text-[#59413a]">Read-only aggregate census, verified minutes, financial trail</span>
                       </div>
                     </td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
-                    <td className="py-4 px-3 text-center"><span className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
+                    <td className="py-4 px-3 text-center"><span aria-hidden="true" className="material-symbols-outlined text-[#59413a] text-[20px]">visibility</span></td>
                     <td className="py-4 px-4 text-right">
                       <span className="text-xs font-semibold text-[#59413a] bg-[#eee7e3] px-2.5 py-1 rounded-md">Read-Only</span>
                     </td>
@@ -641,11 +643,11 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
             <div className="p-4 rounded-xl bg-[#faf2ee] border border-[#e1bfb5] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-[#ffdcc3] flex items-center justify-center text-[#904d00] shrink-0">
-                  <span className="material-symbols-outlined text-[20px]">pending</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[20px]">pending</span>
                 </div>
                 <div>
                   <span className="text-xs font-bold text-[#1e1b19] font-headline">2 unsaved adjustments detected.</span>
-                  <p className="text-[11px] text-[#59413a]">Pending changes in Ministry Department Director awaiting session clerk ratification.</p>
+                  <p className="text-[11px] text-[#59413a]">Pending changes in Ministry Department Director awaiting church secretary ratification.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -684,14 +686,14 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           <div className="p-5 rounded-2xl bg-gradient-to-r from-[#ffdbd0]/60 via-[#ffdcc3]/40 to-[#faf2ee] border border-[#e1bfb5] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-[#9b2f00] shadow-sm shrink-0 border border-[#e1bfb5]/40">
-                <span className="material-symbols-outlined text-[26px]">lock_clock</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[26px]">lock_clock</span>
               </div>
               <div>
                 <h3 className="font-headline text-base font-bold text-[#1e1b19]">
                   Canonic Retention Window & Custody
                 </h3>
                 <p className="text-xs text-[#59413a] max-w-2xl mt-0.5 leading-relaxed">
-                  All soft-deleted parishioners, financial batches, and meeting minutes remain quarantined in this vault for 30 days before permanent ecclesiastical purge. Recovery requires Clerk / Senior Pastor credential dual-authorization.
+                  All soft-deleted members, financial batches, and meeting minutes remain quarantined in this vault for 30 days before permanent church records purge. Recovery requires Clerk / Bishop credential dual-authorization.
                 </p>
               </div>
             </div>
@@ -717,7 +719,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#f4ece8] flex items-center justify-center shrink-0 text-[#c2410c]">
-                <span className="material-symbols-outlined text-[22px]">auto_delete</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">auto_delete</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs text-[#59413a]">Recoverable Records</span>
@@ -730,7 +732,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#ffdcc3]/50 flex items-center justify-center shrink-0 text-[#904d00]">
-                <span className="material-symbols-outlined text-[22px]">hourglass_top</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">hourglass_top</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs text-[#59413a]">Auto-Expiring &lt; 48 Hours</span>
@@ -743,7 +745,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#007d57]/15 flex items-center justify-center shrink-0 text-[#006243]">
-                <span className="material-symbols-outlined text-[22px]">verified_user</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">verified_user</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs text-[#59413a]">Cryptographic Integrity</span>
@@ -757,8 +759,8 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           <div className="bg-white p-3.5 rounded-xl shadow-sm border border-[#e1bfb5]/40 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3 flex-1">
               <div className="relative min-w-[220px] flex-1">
-                <span className="material-symbols-outlined absolute left-3 top-2 text-[#59413a] text-[18px]">search</span>
-                <input
+                <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2 text-[#59413a] text-[18px]">search</span>
+                <input aria-label="Search deleted items by name, ID, or deleting officer"
                   type="text"
                   value={searchTrash}
                   onChange={(e) => setSearchTrash(e.target.value)}
@@ -767,7 +769,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 />
               </div>
 
-              <select
+              <select aria-label="Trash record type filter"
                 value={trashFilter}
                 onChange={(e) => setTrashFilter(e.target.value)}
                 className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/40 focus:outline-none cursor-pointer"
@@ -775,8 +777,8 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 <option>All Record Types (14)</option>
                 <option>Members & Household (6)</option>
                 <option>Giving & Stewardship (4)</option>
-                <option>Governance & Minutes (2)</option>
-                <option>Ministries & Groups (1)</option>
+                <option>Church Council & Minutes (2)</option>
+                <option>Groups & Fellowships (1)</option>
                 <option>Reports & Certificates (1)</option>
               </select>
 
@@ -811,11 +813,11 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           {demoEmptyTrash || trashItems.length === 0 ? (
             <div className="bg-white rounded-xl p-12 text-center border border-[#e1bfb5]/40 shadow-sm flex flex-col items-center justify-center">
               <div className="w-16 h-16 rounded-full bg-[#007d57]/10 flex items-center justify-center text-[#006243] mb-3">
-                <span className="material-symbols-outlined text-[32px]">delete_outline</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[32px]">delete_outline</span>
               </div>
               <h3 className="font-headline text-lg font-bold text-[#1e1b19]">Quarantine Vault is Clean</h3>
               <p className="text-xs text-[#59413a] max-w-sm mt-1 mb-4">
-                No active records in soft-delete status. Parish ledger and rolls are fully synchronized.
+                No active records in soft-delete status. Church ledger and rolls are fully synchronized.
               </p>
               <button
                 type="button"
@@ -835,7 +837,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                       <th className="py-3 px-4">Originating Module</th>
                       <th className="py-3 px-4">Deleted By</th>
                       <th className="py-3 px-4">Retention Window</th>
-                      <th className="py-3 px-4">Ecclesiastical Rationale</th>
+                      <th className="py-3 px-4">Church Rationale</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -863,7 +865,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                                   : 'bg-[#eee7e3] text-[#59413a]'
                               }`}
                             >
-                              <span className="material-symbols-outlined text-[13px]">
+                              <span aria-hidden="true" className="material-symbols-outlined text-[13px]">
                                 {item.isExpiringSoon ? 'warning' : 'schedule'}
                               </span>
                               {item.daysRemaining} days left ({item.expiryDate})
@@ -905,7 +907,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           {/* Cryptographic Audit Trail Footer */}
           <div className="bg-[#f4ece8] rounded-xl p-4 border border-[#e1bfb5]/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#59413a]">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#006243] text-[18px]">verified</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[18px]">verified</span>
               <span>Trash Ledger Checkpoint SHA-256: <code>0x4a92b...e381</code></span>
             </div>
             <button
@@ -928,7 +930,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           <div className="p-6 rounded-2xl bg-gradient-to-r from-[#1e1b19] via-[#332e2a] to-[#25201d] text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-[#59413a]/40">
             <div className="flex items-start gap-4">
               <div className="w-14 h-14 rounded-xl bg-[#c2410c]/20 border border-[#c2410c]/50 flex items-center justify-center text-[#ff8c42] shrink-0">
-                <span className="material-symbols-outlined text-[30px]">lock</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[30px]">lock</span>
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
@@ -940,7 +942,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-[#c9bfb8] max-w-2xl mt-1 leading-relaxed">
-                  Cryptographic hash chains seal every financial event into permanent Diocesan storage. Entries cannot be modified, deleted, or backdated.
+                  Cryptographic hash chains seal every financial event into permanent church storage. Entries cannot be modified, deleted, or backdated.
                 </p>
                 <span className="text-[11px] text-[#a89c94] font-mono mt-1">
                   Genesis block verified: Nov 17, 2024 • Latest Root Hash: 0x7a8b...39fc
@@ -963,7 +965,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#f4ece8] flex items-center justify-center shrink-0 text-[#c2410c]">
-                <span className="material-symbols-outlined text-[22px]">database</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">database</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs text-[#59413a]">Total Ledger Events</span>
@@ -974,7 +976,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#007d57]/15 flex items-center justify-center shrink-0 text-[#006243]">
-                <span className="material-symbols-outlined text-[22px]">verified</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">verified</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs text-[#59413a]">Tamper Proof</span>
@@ -985,7 +987,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#ffdcc3]/50 flex items-center justify-center shrink-0 text-[#904d00]">
-                <span className="material-symbols-outlined text-[22px]">vpn_key</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">vpn_key</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs text-[#59413a]">Active Trustees</span>
@@ -996,12 +998,12 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
             <div className="p-4 rounded-xl bg-white shadow-sm border border-[#e1bfb5]/40 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-lg bg-[#ffdbd0] flex items-center justify-center shrink-0 text-[#9b2f00]">
-                <span className="material-symbols-outlined text-[22px]">security</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">security</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs text-[#59413a]">Anomaly Flags</span>
                 <span className="text-xl font-headline text-[#006243] font-bold">0 Clean</span>
-                <span className="text-[10px] text-[#006243] font-bold">Ecclesiastical Audit Passed</span>
+                <span className="text-[10px] text-[#006243] font-bold">Church Audit Passed</span>
               </div>
             </div>
           </div>
@@ -1010,8 +1012,8 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           <div className="bg-white p-4 rounded-xl shadow-sm border border-[#e1bfb5]/40 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3 flex-1">
               <div className="relative min-w-[240px] flex-1">
-                <span className="material-symbols-outlined absolute left-3 top-2.5 text-[#59413a] text-[18px]">search</span>
-                <input
+                <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2.5 text-[#59413a] text-[18px]">search</span>
+                <input aria-label="Search transaction hash, officer, voucher ID"
                   type="text"
                   value={searchAudit}
                   onChange={(e) => setSearchAudit(e.target.value)}
@@ -1020,13 +1022,13 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 />
               </div>
 
-              <select className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/40 focus:outline-none cursor-pointer">
+              <select aria-label="Fiscal period filter" className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/40 focus:outline-none cursor-pointer">
                 <option>Fiscal Q4 2024</option>
                 <option>Fiscal Q3 2024</option>
                 <option>Fiscal Year 2024 YTD</option>
               </select>
 
-              <select
+              <select aria-label="Audit event type filter"
                 value={auditFilterType}
                 onChange={(e) => setAuditFilterType(e.target.value)}
                 className="h-9 px-3 rounded-lg bg-[#faf2ee] text-xs font-medium text-[#1e1b19] border border-[#e1bfb5]/40 focus:outline-none cursor-pointer"
@@ -1119,20 +1121,20 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
             </div>
           </div>
 
-          {/* Bottom Presbytery Synod Ratification Seal */}
+          {/* Bottom Church Council Ratification Seal */}
           <div className="bg-[#f4ece8] rounded-xl p-5 border border-[#e1bfb5]/40 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[#006243] text-[28px]">verified_user</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[28px]">verified_user</span>
               <div>
-                <span className="text-xs font-bold text-[#1e1b19] font-headline">Presbytery Synod Board of Internal Examiners</span>
+                <span className="text-xs font-bold text-[#1e1b19] font-headline">Board of Internal Examiners</span>
                 <p className="text-[11px] text-[#59413a]">
-                  This parish financial ledger is registered on the Diocesan Sovereign Chain. Zero unauthorized alterations since creation.
+                  This church financial ledger is registered on the Church Audit Chain. Zero unauthorized alterations since creation.
                 </p>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => showToast("Downloading complete Diocesan Cryptographic Audit Binder (PDF, 6.1 MB)...")}
+              onClick={() => showToast("Downloading the complete Church Cryptographic Audit Binder (PDF, 6.1 MB)...")}
               className="px-4 py-2 rounded-lg bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold shadow-xs cursor-pointer whitespace-nowrap"
             >
               Download Audit Ledger Binder
@@ -1151,7 +1153,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#e1bfb5]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#f4ece8]">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#006243] text-[22px]">verified</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[22px]">verified</span>
                 <h3 className="font-headline text-base font-bold text-[#1e1b19]">
                   Cryptographic Proof Receipt #{selectedAuditBlock.height}
                 </h3>
@@ -1161,7 +1163,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 onClick={() => setSelectedAuditBlock(null)}
                 className="text-[#59413a] hover:text-[#1e1b19] p-1"
               >
-                <span className="material-symbols-outlined text-[20px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
@@ -1199,7 +1201,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
             <div className="pt-3 flex items-center justify-between border-t border-[#f4ece8]">
               <span className="text-[11px] text-[#006243] font-bold flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[14px]">check_circle</span>
                 Merkle Root Validated
               </span>
               <button
@@ -1223,7 +1225,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#e1bfb5]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#f4ece8]">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#9b2f00] text-[22px]">warning</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[22px]">warning</span>
                 <h3 className="font-headline text-base font-bold text-[#1e1b19]">
                   Permanently Purge Record?
                 </h3>
@@ -1233,19 +1235,19 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 onClick={() => setPurgeModalItem(null)}
                 className="text-[#59413a] hover:text-[#1e1b19] p-1"
               >
-                <span className="material-symbols-outlined text-[20px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleConfirmPurge} className="py-4 space-y-3.5 text-xs">
               <p className="text-[#59413a] leading-relaxed">
-                You are about to irreversibly purge <strong className="text-[#1e1b19]">{purgeModalItem.name}</strong> ({purgeModalItem.recordId}). This action permanently deletes ecclesiastical data from the active database.
+                You are about to irreversibly purge <strong className="text-[#1e1b19]">{purgeModalItem.name}</strong> ({purgeModalItem.recordId}). This action permanently deletes church data from the active database.
               </p>
 
               <div className="p-3 bg-[#ffdbd0]/30 rounded-xl border border-[#ffdbd0] space-y-1">
                 <span className="text-[10px] uppercase font-bold text-[#9b2f00]">Dual-Key Authorization Policy</span>
                 <p className="text-[11px] text-[#59413a]">
-                  Requires Senior Pastor or Ruling Session Clerk security credential.
+                  Requires Bishop or Church Secretary security credential.
                 </p>
               </div>
 
@@ -1253,7 +1255,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 <label className="block text-xs font-bold text-[#59413a] mb-1">
                   Clerk Dual-Key Passcode *
                 </label>
-                <input
+                <input aria-label="Clerk Dual-Key Passcode"
                   type="password"
                   required
                   placeholder="Enter authorized credential passcode..."
@@ -1290,7 +1292,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-[#f4ece8]">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#c2410c] text-[22px]">policy</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[#c2410c] text-[22px]">policy</span>
                   <h3 className="font-headline text-base font-bold text-[#1e1b19]">Canonic Trash Policies</h3>
                 </div>
                 <button
@@ -1298,7 +1300,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                   onClick={() => setTrashPoliciesDrawer(false)}
                   className="text-[#59413a] hover:text-[#1e1b19] p-1"
                 >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
 
@@ -1307,10 +1309,10 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                   <label className="block text-xs font-bold text-[#59413a] mb-1">
                     Retention Quarantine Duration (Days)
                   </label>
-                  <input
+                  <input aria-label="Retention Quarantine Duration (Days)"
                     type="number"
                     defaultValue={30}
-                    className="w-full h-10 px-3 rounded-lg bg-[#faf2ee] border border-[#e1bfb5]/50 focus:outline-none focus:ring-1 focus:ring-[#c2410c]"
+                    className="w-full h-10 px-3 rounded-lg bg-[#faf2ee] border border-[#e1bfb5]/50 focus:outline-none"
                   />
                   <span className="text-[10px] text-[#59413a] mt-1 block">Default: 30 days under Canon 4.12.</span>
                 </div>
@@ -1318,7 +1320,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 <div className="p-3 bg-[#faf2ee] rounded-xl space-y-2">
                   <span className="font-bold text-xs text-[#1e1b19]">Enforce Dual-Key Purge</span>
                   <p className="text-[11px] text-[#59413a]">
-                    Prevent individual officers from permanently destroying parish records without independent counter-signature.
+                    Prevent individual officers from permanently destroying church records without independent counter-signature.
                   </p>
                   <div className="text-[10px] font-bold text-[#006243]">STATUS: ENFORCED</div>
                 </div>

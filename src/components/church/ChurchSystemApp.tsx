@@ -14,6 +14,7 @@ import {
   SoftDeleteRecord 
 } from '../../types';
 import { INITIAL_CHURCH_MEMBERS } from '../../data/churchMockData';
+import { DEFAULT_LOCATION } from '../../data/churchDomain';
 import { ChurchSidebar } from './ChurchSidebar';
 import { ChurchHeader } from './ChurchHeader';
 import { HomeDashboardView } from './views/HomeDashboardView';
@@ -71,18 +72,18 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
       name: newPartial.name || 'New Member',
       memberId: newPartial.memberId || `#MBR-${Math.floor(1000 + Math.random() * 900)}`,
       initials: newPartial.initials || 'NM',
-      parish: newPartial.parish || 'Downtown #01',
-      roleDescription: newPartial.roleDescription || 'Communicant',
-      membershipTier: newPartial.membershipTier || 'covenant',
+      church: newPartial.church || DEFAULT_LOCATION,
+      roleDescription: newPartial.roleDescription || 'Member',
+      membershipTier: newPartial.membershipTier || 'member',
       baptismType: newPartial.baptismType || 'baptized',
       baptismDate: newPartial.baptismDate || 'Nov 12, 2024',
-      baptismOfficiant: newPartial.baptismOfficiant || 'Rev. Vance',
+      baptismOfficiant: newPartial.baptismOfficiant || 'Bishop Sammy',
       householdName: newPartial.householdName || 'The Household',
       householdId: newPartial.householdId || '#108',
       householdRole: newPartial.householdRole || 'Head',
       email: newPartial.email || 'member@example.com',
-      phone: newPartial.phone || '(555) 000-0000',
-      residentialAddress: newPartial.residentialAddress || 'Springfield',
+      phone: newPartial.phone || '+254 700 000 000',
+      residentialAddress: newPartial.residentialAddress || 'Nyahururu',
       pastoralStatus: newPartial.pastoralStatus || 'active-regular',
       statusLabel: newPartial.statusLabel || 'Active Regular',
       dateOfBirth: newPartial.dateOfBirth || '1990-01-01',
@@ -100,14 +101,14 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
       name: record.name,
       memberId: record.memberId,
       initials: record.initials,
-      parish: 'Downtown #01',
-      membershipTier: 'covenant',
+      church: DEFAULT_LOCATION,
+      membershipTier: 'member',
       baptismType: 'baptized',
       householdName: `${record.name.split(' ').slice(-1)[0]} Household`,
       householdId: '#108',
       householdRole: 'Member',
-      email: `${record.name.toLowerCase().replace(' ', '.')}@gracevalley.org`,
-      phone: '+1 (555) 300-8800',
+      email: `${record.name.toLowerCase().replace(' ', '.')}@destinysanctuary.co.ke`,
+      phone: '+254 753 008 800',
       pastoralStatus: 'active-regular',
       statusLabel: 'Active Restored',
       pastoralNotes: record.rationale,
@@ -123,16 +124,16 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
 
   const getHeaderTitle = () => {
     if (activeTab === 'home') return 'Home Cloud Dashboard';
-    if (isMembersView) return 'Members & Pastoral Care Registry';
+    if (isMembersView) return 'Members & Believers Registry';
     if (activeTab === 'services-worship') return 'Services & Worship Administration';
     if (activeTab === 'ministries-groups') return 'Ministries & Volunteer Rosters';
     if (activeTab === 'giving-stewardship') return 'Giving & Stewardship Treasury';
-    if (activeTab === 'governance') return 'Governance & Council Sessions';
-    if (activeTab === 'reports-certs') return 'Reports & Canonical Certificates';
-    if (activeTab === 'communications') return 'Parish Communications & Community';
-    if (activeTab === 'settings-profile') return 'Parish Settings & Configuration';
+    if (activeTab === 'governance') return 'Leadership & Church Council';
+    if (activeTab === 'reports-certs') return 'Reports & Official Certificates';
+    if (activeTab === 'communications') return 'Church Communications & Community';
+    if (activeTab === 'settings-profile') return 'Church Settings & Configuration';
     if (activeTab === 'admin-portal') return 'Admin & System Security';
-    return 'Grace Valley Fellowship Console';
+    return "Destiny Sanctuary Int'L Console";
   };
 
   return (
@@ -187,7 +188,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
             </div>
           )}
 
-          {/* If Ministries & Groups tab is selected */}
+          {/* If Groups & Fellowships tab is selected */}
           {activeTab === 'ministries-groups' && (
             <div className="w-full px-6 sm:px-8 py-6">
               <MinistriesView 
@@ -207,7 +208,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
             </div>
           )}
 
-          {/* If Governance & Sessions tab is selected */}
+          {/* If Church Council & Sessions tab is selected */}
           {activeTab === 'governance' && (
             <div className="w-full px-6 sm:px-8 py-6">
               <GovernanceView />
@@ -251,17 +252,17 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
             </div>
           )}
 
-          {/* If Members & Pastoral Care Registry is selected */}
+          {/* If Members & Believers Registry is selected */}
           {isMembersView && (
             <>
               {/* Section Header with Tabs */}
               <div className="w-full px-6 sm:px-8 pt-6 pb-4 border-b border-[#E7E5E4] bg-[#FFFFFF] shadow-sm">
                 <div className="flex flex-col gap-1">
                   <h1 className="font-headline text-2xl font-bold text-[#1C1917] tracking-tight">
-                    Members & Pastoral Care Registry
+                    Members & Believers Registry
                   </h1>
                   <p className="font-body text-xs sm:text-sm text-[#57534E]">
-                    Comprehensive parish roll, sacramental registry, household mappings, and ecclesiastical records.
+                    Comprehensive members register, baptism register, household mappings, and church records.
                   </p>
                 </div>
 
@@ -358,7 +359,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
             activeTab !== 'admin-portal' && (
             <div className="w-full px-6 sm:px-8 py-12 text-center">
               <div className="max-w-md mx-auto p-8 rounded-[14px] bg-[#FFFFFF] border border-[#E7E5E4] shadow-warm-card">
-                <span className="material-symbols-outlined text-4xl text-[#C2410C] mb-2">church</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-4xl text-[#C2410C] mb-2">church</span>
                 <h3 className="font-headline text-lg font-bold text-[#1C1917] capitalize">
                   {activeTab.replace('-', ' ')}
                 </h3>
@@ -370,7 +371,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                     onClick={() => setActiveTab('ministries-groups')}
                     className="px-4 py-2 rounded-[9px] bg-[#F5EDE4] hover:bg-[#EAE1D7] text-xs font-bold text-[#C2410C] border border-[#E7E5E4] transition-colors cursor-pointer"
                   >
-                    Ministries & Groups
+                    Groups & Fellowships
                   </button>
                   <button
                     onClick={() => setActiveTab('giving-stewardship')}
@@ -396,7 +397,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                 onClick={() => setQuickActionModal(false)}
                 className="text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4] p-1 rounded-[9px] transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
             <div className="py-3 space-y-2 text-xs font-headline font-semibold">
@@ -409,7 +410,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                 }}
                 className="w-full p-2.5 rounded-[9px] bg-[#FDF8F3] hover:bg-[#F5EDE4] text-left flex items-center gap-2.5 text-[#1C1917] border border-[#E7E5E4] transition-colors cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[#C2410C] text-[18px]">person_add</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[#C2410C] text-[18px]">person_add</span>
                 <span>Enroll New Christian</span>
               </button>
               <button
@@ -421,7 +422,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                 }}
                 className="w-full p-2.5 rounded-[9px] bg-[#FDF8F3] hover:bg-[#F5EDE4] text-left flex items-center gap-2.5 text-[#1C1917] border border-[#E7E5E4] transition-colors cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[#D97706] text-[18px]">domain_add</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[#D97706] text-[18px]">domain_add</span>
                 <span>Manage Ministries & Departments</span>
               </button>
               <button
@@ -433,7 +434,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                 }}
                 className="w-full p-2.5 rounded-[9px] bg-[#FDF8F3] hover:bg-[#F5EDE4] text-left flex items-center gap-2.5 text-[#1C1917] border border-[#E7E5E4] transition-colors cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[#059669] text-[18px]">volunteer_activism</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[#059669] text-[18px]">volunteer_activism</span>
                 <span>Giving & Stewardship Treasury</span>
               </button>
               <button
@@ -445,7 +446,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                 }}
                 className="w-full p-2.5 rounded-[9px] bg-[#FDF8F3] hover:bg-[#F5EDE4] text-left flex items-center gap-2.5 text-[#1C1917] border border-[#E7E5E4] transition-colors cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[#C2410C] text-[18px]">add_home</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[#C2410C] text-[18px]">add_home</span>
                 <span>Create Household Unit</span>
               </button>
             </div>

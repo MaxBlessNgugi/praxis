@@ -18,7 +18,7 @@ import { COLOR_TOKENS, TYPOGRAPHY_TOKENS, SPACING_TOKENS, SHADOW_TOKENS } from '
 export const DesignSystemView: React.FC = () => {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [switchState, setSwitchState] = useState(true);
-  const [inputVal, setInputVal] = useState('Parish Roll Verification');
+  const [inputVal, setInputVal] = useState('Members Register Verification');
   const [activeTab, setActiveTab] = useState<'colors' | 'typography' | 'components' | 'spacing'>('colors');
 
   const copyToClipboard = (text: string, tokenName: string) => {
@@ -37,13 +37,13 @@ export const DesignSystemView: React.FC = () => {
               <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-[#9b2f00]/20 text-[#fe932c] border border-[#9b2f00]/30">
                 Figma Design Tokens & UI Kit
               </span>
-              <span className="text-xs text-[#a69c96]">• Warm Ember Palette & Ecclesiastical Typography</span>
+              <span className="text-xs text-[#a69c96]">• Warm Ember Palette & Church Typography</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-['Plus_Jakarta_Sans',sans-serif]">
               Praxis Church OS — Warm Ember Design System
             </h1>
             <p className="text-xs sm:text-sm text-[#a69c96] mt-1 max-w-2xl">
-              High-fidelity foundational tokens, sacramental registers, canonical notice banners, and optical spacing rules calibrated for parish management and ecclesiastical assemblies.
+              High-fidelity foundational tokens, membership registers, official notice banners, and optical spacing rules calibrated for church management and church assemblies.
             </p>
           </div>
 
@@ -169,7 +169,7 @@ export const DesignSystemView: React.FC = () => {
                 <Box className="w-5 h-5 text-[#fe932c]" />
                 Atomic Component Specimens
               </h2>
-              <p className="text-xs text-[#a69c96]">Parish membership pills, sacramental buttons, and canonical notices.</p>
+              <p className="text-xs text-[#a69c96]">Church membership pills, membership buttons, and official notices.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -194,11 +194,11 @@ export const DesignSystemView: React.FC = () => {
               {/* Status Pills */}
               <div className="p-6 rounded-2xl bg-[#262320] border border-[#3e3934] space-y-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 font-mono">
-                  Parish Status Badges
+                  Church Status Badges
                 </h3>
                 <div className="flex flex-wrap gap-2.5 items-center">
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#9b2f00] text-white">
-                    <Church className="w-3 h-3" /> Covenant Partner
+                    <Church className="w-3 h-3" /> Member
                   </span>
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#102920] text-[#85f8c4] border border-[#006243]/40">
                     <Droplets className="w-3 h-3" /> Baptized Believer
@@ -225,7 +225,7 @@ export const DesignSystemView: React.FC = () => {
                     />
                   </div>
                   <div className="flex items-center justify-between pt-2">
-                    <span className="text-xs text-stone-300 font-medium">Session Archival Mode Toggle</span>
+                    <span className="text-xs text-stone-300 font-medium">Council Archival Mode Toggle</span>
                     <button
                       onClick={() => setSwitchState(!switchState)}
                       className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${

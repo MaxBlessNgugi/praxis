@@ -5,7 +5,7 @@ import { INITIAL_BACKUP_SNAPSHOTS } from '../../../../data/churchMockData';
 export const DataBackupSettingsPanel: React.FC = () => {
   const [backups, setBackups] = useState<DataBackupSnapshot[]>(INITIAL_BACKUP_SNAPSHOTS);
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState<boolean>(false);
-  const [backupLabel, setBackupLabel] = useState<string>('Pre-Session Synod Audit Snapshot');
+  const [backupLabel, setBackupLabel] = useState<string>('Pre-Council Audit Snapshot');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState<DataBackupSnapshot | null>(null);
 
@@ -27,7 +27,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
 
     setBackups([newSnapshot, ...backups]);
     setIsCreatingSnapshot(false);
-    setSuccessMessage('Parish dataset snapshot created and checksum verified!');
+    setSuccessMessage('Church dataset snapshot created and checksum verified!');
     setTimeout(() => setSuccessMessage(null), 4000);
   };
 
@@ -53,11 +53,11 @@ export const DataBackupSettingsPanel: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4]">
         <div>
           <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-            <span className="material-symbols-outlined text-[20px] text-[#C2410C]">backup</span>
-            Parish Data Sovereignty, Backup & Archival
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">backup</span>
+            Church Data Sovereignty, Backup & Archival
           </h3>
           <p className="text-xs text-[#57534E] mt-0.5">
-            Automated midnight snapshots, local JSON exports, and encrypted parish roll archives.
+            Automated midnight snapshots, local JSON exports, and encrypted members register archives.
           </p>
         </div>
 
@@ -67,7 +67,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
             onClick={handleExportJSON}
             className="px-3 py-1.5 rounded-[8px] bg-[#F8F1E9] hover:bg-[#F5EDE4] text-[#1C1917] text-xs font-bold border border-[#E7E5E4] transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px]">file_download</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">file_download</span>
             Export JSON
           </button>
 
@@ -76,7 +76,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
             onClick={() => setIsCreatingSnapshot(true)}
             className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px]">add_circle</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
             Create Snapshot
           </button>
         </div>
@@ -84,7 +84,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
 
       {successMessage && (
         <div className="p-3.5 rounded-[12px] bg-[#059669]/10 border border-[#059669]/30 text-[#059669] text-xs font-bold flex items-center gap-2">
-          <span className="material-symbols-outlined text-[18px]">check_circle</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">check_circle</span>
           {successMessage}
         </div>
       )}
@@ -114,7 +114,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
                     {snap.backupType}
                   </span>
                   <span className="text-[10px] font-bold text-[#059669] flex items-center gap-0.5">
-                    <span className="material-symbols-outlined text-[12px]">verified</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[12px]">verified</span>
                     Verified
                   </span>
                 </div>
@@ -159,14 +159,14 @@ export const DataBackupSettingsPanel: React.FC = () => {
                 onClick={() => setIsCreatingSnapshot(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateBackup} className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Snapshot Label / Reason *</label>
-                <input
+                <input aria-label="Snapshot Label / Reason"
                   type="text"
                   required
                   value={backupLabel}
@@ -176,7 +176,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
               </div>
 
               <p className="text-xs text-[#57534E] leading-relaxed">
-                This will bundle all active parish registers, finance ledgers, service reports, and volunteer rosters into an immutable snapshot.
+                This will bundle all active church registers, finance ledgers, service reports, and volunteer rosters into an immutable snapshot.
               </p>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
@@ -204,7 +204,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#DC2626]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center gap-2 pb-3 border-b border-[#E7E5E4] text-[#DC2626]">
-              <span className="material-symbols-outlined text-[22px]">warning</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[22px]">warning</span>
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Confirm Snapshot Restoration</h3>
             </div>
 

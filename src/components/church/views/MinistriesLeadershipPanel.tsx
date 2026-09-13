@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CHURCH } from '../../../data/churchDomain';
 
 interface LeaderRow {
   id: string;
@@ -22,33 +23,50 @@ interface LeaderRow {
 const LEADERS: LeaderRow[] = [
   {
     id: 'lead-1',
-    role: 'Lead Pastor & Session Moderator',
-    department: 'Pastoral Council & Session',
+    role: 'Bishop & Visionary Leader',
+    department: 'Visionary Leadership & Church Council',
     deptDotColor: 'bg-[#9b2f00]',
-    name: 'Pastor Michael Vance',
-    credentials: 'Ordained Clergy',
-    credentialCode: '#ORD-104',
-    initials: 'MV',
+    name: 'Bishop Sammy',
+    credentials: 'Consecrated Bishop',
+    credentialCode: '#ORD-001',
+    initials: 'BS',
     avatarBg: 'bg-[#9b2f00] text-white',
-    email: 'michael.v@gracevalley.org',
-    phone: '(555) 234-8901',
-    startDate: 'Jan 15, 2018',
+    email: 'bishop@destinysanctuary.co.ke',
+    phone: CHURCH.phone,
+    startDate: 'Founding Visionary',
+    termEnd: 'Perpetual / Tenured',
+    isPerpetual: true,
+    status: 'active',
+  },
+  {
+    id: 'lead-9',
+    role: 'Co-Visionary Leader & Church Administrator',
+    department: 'Visionary Leadership & Church Council',
+    deptDotColor: 'bg-[#9b2f00]',
+    name: 'Rev. Alice',
+    credentials: 'Ordained Clergy',
+    credentialCode: '#ORD-002',
+    initials: 'RA',
+    avatarBg: 'bg-[#ffdcc3] text-[#2f1500]',
+    email: 'rev.alice@destinysanctuary.co.ke',
+    phone: CHURCH.phone,
+    startDate: 'Founding Visionary',
     termEnd: 'Perpetual / Tenured',
     isPerpetual: true,
     status: 'active',
   },
   {
     id: 'lead-2',
-    role: 'Ruling Elder & Session Clerk',
-    department: 'Pastoral Council & Session',
+    role: 'Church Elder & Church Secretary',
+    department: 'Pastoral Team & Church Council',
     deptDotColor: 'bg-[#904d00]',
     name: 'Elder Marcus Jenkins',
-    credentials: 'Ruling Elder',
+    credentials: 'Church Elder',
     credentialCode: "Class of '26",
     initials: 'MJ',
     avatarBg: 'bg-[#ffdcc3] text-[#2f1500]',
-    email: 'marcus.j@gracevalley.org',
-    phone: '(555) 345-6712',
+    email: 'marcus.j@destinysanctuary.co.ke',
+    phone: '+254 734 567 120',
     startDate: 'Nov 01, 2021',
     termEnd: 'Dec 31, 2026',
     termUrgencyText: '· 2 yrs left',
@@ -61,11 +79,11 @@ const LEADERS: LeaderRow[] = [
     deptDotColor: 'bg-[#006243]',
     name: 'Dr. Jonathan Edwards',
     credentials: 'Faculty Dean',
-    credentialCode: 'Covenant Member',
+    credentialCode: 'Member',
     initials: 'JE',
     avatarBg: 'bg-[#007d57] text-white',
     email: 'j.edwards@berean.org',
-    phone: '(555) 456-7823',
+    phone: '+254 745 678 230',
     startDate: 'Sep 01, 2020',
     termEnd: 'Aug 31, 2025',
     termUrgencyText: '· 10 mos left',
@@ -76,13 +94,13 @@ const LEADERS: LeaderRow[] = [
     role: "Director of Women's Ministry",
     department: "Women's Discipleship Guild",
     deptDotColor: 'bg-[#fe932c]',
-    name: 'Pastor Sarah Alistair',
+    name: 'Rev. Sarah Alistair',
     credentials: 'Ordained Clergy',
     credentialCode: '#ORD-112',
     initials: 'SA',
     avatarBg: 'bg-[#fe932c] text-white',
-    email: 'sarah.alistair@gracevalley.org',
-    phone: '(555) 789-0123',
+    email: 'sarah.alistair@destinysanctuary.co.ke',
+    phone: '+254 778 901 230',
     startDate: 'Oct 15, 2021',
     termEnd: 'Nov 15, 2024',
     termUrgencyText: '· 18 days left',
@@ -93,13 +111,13 @@ const LEADERS: LeaderRow[] = [
     role: 'Youth Pastor & Sports Chaplain',
     department: 'NextGen & Youth Ministries',
     deptDotColor: 'bg-[#c2410c]',
-    name: 'Pastor David Alistair',
+    name: 'Hannah Abbott',
     credentials: 'Appointed Staff',
     credentialCode: 'Licentiate',
     initials: 'DA',
     avatarBg: 'bg-[#e9e1dd] text-[#1e1b19]',
-    email: 'david.alistair@gracevalley.org',
-    phone: '(555) 567-8934',
+    email: 'david.alistair@destinysanctuary.co.ke',
+    phone: '+254 756 789 340',
     startDate: 'Jun 01, 2022',
     termEnd: 'May 31, 2025',
     termUrgencyText: '· 7 mos left',
@@ -112,11 +130,11 @@ const LEADERS: LeaderRow[] = [
     deptDotColor: 'bg-[#ffb77d]',
     name: 'Elena Vance',
     credentials: 'CPP Certified',
-    credentialCode: 'Covenant Member',
+    credentialCode: 'Member',
     initials: 'EV',
     avatarBg: 'bg-[#ffdbd0] text-[#390c00]',
-    email: 'elena.vance@gracevalley.org',
-    phone: '(555) 678-9045',
+    email: 'elena.vance@destinysanctuary.co.ke',
+    phone: '+254 767 890 450',
     startDate: 'Aug 15, 2021',
     termEnd: 'Dec 31, 2025',
     termUrgencyText: '· 1 yr left',
@@ -132,8 +150,8 @@ const LEADERS: LeaderRow[] = [
     credentialCode: "Class of '25",
     initials: 'CO',
     avatarBg: 'bg-[#85f8c4] text-[#002114]',
-    email: 'clara.oswald@gracevalley.org',
-    phone: '(555) 789-0156',
+    email: 'clara.oswald@destinysanctuary.co.ke',
+    phone: '+254 778 901 560',
     startDate: 'Feb 01, 2022',
     termEnd: 'Jan 31, 2025',
     termUrgencyText: '· 65 days left',
@@ -141,7 +159,7 @@ const LEADERS: LeaderRow[] = [
   },
   {
     id: 'lead-8',
-    role: 'Ruling Elder Emeritus & Trustee',
+    role: 'Church Elder Emeritus & Trustee',
     department: 'Board of Trustees & Endowment',
     deptDotColor: 'bg-[#8d7168]',
     name: 'Arthur Miller',
@@ -149,19 +167,44 @@ const LEADERS: LeaderRow[] = [
     credentialCode: '30yr Service',
     initials: 'AM',
     avatarBg: 'bg-[#eee7e3] text-[#59413a]',
-    email: 'arthur.miller@gracevalley.org',
-    phone: '(555) 890-1267',
+    email: 'arthur.miller@destinysanctuary.co.ke',
+    phone: '+254 789 012 670',
     startDate: 'Jan 10, 1994',
     termEnd: 'Life Appointment',
     status: 'emeritus',
   },
 ];
 
+/** Roster size, so the Ministries tab badge can't drift from the table it counts. */
+export const LEADER_COUNT = LEADERS.length;
+
+/** Filter options are derived from the roster, so an option can never match nothing. */
+const DEPARTMENTS = ['All Councils & Ministries', ...new Set(LEADERS.map((leader) => leader.department))];
+const ROLES = ['All Leadership Tiers', ...new Set(LEADERS.map((leader) => leader.role))];
+
+const STATUS_LABELS: Record<LeaderRow['status'], string> = {
+  active: 'Active Tenures',
+  'renewal-due': 'Renewal Due',
+  emeritus: 'Emeritus / Honorary',
+};
+const countByStatus = (status: LeaderRow['status']) => LEADERS.filter((leader) => leader.status === status).length;
+const STATUS_OPTIONS = [
+  { value: 'all', label: `Status: All (${LEADERS.length})` },
+  ...(Object.keys(STATUS_LABELS) as LeaderRow['status'][]).map((status) => ({
+    value: status,
+    label: `${STATUS_LABELS[status]} (${countByStatus(status)})`,
+  })),
+];
+
+const ACTIVE_COUNT = countByStatus('active');
+/** Share of the roster on an active tenure, for the tenures card. */
+const TENURE_PERCENT = Math.round((ACTIVE_COUNT / LEADERS.length) * 100);
+
 export const MinistriesLeadershipPanel: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('All Councils & Ministries');
   const [selectedTier, setSelectedTier] = useState('All Leadership Tiers');
-  const [selectedStatus, setSelectedStatus] = useState('Status: All (28)');
+  const [selectedStatus, setSelectedStatus] = useState<'all' | LeaderRow['status']>('all');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
   const toggleSelectAll = () => {
@@ -178,12 +221,20 @@ export const MinistriesLeadershipPanel: React.FC = () => {
     );
   };
 
-  const filteredLeaders = LEADERS.filter(l => 
-    l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    l.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    l.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    l.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredLeaders = LEADERS.filter((leader) => {
+    const query = searchQuery.toLowerCase();
+    const matchesSearch =
+      query === '' ||
+      [leader.name, leader.role, leader.department, leader.email].some((value) =>
+        value.toLowerCase().includes(query),
+      );
+    return (
+      matchesSearch &&
+      (selectedDept === DEPARTMENTS[0] || leader.department === selectedDept) &&
+      (selectedTier === ROLES[0] || leader.role === selectedTier) &&
+      (selectedStatus === 'all' || leader.status === selectedStatus)
+    );
+  });
 
   return (
     <div className="flex flex-col w-full space-y-6">
@@ -195,19 +246,20 @@ export const MinistriesLeadershipPanel: React.FC = () => {
             <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
               Total Appointed Leaders
             </span>
-            <span className="p-2 rounded-xl bg-[#f4ece8] text-[#9b2f00] material-symbols-outlined text-[20px]">
+            <span aria-hidden="true" className="p-2 rounded-xl bg-[#f4ece8] text-[#9b2f00] material-symbols-outlined text-[20px]">
               assignment_ind
             </span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight">28</span>
+            <span className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight">{LEADERS.length}</span>
             <span className="text-xs font-semibold text-[#006243] flex items-center gap-0.5">
-              <span className="material-symbols-outlined text-[16px]">trending_up</span> +3 this year
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">trending_up</span>
+              {ACTIVE_COUNT} active
             </span>
           </div>
           <div className="mt-3 flex items-center gap-2 pt-2 border-t border-[#f4ece8] text-[#59413a] text-xs">
             <span className="w-2 h-2 rounded-full bg-[#c2410c] inline-block"></span>
-            <span>Across 7 Pastoral Departments</span>
+            <span>Across {DEPARTMENTS.length - 1} Pastoral Departments</span>
           </div>
         </div>
 
@@ -217,19 +269,19 @@ export const MinistriesLeadershipPanel: React.FC = () => {
             <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
               Active Tenures
             </span>
-            <span className="p-2 rounded-xl bg-[#f4ece8] text-[#006243] material-symbols-outlined text-[20px]">
+            <span aria-hidden="true" className="p-2 rounded-xl bg-[#f4ece8] text-[#006243] material-symbols-outlined text-[20px]">
               how_to_reg
             </span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight">24</span>
-            <span className="text-xs text-[#59413a]">/ 28 installed</span>
+            <span className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight">{ACTIVE_COUNT}</span>
+            <span className="text-xs text-[#59413a]">/ {LEADERS.length} installed</span>
           </div>
           <div className="mt-3 flex items-center gap-2 pt-2 border-t border-[#f4ece8]">
             <div className="w-full h-1.5 rounded-full bg-[#f4ece8] overflow-hidden">
-              <div className="h-full bg-[#006243] rounded-full" style={{ width: '85.7%' }}></div>
+              <div className="h-full bg-[#006243] rounded-full" style={{ width: `${TENURE_PERCENT}%` }}></div>
             </div>
-            <span className="font-mono text-xs text-[#006243] font-bold">86%</span>
+            <span className="font-mono text-xs text-[#006243] font-bold">{TENURE_PERCENT}%</span>
           </div>
         </div>
 
@@ -239,29 +291,29 @@ export const MinistriesLeadershipPanel: React.FC = () => {
             <span className="text-xs font-semibold text-[#904d00] uppercase tracking-wider">
               Expiring ≤ 60 Days
             </span>
-            <span className="p-2 rounded-xl bg-[#f4ece8] text-[#904d00] material-symbols-outlined text-[20px]">
+            <span aria-hidden="true" className="p-2 rounded-xl bg-[#f4ece8] text-[#904d00] material-symbols-outlined text-[20px]">
               schedule
             </span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="font-headline text-3xl font-bold text-[#904d00] tracking-tight">4</span>
+            <span className="font-headline text-3xl font-bold text-[#904d00] tracking-tight">{countByStatus('renewal-due')}</span>
             <span className="px-2 py-0.5 rounded-full bg-[#ffdcc3] text-[#2f1500] text-xs font-bold">
               Action Required
             </span>
           </div>
           <div className="mt-3 flex items-center gap-1.5 pt-2 border-t border-[#f4ece8] text-[#59413a] text-xs">
-            <span className="material-symbols-outlined text-[16px] text-[#904d00]">notification_important</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#904d00]">notification_important</span>
             <span>Reappointment review slated</span>
           </div>
         </div>
 
-        {/* Stat 4: Session & Presbytery Quorum */}
+        {/* Stat 4: Council & Church Council Quorum */}
         <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              Session Quorum
+              Council Quorum
             </span>
-            <span className="p-2 rounded-xl bg-[#f4ece8] text-[#007d57] material-symbols-outlined text-[20px]">
+            <span aria-hidden="true" className="p-2 rounded-xl bg-[#f4ece8] text-[#007d57] material-symbols-outlined text-[20px]">
               gavel
             </span>
           </div>
@@ -270,8 +322,8 @@ export const MinistriesLeadershipPanel: React.FC = () => {
             <span className="text-xs text-[#006243] font-bold">Ratified</span>
           </div>
           <div className="mt-3 flex items-center gap-1.5 pt-2 border-t border-[#f4ece8] text-[#59413a] text-xs">
-            <span className="material-symbols-outlined text-[16px] text-[#007d57]">verified_user</span>
-            <span>Book of Order compliance valid</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#007d57]">verified_user</span>
+            <span>Leadership requirements valid</span>
           </div>
         </div>
       </div>
@@ -281,10 +333,10 @@ export const MinistriesLeadershipPanel: React.FC = () => {
         {/* Search & Filter Dropdowns */}
         <div className="flex flex-wrap items-center gap-2 flex-1">
           <div className="relative flex-1 min-w-[240px]">
-            <span className="material-symbols-outlined absolute left-3 top-2.5 text-[#8d7168] text-[18px]">
+            <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2.5 text-[#8d7168] text-[18px]">
               search
             </span>
-            <input
+            <input aria-label="Search leader name, office, ministry, email"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -295,57 +347,50 @@ export const MinistriesLeadershipPanel: React.FC = () => {
 
           {/* Department Filter */}
           <div className="relative">
-            <select
+            <select aria-label="Council or ministry filter"
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
               className="h-10 pl-3 pr-8 rounded-xl bg-[#faf2ee] text-[#1e1b19] text-xs font-medium border border-[#EAE1D7] outline-none appearance-none cursor-pointer hover:bg-[#f4ece8]"
             >
-              <option>All Councils & Ministries</option>
-              <option>Pastoral Council & Session</option>
-              <option>Berean Bible Academy</option>
-              <option>Women's Discipleship Guild</option>
-              <option>NextGen & Youth Ministries</option>
-              <option>Kids of Grace Ministry</option>
-              <option>Board of Deacons & Mercy</option>
-              <option>Board of Trustees</option>
+              {DEPARTMENTS.map((department) => (
+                <option key={department}>{department}</option>
+              ))}
             </select>
-            <span className="material-symbols-outlined absolute right-2 top-2.5 text-[#8d7168] text-[18px] pointer-events-none">
+            <span aria-hidden="true" className="material-symbols-outlined absolute right-2 top-2.5 text-[#8d7168] text-[18px] pointer-events-none">
               arrow_drop_down
             </span>
           </div>
 
           {/* Leadership Tier Filter */}
           <div className="relative">
-            <select
+            <select aria-label="Leadership tier filter"
               value={selectedTier}
               onChange={(e) => setSelectedTier(e.target.value)}
               className="h-10 pl-3 pr-8 rounded-xl bg-[#faf2ee] text-[#1e1b19] text-xs font-medium border border-[#EAE1D7] outline-none appearance-none cursor-pointer hover:bg-[#f4ece8]"
             >
-              <option>All Leadership Tiers</option>
-              <option>Ordained Clergy / Teaching Elder</option>
-              <option>Ruling Elder (Session)</option>
-              <option>Appointed Pastoral Staff</option>
-              <option>Diaconate (Deacon/Deaconess)</option>
-              <option>Elder Emeritus</option>
+              {ROLES.map((role) => (
+                <option key={role}>{role}</option>
+              ))}
             </select>
-            <span className="material-symbols-outlined absolute right-2 top-2.5 text-[#8d7168] text-[18px] pointer-events-none">
+            <span aria-hidden="true" className="material-symbols-outlined absolute right-2 top-2.5 text-[#8d7168] text-[18px] pointer-events-none">
               arrow_drop_down
             </span>
           </div>
 
           {/* Status Filter */}
           <div className="relative">
-            <select
+            <select aria-label="Status filter"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="h-10 pl-3 pr-8 rounded-xl bg-[#faf2ee] text-[#1e1b19] text-xs font-medium border border-[#EAE1D7] outline-none appearance-none cursor-pointer hover:bg-[#f4ece8]"
             >
-              <option>Status: All (28)</option>
-              <option>Active Tenures (24)</option>
-              <option>Renewal Due ≤60d (4)</option>
-              <option>Emeritus / Honorary (2)</option>
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
-            <span className="material-symbols-outlined absolute right-2 top-2.5 text-[#8d7168] text-[18px] pointer-events-none">
+            <span aria-hidden="true" className="material-symbols-outlined absolute right-2 top-2.5 text-[#8d7168] text-[18px] pointer-events-none">
               arrow_drop_down
             </span>
           </div>
@@ -357,14 +402,14 @@ export const MinistriesLeadershipPanel: React.FC = () => {
             type="button"
             className="h-10 px-3.5 rounded-xl bg-[#faf2ee] hover:bg-[#f4ece8] text-[#1e1b19] text-xs font-semibold flex items-center gap-1.5 border border-[#EAE1D7] transition-colors"
           >
-            <span className="material-symbols-outlined text-[18px] text-[#8d7168]">file_download</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#8d7168]">file_download</span>
             <span>Export CSV</span>
           </button>
           <button 
             type="button"
             className="h-10 px-4 rounded-xl bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px]">add</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">add</span>
             <span>Assign New Role</span>
           </button>
         </div>
@@ -377,11 +422,11 @@ export const MinistriesLeadershipPanel: React.FC = () => {
             <thead>
               <tr className="bg-[#faf2ee] text-[#59413a] text-xs font-semibold uppercase tracking-wider border-b border-[#EAE1D7]">
                 <th className="py-3 px-4 w-12 text-center">
-                  <input
+                  <input aria-label="Select all leaders"
                     type="checkbox"
                     checked={selectedRows.length === LEADERS.length}
                     onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded text-[#c2410c] focus:ring-0 cursor-pointer"
+                    className="w-4 h-4 rounded text-[#c2410c] cursor-pointer"
                   />
                 </th>
                 <th className="py-3 px-4">Role & Ministry Department</th>
@@ -389,7 +434,7 @@ export const MinistriesLeadershipPanel: React.FC = () => {
                 <th className="py-3 px-4">Contact Information</th>
                 <th className="py-3 px-4">Start Date</th>
                 <th className="py-3 px-4">Term End / Urgency</th>
-                <th className="py-3 px-4">Ecclesiastical Status</th>
+                <th className="py-3 px-4">Church Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -410,11 +455,11 @@ export const MinistriesLeadershipPanel: React.FC = () => {
                     }`}
                   >
                     <td className="py-3.5 px-4 text-center">
-                      <input
+                      <input aria-label="Select leader"
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleRow(leader.id)}
-                        className="w-4 h-4 rounded text-[#c2410c] focus:ring-0 cursor-pointer"
+                        className="w-4 h-4 rounded text-[#c2410c] cursor-pointer"
                       />
                     </td>
                     <td className="py-3.5 px-4">
@@ -458,12 +503,12 @@ export const MinistriesLeadershipPanel: React.FC = () => {
                     <td className="py-3.5 px-4">
                       {leader.isPerpetual ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#faf2ee] text-[#1e1b19] font-medium text-xs">
-                          <span className="material-symbols-outlined text-[16px] text-[#006243]">all_inclusive</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#006243]">all_inclusive</span>
                           <span>Perpetual / Tenured</span>
                         </div>
                       ) : isRenewal ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#ffdcc3] text-[#6e3900] font-semibold text-xs">
-                          <span className="material-symbols-outlined text-[16px] text-[#904d00]">alarm</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#904d00]">alarm</span>
                           <span>{leader.termEnd}</span>
                           <span className="font-mono text-[11px] font-bold">{leader.termUrgencyText}</span>
                         </div>
@@ -503,16 +548,16 @@ export const MinistriesLeadershipPanel: React.FC = () => {
                             type="button"
                             className="px-2.5 py-1 rounded-md bg-[#904d00] text-white hover:bg-[#6e3900] font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-[16px]">cycle</span>
+                            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">cycle</span>
                             <span>Renew</span>
                           </button>
                         ) : (
                           <button className="p-1.5 rounded-md hover:bg-[#f4ece8] text-[#59413a] hover:text-[#1e1b19] transition-colors" title="Edit leader">
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">edit</span>
                           </button>
                         )}
                         <button className="p-1.5 rounded-md hover:bg-[#f4ece8] text-[#59413a] hover:text-[#1e1b19] transition-colors" title="Options">
-                          <span className="material-symbols-outlined text-[18px]">more_vert</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">more_vert</span>
                         </button>
                       </div>
                     </td>
@@ -524,52 +569,32 @@ export const MinistriesLeadershipPanel: React.FC = () => {
         </div>
 
         {/* Table Pagination Footer */}
-        <div className="px-5 py-3.5 bg-[#faf2ee] flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#EAE1D7]">
-          <div className="flex items-center gap-2 text-xs text-[#59413a]">
-            <span>Showing <strong className="text-[#1e1b19] font-semibold">1–8</strong> of <strong className="text-[#1e1b19] font-semibold">28</strong> appointed leaders</span>
-            <span className="hidden md:inline">·</span>
-            <span className="hidden md:inline">Page 1 of 4</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button className="px-3 py-1.5 rounded-lg bg-white border border-[#EAE1D7] text-[#59413a] text-xs font-medium hover:bg-[#f4ece8] disabled:opacity-40" disabled>
-              Previous
-            </button>
-            <button className="w-8 h-8 rounded-lg bg-[#9b2f00] text-white text-xs font-bold shadow-xs">
-              1
-            </button>
-            <button className="w-8 h-8 rounded-lg bg-white border border-[#EAE1D7] text-[#1e1b19] text-xs font-medium hover:bg-[#f4ece8]">
-              2
-            </button>
-            <button className="w-8 h-8 rounded-lg bg-white border border-[#EAE1D7] text-[#1e1b19] text-xs font-medium hover:bg-[#f4ece8]">
-              3
-            </button>
-            <button className="w-8 h-8 rounded-lg bg-white border border-[#EAE1D7] text-[#1e1b19] text-xs font-medium hover:bg-[#f4ece8]">
-              4
-            </button>
-            <button className="px-3 py-1.5 rounded-lg bg-white border border-[#EAE1D7] text-[#59413a] text-xs font-medium hover:bg-[#f4ece8]">
-              Next
-            </button>
-          </div>
+        <div className="px-5 py-3.5 bg-[#faf2ee] flex items-center gap-2 border-t border-[#EAE1D7] text-xs text-[#59413a]">
+          {filteredLeaders.length === 0 ? (
+            <span>No leaders match the current filters</span>
+          ) : (
+            <span>Showing <strong className="text-[#1e1b19] font-semibold">1–{filteredLeaders.length}</strong> of <strong className="text-[#1e1b19] font-semibold">{LEADERS.length}</strong> appointed leaders</span>
+          )}
         </div>
       </div>
 
-      {/* Presbytery Governance Quorum Ratified Banner */}
+      {/* Church Council Church Council Quorum Ratified Banner */}
       <div className="p-5 rounded-2xl bg-[#faf2ee] border border-[#EAE1D7] shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-start md:items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-[#007d57] text-white flex items-center justify-center shrink-0 shadow-xs">
-            <span className="material-symbols-outlined text-[26px]">balance</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[26px]">balance</span>
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <h3 className="font-headline text-base font-bold text-[#1e1b19]">
-                Presbytery Governance & Session Ratification
+                Church Council Leadership & Council Ratification
               </h3>
               <span className="px-2 py-0.5 rounded-full bg-[#85f8c4]/30 text-[#005137] text-xs font-bold">
                 Quorum Validated
               </span>
             </div>
             <p className="text-xs text-[#59413a] mt-0.5">
-              All appointed Teaching Elders and Ruling Elders fulfill Book of Church Order Chapter 12 requirements. Next formal Presbytery assembly convened on <strong className="text-[#1e1b19]">Thursday, Nov 21, 2024</strong>.
+              All appointed Church Elders and ministry leaders fulfil the church's leadership requirements. Next formal Church Council assembly convened on <strong className="text-[#1e1b19]">Thursday, Nov 21, 2024</strong>.
             </p>
           </div>
         </div>
@@ -578,14 +603,14 @@ export const MinistriesLeadershipPanel: React.FC = () => {
             type="button" 
             className="h-9 px-3.5 rounded-xl bg-white hover:bg-[#f4ece8] text-[#1e1b19] text-xs font-semibold border border-[#EAE1D7] flex items-center gap-1.5 transition-colors"
           >
-            <span className="material-symbols-outlined text-[16px]">menu_book</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">menu_book</span>
             <span>View Book of Order</span>
           </button>
           <button 
             type="button" 
             className="h-9 px-3.5 rounded-xl bg-[#904d00] hover:bg-[#6e3900] text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs"
           >
-            <span className="material-symbols-outlined text-[16px]">verified</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">verified</span>
             <span>Download Minutes</span>
           </button>
         </div>

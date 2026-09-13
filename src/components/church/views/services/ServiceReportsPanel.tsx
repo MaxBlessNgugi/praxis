@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ServiceReportItem, WorshipService } from '../../../../types';
 import { INITIAL_SERVICE_REPORTS, INITIAL_SERVICES } from '../../../../data/churchMockData';
+import { interactiveCard } from '../../interactiveCard';
 
 export const ServiceReportsPanel: React.FC = () => {
   const [reports, setReports] = useState<ServiceReportItem[]>(INITIAL_SERVICE_REPORTS);
@@ -10,15 +11,15 @@ export const ServiceReportsPanel: React.FC = () => {
 
   // Form State for New Service Report
   const [targetServiceId, setTargetServiceId] = useState<string>(INITIAL_SERVICES[0].id);
-  const [preacherName, setPreacherName] = useState<string>('Rev. Dr. Michael Vance');
+  const [preacherName, setPreacherName] = useState<string>('Bishop Sammy');
   const [sermonTopic, setSermonTopic] = useState<string>('The Sovereign Shepherd of Israel (John 10:11-18)');
   const [attendance, setAttendance] = useState<number>(340);
   const [visitors, setVisitors] = useState<number>(12);
   const [salvations, setSalvations] = useState<number>(3);
   const [offering, setOffering] = useState<number>(8920.0);
-  const [testimonies, setTestimonies] = useState<string>('Two families expressed desire to begin covenant membership classes.\nElder Miller celebrated milestone anniversary with thanksgiving.');
-  const [incidents, setIncidents] = useState<string>('Narthex speaker channel 2 crackle observed during prelude; volume balanced.');
-  const [pastoralNotes, setPastoralNotes] = useState<string>('Pastor Vance to conduct hospital visit for Sister Sterling on Tuesday.\nDeaconess Clara to deliver new visitor packages to 4 families.');
+  const [testimonies, setTestimonies] = useState<string>('Two families expressed desire to begin member membership classes.\nElder Miller celebrated milestone anniversary with thanksgiving.');
+  const [incidents, setIncidents] = useState<string>('Entrance speaker channel 2 crackle observed during prelude; volume balanced.');
+  const [pastoralNotes, setPastoralNotes] = useState<string>('Bishop Sammy to conduct hospital visit for Sister Sterling on Tuesday.\nDeaconess Clara to deliver new visitor packages to 4 families.');
   const [submittedBy, setSubmittedBy] = useState<string>('Elder Marcus Jenkins (Clerk Pro-Tem)');
 
   const currentReport = reports.find((r) => r.id === selectedReportId) || reports[0];
@@ -63,12 +64,12 @@ export const ServiceReportsPanel: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Archived Reports</span>
             <div className="text-2xl font-black text-[#1C1917] mt-0.5">{reports.length} Sealed</div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">verified</span>
-              Canonical Docket
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span>
+              Official Docket
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span className="material-symbols-outlined text-[24px]">summarize</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">summarize</span>
           </div>
         </div>
 
@@ -76,15 +77,15 @@ export const ServiceReportsPanel: React.FC = () => {
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Avg Offering / Lord's Day</span>
             <div className="text-2xl font-black text-[#059669] mt-0.5">
-              ${(reports.reduce((acc, r) => acc + r.offeringCollected, 0) / (reports.length || 1)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              KSh {(reports.reduce((acc, r) => acc + r.offeringCollected, 0) / (reports.length || 1)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">account_balance_wallet</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">account_balance_wallet</span>
               Diaconal verified
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span className="material-symbols-outlined text-[24px]">paid</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">paid</span>
           </div>
         </div>
 
@@ -95,12 +96,12 @@ export const ServiceReportsPanel: React.FC = () => {
               {reports.reduce((acc, r) => acc + r.salvationsAndDecisions, 0)} Total
             </div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">favorite</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">favorite</span>
               Catechism inquiries active
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span className="material-symbols-outlined text-[24px]">volunteer_activism</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">volunteer_activism</span>
           </div>
         </div>
 
@@ -111,12 +112,12 @@ export const ServiceReportsPanel: React.FC = () => {
               {currentReport.pastoralFollowUpNotes.length} Action Items
             </div>
             <span className="text-xs text-[#D97706] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">assignment_turned_in</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">assignment_turned_in</span>
               Assigned to Pastoral Staff
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#D97706]">
-            <span className="material-symbols-outlined text-[24px]">elderly</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">elderly</span>
           </div>
         </div>
       </div>
@@ -128,7 +129,7 @@ export const ServiceReportsPanel: React.FC = () => {
           <div className="bg-[#FFFFFF] rounded-[14px] p-4 border border-[#E7E5E4] shadow-warm-card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-headline text-sm font-bold text-[#1C1917] flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px] text-[#C2410C]">history_edu</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#C2410C]">history_edu</span>
                 Past Service Records
               </h3>
               <button
@@ -136,7 +137,7 @@ export const ServiceReportsPanel: React.FC = () => {
                 onClick={() => setIsFilingReport(true)}
                 className="px-2.5 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">add</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add</span>
                 File Report
               </button>
             </div>
@@ -148,7 +149,7 @@ export const ServiceReportsPanel: React.FC = () => {
                 return (
                   <div
                     key={rep.id}
-                    onClick={() => setSelectedReportId(rep.id)}
+                    {...interactiveCard(() => setSelectedReportId(rep.id))}
                     className={`p-3.5 rounded-[12px] border transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-[#FDF8F3] border-[#C2410C] ring-2 ring-[#C2410C]/20 shadow-sm'
@@ -187,7 +188,7 @@ export const ServiceReportsPanel: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="px-2 py-0.5 rounded-md bg-[#059669]/10 text-[#059669] text-[11px] font-bold uppercase tracking-wider">
-                    Official Session Record
+                    Official Council Record
                   </span>
                   <span className="text-xs font-mono text-[#A8A29E]">Filed on {currentReport.submissionDate}</span>
                 </div>
@@ -205,7 +206,7 @@ export const ServiceReportsPanel: React.FC = () => {
                   onClick={() => setIsPrintModalOpen(true)}
                   className="px-3 py-2 rounded-[9px] bg-[#F8F1E9] hover:bg-[#F5EDE4] text-[#C2410C] text-xs font-bold border border-[#E7E5E4] transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[16px]">print</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">print</span>
                   Print Dossier
                 </button>
               </div>
@@ -239,8 +240,8 @@ export const ServiceReportsPanel: React.FC = () => {
               {/* Testimonies & Highlights */}
               <div>
                 <h4 className="font-headline text-xs font-bold text-[#1C1917] uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                  <span className="material-symbols-outlined text-[16px] text-[#059669]">campaign</span>
-                  Praise Testimonies & Liturgical Highlights
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#059669]">campaign</span>
+                  Praise Testimonies & Service Highlights
                 </h4>
                 <div className="space-y-1.5">
                   {currentReport.testimoniesHighlights.map((testimony, idx) => (
@@ -248,7 +249,7 @@ export const ServiceReportsPanel: React.FC = () => {
                       key={idx}
                       className="p-3 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4] text-xs text-[#1C1917] flex items-start gap-2"
                     >
-                      <span className="material-symbols-outlined text-[16px] text-[#059669] shrink-0 mt-0.5">check_circle</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#059669] shrink-0 mt-0.5">check_circle</span>
                       <span>{testimony}</span>
                     </div>
                   ))}
@@ -258,7 +259,7 @@ export const ServiceReportsPanel: React.FC = () => {
               {/* Technical / Facility Incidents */}
               <div>
                 <h4 className="font-headline text-xs font-bold text-[#1C1917] uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                  <span className="material-symbols-outlined text-[16px] text-[#D97706]">build</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#D97706]">build</span>
                   Technical, Sound & Sanctuary Operations
                 </h4>
                 <div className="space-y-1.5">
@@ -267,7 +268,7 @@ export const ServiceReportsPanel: React.FC = () => {
                       key={idx}
                       className="p-3 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4] text-xs text-[#1C1917] flex items-start gap-2"
                     >
-                      <span className="material-symbols-outlined text-[16px] text-[#D97706] shrink-0 mt-0.5">warning</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#D97706] shrink-0 mt-0.5">warning</span>
                       <span>{incident}</span>
                     </div>
                   ))}
@@ -277,7 +278,7 @@ export const ServiceReportsPanel: React.FC = () => {
               {/* Pastoral Follow-up Action Items */}
               <div>
                 <h4 className="font-headline text-xs font-bold text-[#1C1917] uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                  <span className="material-symbols-outlined text-[16px] text-[#C2410C]">assignment_ind</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#C2410C]">assignment_ind</span>
                   Pastoral Care & Diaconal Follow-Up Action Items
                 </h4>
                 <div className="space-y-1.5">
@@ -286,7 +287,7 @@ export const ServiceReportsPanel: React.FC = () => {
                       key={idx}
                       className="p-3 rounded-[10px] bg-[#FDF8F3] border border-[#C2410C]/30 text-xs text-[#1C1917] flex items-start gap-2"
                     >
-                      <span className="material-symbols-outlined text-[16px] text-[#C2410C] shrink-0 mt-0.5">task_alt</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#C2410C] shrink-0 mt-0.5">task_alt</span>
                       <span className="font-medium">{note}</span>
                     </div>
                   ))}
@@ -300,7 +301,7 @@ export const ServiceReportsPanel: React.FC = () => {
                 Submitted by: <strong className="text-[#1C1917]">{currentReport.submittedBy}</strong>
               </div>
               <div className="text-[11px] text-[#A8A29E] font-mono">
-                Canonical Report Archive Ref: #{currentReport.id.toUpperCase()}
+                Official Report Archive Ref: #{currentReport.id.toUpperCase()}
               </div>
             </div>
           </div>
@@ -314,7 +315,7 @@ export const ServiceReportsPanel: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <div className="flex items-center gap-2">
                 <span className="p-1.5 rounded-[8px] bg-[#C2410C]/10 text-[#C2410C]">
-                  <span className="material-symbols-outlined text-[20px]">summarize</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[20px]">summarize</span>
                 </span>
                 <h3 className="font-headline text-base font-bold text-[#1C1917]">File Post-Service Summary Report</h3>
               </div>
@@ -323,14 +324,14 @@ export const ServiceReportsPanel: React.FC = () => {
                 onClick={() => setIsFilingReport(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateReport} className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Target Service</label>
-                <select
+                <select aria-label="Target Service"
                   value={targetServiceId}
                   onChange={(e) => setTargetServiceId(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -346,7 +347,7 @@ export const ServiceReportsPanel: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Preacher</label>
-                  <input
+                  <input aria-label="Preacher"
                     type="text"
                     required
                     value={preacherName}
@@ -356,7 +357,7 @@ export const ServiceReportsPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Sermon Topic & Scripture</label>
-                  <input
+                  <input aria-label="Sermon Topic &amp; Scripture"
                     type="text"
                     required
                     value={sermonTopic}
@@ -369,7 +370,7 @@ export const ServiceReportsPanel: React.FC = () => {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Attendance</label>
-                  <input
+                  <input aria-label="Attendance"
                     type="number"
                     min={0}
                     value={attendance}
@@ -379,7 +380,7 @@ export const ServiceReportsPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Visitors</label>
-                  <input
+                  <input aria-label="Visitors"
                     type="number"
                     min={0}
                     value={visitors}
@@ -389,7 +390,7 @@ export const ServiceReportsPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#1C1917] mb-1">Decisions</label>
-                  <input
+                  <input aria-label="Decisions"
                     type="number"
                     min={0}
                     value={salvations}
@@ -398,8 +399,8 @@ export const ServiceReportsPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Offering ($)</label>
-                  <input
+                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Offering (KSh)</label>
+                  <input aria-label="Offering (KSh)"
                     type="number"
                     min={0}
                     step="0.01"
@@ -412,7 +413,7 @@ export const ServiceReportsPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Testimonies & Highlights (One per line)</label>
-                <textarea
+                <textarea aria-label="Testimonies &amp; Highlights (One per line)"
                   rows={2}
                   value={testimonies}
                   onChange={(e) => setTestimonies(e.target.value)}
@@ -422,7 +423,7 @@ export const ServiceReportsPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Technical / Sound / Facility Incidents</label>
-                <textarea
+                <textarea aria-label="Technical / Sound / Facility Incidents"
                   rows={2}
                   value={incidents}
                   onChange={(e) => setIncidents(e.target.value)}
@@ -432,7 +433,7 @@ export const ServiceReportsPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Pastoral Follow-Up Notes (One per line)</label>
-                <textarea
+                <textarea aria-label="Pastoral Follow-Up Notes (One per line)"
                   rows={2}
                   value={pastoralNotes}
                   onChange={(e) => setPastoralNotes(e.target.value)}
@@ -442,7 +443,7 @@ export const ServiceReportsPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Submitted By</label>
-                <input
+                <input aria-label="Submitted By"
                   type="text"
                   required
                   value={submittedBy}
@@ -478,7 +479,7 @@ export const ServiceReportsPanel: React.FC = () => {
             <div className="flex items-center justify-between pb-4 border-b-2 border-[#1C1917]">
               <div>
                 <span className="text-xs uppercase tracking-widest font-sans font-bold text-[#C2410C]">
-                  Grace Valley Session Records
+                  Destiny Sanctuary Council Records
                 </span>
                 <h2 className="text-2xl font-bold text-[#1C1917] mt-0.5">Lord’s Day Service Dossier</h2>
                 <div className="text-xs font-sans text-[#57534E] mt-1">
@@ -490,7 +491,7 @@ export const ServiceReportsPanel: React.FC = () => {
                 onClick={() => setIsPrintModalOpen(false)}
                 className="font-sans text-[#57534E] hover:text-[#1C1917] p-1.5 rounded-md border border-[#E7E5E4]"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
@@ -530,7 +531,7 @@ export const ServiceReportsPanel: React.FC = () => {
                 onClick={() => window.print()}
                 className="px-4 py-2 rounded-[8px] bg-[#C2410C] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
               >
-                <span className="material-symbols-outlined text-[16px]">print</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">print</span>
                 Print Report
               </button>
             </div>

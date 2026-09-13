@@ -35,12 +35,12 @@ export type SettingsSubTab = 'org-profile' | 'notifications' | 'integrations' | 
 
 // ==================== SERVICE & WORSHIP TYPES ====================
 
-export type ServiceType = 'sunday-morning' | 'sunday-evening' | 'midweek-vespers' | 'communion-special' | 'youth-service' | 'festival';
+export type ServiceType = 'sunday-morning' | 'sunday-evening' | 'midweek-service' | 'communion-special' | 'youth-service' | 'festival';
 
 export interface LiturgyItem {
   id: string;
   order: number;
-  type: 'prelude' | 'call-to-worship' | 'worship-praise' | 'pastoral-prayer' | 'scripture-reading' | 'tithes-offering' | 'sermon' | 'communion' | 'benediction' | 'announcements';
+  type: 'prelude' | 'call-to-worship' | 'worship-praise' | 'pastoral-prayer' | 'scripture-reading' | 'tithes-offering' | 'sermon' | 'communion' | 'benediction' | 'announcements' | 'fellowship';
   title: string;
   durationMinutes: number;
   leader: string;
@@ -98,7 +98,7 @@ export interface FirstTimeVisitorLink {
   email: string;
   interestedMinistry: string;
   assignedFollowUpPastor: string;
-  status: 'new-intake' | 'contacted' | 'inquirer-enrolled' | 'regular-attender';
+  status: 'new-intake' | 'contacted' | 'first-timer-enrolled' | 'regular-attender';
   householdLinked?: boolean;
 }
 
@@ -150,7 +150,7 @@ export interface ServiceReportItem {
 
 // ==================== COMMUNICATIONS TYPES ====================
 
-export type AnnouncementAudience = 'everyone' | 'members-only' | 'ministry-leaders' | 'youth-roll' | 'session-elders';
+export type AnnouncementAudience = 'everyone' | 'members-only' | 'ministry-leaders' | 'youth-roll' | 'church-council';
 
 export interface AnnouncementItem {
   id: string;
@@ -262,36 +262,25 @@ export interface BirthdayAnniversaryItem {
 
 // ==================== SETTINGS TYPES ====================
 
-export interface CampusBranch {
-  id: string;
-  name: string;
-  code: string;
-  address: string;
-  city: string;
-  campusPastor: string;
-  phone: string;
-  capacity: number;
-  isPrimary: boolean;
-  status: 'active' | 'under-renovation' | 'planned';
-}
-
+/**
+ * One field per fact. The profile used to carry mirror pairs (`churchName` + `name`,
+ * `foundingYear` + `establishedYear`, `taxExemptNumber` + `taxId`, `physicalAddress` +
+ * `mailingAddress` + `address`, `campuses` + LOCATIONS) where only one half was ever
+ * read and nothing kept the other honest. The church's own identity and location facts
+ * live in `src/data/churchDomain.ts`; this type only carries what the profile screen
+ * edits.
+ */
 export interface ChurchOrgProfile {
   name?: string;
-  churchName: string;
   denomination?: string;
-  legalEntityName?: string;
   tagline?: string;
-  taxExemptNumber?: string;
   taxId?: string;
   nonprofitStatus?: string;
   establishedYear?: number;
-  foundingYear?: number;
   phone: string;
   email: string;
   website: string;
   address?: string;
-  physicalAddress?: string;
-  mailingAddress?: string;
   city?: string;
   state?: string;
   zipCode?: string;
@@ -300,7 +289,14 @@ export interface ChurchOrgProfile {
   fiscalYearStart?: string;
   seniorPastor?: string;
   administrator?: string;
-  campuses?: CampusBranch[];
+  officeHours: string;
+  serviceTimes: { name: string; time: string }[];
+  socials: { platform: string; handle: string; url: string }[];
+  vision: string;
+  mission: string[];
+  coreValues: { title: string; description: string }[];
+  teamValues: { title: string; points: string[] }[];
+  yearTheme: { year: string; title: string; declaration: string };
 }
 
 export interface NotificationCategoryPref {
@@ -392,7 +388,7 @@ export interface CustomFieldDefinition {
   fieldType: 'text' | 'select' | 'date' | 'checkbox' | 'tag-list';
   required: boolean;
   options?: string[];
-  appliedTo: 'all-members' | 'covenant-only' | 'officers-only';
+  appliedTo: 'all-members' | 'member-only' | 'officers-only';
 }
 
 export interface MembershipTierConfig {
@@ -401,12 +397,12 @@ export interface MembershipTierConfig {
   name: string;
   description: string;
   votingRights: boolean;
-  sacramentAccess: 'full' | 'baptized-only' | 'inquirer-supervised';
+  communionAccess: 'full' | 'baptized-only' | 'first-timer-supervised';
   colorBadge: string;
   activeMembersCount: number;
 }
 
-export type MembershipTier = 'covenant' | 'communicant' | 'inquirer' | 'youth' | 'adherent';
+export type MembershipTier = 'member' | 'active-member' | 'first-timer' | 'youth' | 'visitor';
 
 export type BaptismType = 'baptized' | 'dedicated' | 'awaiting' | 'transfer';
 
@@ -415,7 +411,7 @@ export interface ParishMember {
   name: string;
   memberId: string; // e.g. #MBR-1092
   initials: string;
-  parish: string;
+  church: string;
   roleDescription?: string;
   membershipTier: MembershipTier;
   baptismType: BaptismType;
@@ -427,7 +423,7 @@ export interface ParishMember {
   email: string;
   phone: string;
   residentialAddress?: string;
-  pastoralStatus: 'active-regular' | 'active-officer' | 'active-mercy' | 'homebound' | 'active-honored' | 'youth-confirmand' | 'pastoral-staff';
+  pastoralStatus: 'active-regular' | 'active-officer' | 'active-mercy' | 'homebound' | 'active-honored' | 'youth-discipleship' | 'pastoral-staff';
   statusLabel: string;
   dateOfBirth?: string;
   pastoralNotes?: string;

@@ -128,12 +128,12 @@ export const VolunteerRosterPanel: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Total Roster Slots</span>
             <div className="text-2xl font-black text-[#1C1917] mt-0.5">{duties.length} Assigned</div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">event_available</span>
-              Across 7 liturgical teams
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">event_available</span>
+              Across 7 service teams
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span className="material-symbols-outlined text-[24px]">assignment_ind</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">assignment_ind</span>
           </div>
         </div>
 
@@ -142,12 +142,12 @@ export const VolunteerRosterPanel: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Confirmed & Ready</span>
             <div className="text-2xl font-black text-[#059669] mt-0.5">{confirmedCount} Volunteers</div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">verified</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span>
               {Math.round((confirmedCount / (duties.length || 1)) * 100)}% coverage confirmed
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span className="material-symbols-outlined text-[24px]">check_circle</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">check_circle</span>
           </div>
         </div>
 
@@ -156,12 +156,12 @@ export const VolunteerRosterPanel: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Awaiting RSVP</span>
             <div className="text-2xl font-black text-[#D97706] mt-0.5">{pendingCount} Pending</div>
             <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">sms</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">sms</span>
               SMS automated reminders active
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#D97706]">
-            <span className="material-symbols-outlined text-[24px]">schedule</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">schedule</span>
           </div>
         </div>
 
@@ -170,12 +170,12 @@ export const VolunteerRosterPanel: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Swap / Replacements</span>
             <div className="text-2xl font-black text-[#C2410C] mt-0.5">{replacementCount} Requests</div>
             <span className="text-xs text-[#DC2626] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">swap_horiz</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">swap_horiz</span>
               {swapRequests.filter((s) => s.status === 'pending-approval').length} awaiting approval
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#DC2626]">
-            <span className="material-symbols-outlined text-[24px]">swap_horiz</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">swap_horiz</span>
           </div>
         </div>
       </div>
@@ -186,7 +186,7 @@ export const VolunteerRosterPanel: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#E7E5E4] mb-4">
           <div>
             <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-[#C2410C]">badge</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">badge</span>
               Service Duty Roster & Ministry Allocation
             </h3>
             <p className="text-xs text-[#57534E] mt-0.5">
@@ -195,7 +195,7 @@ export const VolunteerRosterPanel: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <select aria-label="Department filter"
               value={selectedDepartment}
               onChange={(e) => setSelectedDepartment(e.target.value)}
               className="px-3 py-1.5 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-medium"
@@ -215,7 +215,7 @@ export const VolunteerRosterPanel: React.FC = () => {
               onClick={() => setIsAssigningDuty(true)}
               className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">person_add</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">person_add</span>
               Assign Volunteer
             </button>
           </div>
@@ -258,7 +258,7 @@ export const VolunteerRosterPanel: React.FC = () => {
                     <div className="text-[11px] text-[#A8A29E]">{duty.email}</div>
                   </td>
                   <td className="py-3 px-3">
-                    <select
+                    <select aria-label="Duty status"
                       value={duty.status}
                       onChange={(e) => handleUpdateStatus(duty.id, e.target.value as any)}
                       className={`text-[11px] font-bold px-2 py-1 rounded-[6px] border ${
@@ -300,7 +300,7 @@ export const VolunteerRosterPanel: React.FC = () => {
         <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4] mb-4">
           <div>
             <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-[#C2410C]">swap_horiz</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">swap_horiz</span>
               Substitute & Roster Swap Queue
             </h3>
             <p className="text-xs text-[#57534E] mt-0.5">
@@ -336,7 +336,7 @@ export const VolunteerRosterPanel: React.FC = () => {
                 </div>
                 <div className="text-xs text-[#57534E] flex items-center gap-2">
                   <span>Scheduled: <strong className="text-[#1C1917]">{req.requestingVolunteer}</strong></span>
-                  <span className="material-symbols-outlined text-[14px] text-[#C2410C]">arrow_forward</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-[#C2410C]">arrow_forward</span>
                   <span>Substitute: <strong className="text-[#059669]">{req.replacementVolunteer}</strong></span>
                 </div>
                 <div className="text-[11px] text-[#A8A29E] italic">Reason: "{req.reason}"</div>
@@ -349,7 +349,7 @@ export const VolunteerRosterPanel: React.FC = () => {
                     onClick={() => handleApproveSwap(req.id, req.dutyId, req.replacementVolunteer)}
                     className="px-3 py-1.5 rounded-[8px] bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[16px]">check</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check</span>
                     Approve Swap
                   </button>
                   <button
@@ -381,14 +381,14 @@ export const VolunteerRosterPanel: React.FC = () => {
                 onClick={() => setIsAssigningDuty(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateAssignment} className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Ministry Department</label>
-                <select
+                <select aria-label="Ministry Department"
                   value={targetDept}
                   onChange={(e) => setTargetDept(e.target.value as any)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -405,7 +405,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Role Title *</label>
-                <input
+                <input aria-label="Role Title"
                   type="text"
                   required
                   placeholder="e.g. Aisle 2 Collection Steward"
@@ -417,7 +417,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Select Volunteer (Member Roll)</label>
-                <select
+                <select aria-label="Select Volunteer (Member Roll)"
                   value={selectedMemberId}
                   onChange={(e) => setSelectedMemberId(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -432,7 +432,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Call Time</label>
-                <input
+                <input aria-label="Call Time"
                   type="text"
                   placeholder="09:45 AM"
                   value={callTime}
@@ -443,7 +443,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Duty Notes / Special Instructions</label>
-                <textarea
+                <textarea aria-label="Duty Notes / Special Instructions"
                   rows={2}
                   placeholder="e.g. Please pick up badge at Welcome Kiosk by 09:30 AM"
                   value={dutyNotes}
@@ -483,7 +483,7 @@ export const VolunteerRosterPanel: React.FC = () => {
                 onClick={() => setSwappingDuty(null)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
@@ -500,7 +500,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Proposed Replacement Volunteer *</label>
-                <input
+                <input aria-label="Proposed Replacement Volunteer"
                   type="text"
                   required
                   placeholder="e.g. Elena Vance"
@@ -512,7 +512,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#1C1917] mb-1">Reason for Swap</label>
-                <textarea
+                <textarea aria-label="Reason for Swap"
                   rows={2}
                   placeholder="e.g. Family travel / rehearsal overlap"
                   value={swapReason}

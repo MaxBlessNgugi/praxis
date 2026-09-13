@@ -21,11 +21,11 @@ export const COLOR_TOKENS: Record<string, TokenItem[]> = {
     { name: 'Secondary Fixed', hex: '#FFDCC3', role: 'Soft Amber Pill Background', tailwindClass: 'bg-[#ffdcc3] text-[#2f1500]', contrastWhite: false },
     { name: 'Secondary Fixed Dim', hex: '#FFB77D', role: 'Muted Amber Element Accent', tailwindClass: 'bg-[#ffb77d] text-[#2f1500]', contrastWhite: false },
   ],
-  Canonical: [
-    { name: 'Sacramental Green', hex: '#006243', role: 'Baptism & Verified Status', tailwindClass: 'bg-[#006243] text-white', contrastWhite: true },
+  Official: [
+    { name: 'Membership Green', hex: '#006243', role: 'Baptism & Verified Status', tailwindClass: 'bg-[#006243] text-white', contrastWhite: true },
     { name: 'Tertiary Container', hex: '#007D57', role: 'Active Attending Badges', tailwindClass: 'bg-[#007d57] text-white', contrastWhite: true },
     { name: 'Tertiary Fixed', hex: '#85F8C4', role: 'Honorary & Elder Badges', tailwindClass: 'bg-[#85f8c4] text-[#002114]', contrastWhite: false },
-    { name: 'Canonical Alert Error', hex: '#BA1A1A', role: 'Strict Guard & Destructive Action', tailwindClass: 'bg-[#ba1a1a] text-white', contrastWhite: true },
+    { name: 'Official Alert Error', hex: '#BA1A1A', role: 'Strict Guard & Destructive Action', tailwindClass: 'bg-[#ba1a1a] text-white', contrastWhite: true },
   ],
   Surfaces: [
     { name: 'Canvas Surface', hex: '#FFF8F5', role: 'Warm Earthen App Canvas', tailwindClass: 'bg-[#fff8f5] text-[#1e1b19]', contrastWhite: false },
@@ -38,16 +38,16 @@ export const COLOR_TOKENS: Record<string, TokenItem[]> = {
 };
 
 export const TYPOGRAPHY_TOKENS = [
-  { level: 'Headline XL', size: '40px / 48px', weight: 'Bold 700', tailwind: 'font-headline text-[40px] leading-[48px] font-bold tracking-tight', sample: 'Members & Pastoral Care' },
+  { level: 'Headline XL', size: '40px / 48px', weight: 'Bold 700', tailwind: 'font-headline text-[40px] leading-[48px] font-bold tracking-tight', sample: 'Members & Believers' },
   { level: 'Headline LG', size: '32px / 40px', weight: 'Semibold 600', tailwind: 'font-headline text-[32px] leading-[40px] font-semibold tracking-tight', sample: '1,248 Active Souls on Roll' },
-  { level: 'Headline MD', size: '24px / 32px', weight: 'Semibold 600', tailwind: 'font-headline text-[24px] leading-[32px] font-semibold tracking-tight', sample: 'Christian Intake & Sacramental Record' },
+  { level: 'Headline MD', size: '24px / 32px', weight: 'Semibold 600', tailwind: 'font-headline text-[24px] leading-[32px] font-semibold tracking-tight', sample: 'New Believer Intake & Records' },
   { level: 'Headline SM', size: '20px / 28px', weight: 'Semibold 600', tailwind: 'font-headline text-[20px] leading-[28px] font-semibold tracking-tight', sample: 'The Vance Household (#108)' },
   { level: 'Title MD', size: '16px / 24px', weight: 'Semibold 600', tailwind: 'font-headline text-[16px] leading-[24px] font-semibold', sample: 'Caleb Timothy Vance' },
-  { level: 'Label MD', size: '14px / 20px', weight: 'Semibold 600', tailwind: 'font-headline text-[14px] leading-[20px] font-semibold tracking-wide', sample: 'Covenant Partner' },
+  { level: 'Label MD', size: '14px / 20px', weight: 'Semibold 600', tailwind: 'font-headline text-[14px] leading-[20px] font-semibold tracking-wide', sample: 'Member' },
   { level: 'Label SM', size: '12px / 16px', weight: 'Semibold 600', tailwind: 'font-headline text-[12px] leading-[16px] font-semibold tracking-wide', sample: 'Canon 4.12 Strict Guard' },
-  { level: 'Body LG', size: '16px / 26px', weight: 'Regular 400', tailwind: 'font-body text-[16px] leading-[26px]', sample: 'Comprehensive parish roll, sacramental registry, and ecclesiastical records.' },
-  { level: 'Body MD', size: '14px / 22px', weight: 'Regular 400', tailwind: 'font-body text-[14px] leading-[22px]', sample: 'Register an individual for pastoral oversight, formal church membership, and sacramental fellowship.' },
-  { level: 'Body SM', size: '13px / 18px', weight: 'Regular 400', tailwind: 'font-body text-[13px] leading-[18px]', sample: 'All sacramental and personal records are encrypted under ecclesiastical privilege.' },
+  { level: 'Body LG', size: '16px / 26px', weight: 'Regular 400', tailwind: 'font-body text-[16px] leading-[26px]', sample: 'Comprehensive members register, baptism register, and church records.' },
+  { level: 'Body MD', size: '14px / 22px', weight: 'Regular 400', tailwind: 'font-body text-[14px] leading-[22px]', sample: 'Register an individual for pastoral oversight, formal church membership, and church fellowship.' },
+  { level: 'Body SM', size: '13px / 18px', weight: 'Regular 400', tailwind: 'font-body text-[13px] leading-[18px]', sample: 'All membership and personal records are encrypted under church confidentiality.' },
 ];
 
 export const SPACING_TOKENS = [
@@ -110,7 +110,7 @@ export const SAMPLE_INSPECTABLE_ELEMENTS: InspectedElementInfo[] = [
     },
   },
   {
-    id: 'canonical-guard-banner',
+    id: 'official-guard-banner',
     name: 'CanonicalNoticeBanner',
     category: 'Banners & Alerts',
     tailwindClasses: 'relative overflow-hidden rounded-xl bg-gradient-to-r from-[#ffdad6] via-[#eee7e3] to-[#f4ece8] p-6 shadow-sm border border-[#e1bfb5]/40',
@@ -131,7 +131,7 @@ export const SAMPLE_INSPECTABLE_ELEMENTS: InspectedElementInfo[] = [
     },
   },
   {
-    id: 'covenant-partner-pill',
+    id: 'member-partner-pill',
     name: 'CovenantPartnerBadge',
     category: 'Badges & Status',
     tailwindClasses: 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#c2410c] text-white font-semibold text-xs shadow-sm',

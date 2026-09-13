@@ -64,7 +64,7 @@ export const FigmaTopBar: React.FC<FigmaTopBarProps> = ({
             Praxis Church OS
           </span>
           <span className="text-[10px] font-mono text-[#fe932c] bg-[#fe932c]/10 border border-[#fe932c]/30 px-1.5 py-0.5 rounded">
-            Parish Roll & Sacraments v3.4
+            Members Register & Sacraments v3.4
           </span>
         </div>
       </div>
