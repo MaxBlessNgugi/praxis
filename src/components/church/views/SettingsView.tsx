@@ -33,10 +33,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <span className="px-2 py-0.5 rounded-md bg-[#C2410C]/10 text-[#C2410C] text-[11px] font-bold uppercase tracking-wider">
                 System Configuration
               </span>
-              <span className="text-xs text-[#A8A29E] font-medium">· Parish Settings & Data Control</span>
+              <span className="text-xs text-[#A8A29E] font-medium">· Church Settings & Data Control</span>
             </div>
             <h1 className="font-headline text-2xl font-black text-[#1C1917]">
-              Parish System Settings & Configuration
+              Church System Settings & Configuration
             </h1>
             <p className="text-xs text-[#57534E] mt-0.5">
               Manage organization metadata, automated notifications, merchant giving integrations, database backups, and custom denominational terminology.
@@ -57,7 +57,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]/70'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[16px]">{tab.icon}</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">{tab.icon}</span>
                   {tab.label}
                 </button>
               );

@@ -1,5 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { ParishMember } from '../../../types';
+import { LOCATIONS } from '../../../data/churchDomain';
+import { dialogProps } from '../dialog';
+import { interactiveCard } from '../interactiveCard'
+;
 
 interface FindChristianViewProps {
   members: ParishMember[];
@@ -39,11 +43,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
         (statusFilter === 'care' && m.pastoralStatus === 'homebound') ||
         (statusFilter === 'homebound' && m.pastoralStatus === 'homebound');
 
-      const matchParish =
-        parishFilter === '' ||
-        (parishFilter === 'downtown' && m.parish.includes('Downtown')) ||
-        (parishFilter === 'north' && m.parish.includes('North')) ||
-        (parishFilter === 'valley' && m.parish.includes('Valley'));
+      const matchParish = parishFilter === '' || m.church === parishFilter;
 
       return matchSearch && matchTier && matchStatus && matchParish;
     });
@@ -72,10 +72,10 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
           <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-[#9b2f00]/5 pointer-events-none"></div>
           <div className="flex items-center justify-between">
             <span className="font-headline text-xs font-semibold uppercase tracking-wider text-[#59413a]">
-              Parish Roll Census
+              Members Register Census
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-[#006243]/10 px-2 py-0.5 font-headline text-xs text-[#006243] font-bold">
-              <span className="material-symbols-outlined text-[14px]">arrow_upward</span>+12 this mo
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_upward</span>+12 this mo
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
@@ -83,7 +83,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             <span className="font-body text-xs text-[#59413a]">Active Souls</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
-            <span>Parish Book Vol. IV</span>
+            <span>Membership Register Vol. I</span>
             <span className="text-[#9b2f00] font-bold">99.2% verified</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
@@ -91,12 +91,12 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
           </div>
         </div>
 
-        {/* Stat 2: Covenant Partners */}
+        {/* Stat 2: Members */}
         <div className="relative overflow-hidden rounded-xl bg-white p-4 shadow-sm border border-[#EAE1D7]/60 hover:shadow-md transition-all">
           <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-[#fe932c]/10 pointer-events-none"></div>
           <div className="flex items-center justify-between">
             <span className="font-headline text-xs font-semibold uppercase tracking-wider text-[#59413a]">
-              Covenant Partners
+              Members
             </span>
             <span className="inline-flex items-center rounded-md bg-[#f4ece8] px-2 py-0.5 font-mono text-xs text-[#904d00] font-bold">
               71.6% ratio
@@ -115,15 +115,15 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
           </div>
         </div>
 
-        {/* Stat 3: Inquirers / Adherents */}
+        {/* Stat 3: First Timers / Visitors */}
         <div className="relative overflow-hidden rounded-xl bg-white p-4 shadow-sm border border-[#EAE1D7]/60 hover:shadow-md transition-all">
           <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-[#006243]/10 pointer-events-none"></div>
           <div className="flex items-center justify-between">
             <span className="font-headline text-xs font-semibold uppercase tracking-wider text-[#59413a]">
-              Inquirers & Adherents
+              First Timers & Visitors
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-[#f4ece8] px-2 py-0.5 font-headline text-xs text-[#59413a] font-semibold">
-              Catechumenate
+              Discipleship Class
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
@@ -131,8 +131,8 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             <span className="font-body text-xs text-[#59413a]">Under Instruction</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
-            <span>Next Covenant Class</span>
-            <span className="font-bold text-[#1e1b19]">Nov 14</span>
+            <span>Next Membership Class</span>
+            <span className="font-bold text-[#1e1b19]">Feb 13</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
             <div className="h-1.5 rounded-full bg-[#006243]" style={{ width: '44%' }}></div>
@@ -169,10 +169,10 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
         <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-4">
           {/* Search Input */}
           <div className="relative flex-1 min-w-[280px]">
-            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-[#59413a]">
+            <span aria-hidden="true" className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-[#59413a]">
               search
             </span>
-            <input
+            <input aria-label="Search by name, member ID #, email, phone, or household"
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -186,7 +186,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-[#59413a] hover:text-[#1e1b19]"
                 title="Clear input"
               >
-                <span className="material-symbols-outlined text-[18px]">backspace</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">backspace</span>
               </button>
             )}
           </div>
@@ -194,50 +194,52 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
           {/* Quick Filter Selects */}
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
             <div className="relative min-w-[155px] flex-1 sm:flex-initial">
-              <select
+              <select aria-label="Membership tier filter"
                 value={tierFilter}
                 onChange={(e) => setTierFilter(e.target.value)}
-                className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-[#9b2f00]/20"
+                className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none"
               >
                 <option value="">All Tiers</option>
-                <option value="covenant">Covenant Partner</option>
-                <option value="communicant">Communicant</option>
-                <option value="inquirer">Inquirer / Adherent</option>
-                <option value="youth">Youth / Confirmand</option>
+                <option value="member">Member</option>
+                <option value="active-member">Active Member</option>
+                <option value="first-timer">First Timer / Visitor</option>
+                <option value="youth">Youth / Discipleship Class</option>
               </select>
-              <span className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
+              <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
                 expand_more
               </span>
             </div>
 
             <div className="relative min-w-[160px] flex-1 sm:flex-initial">
-              <select
+              <select aria-label="Pastoral status filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-[#9b2f00]/20"
+                className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none"
               >
                 <option value="">All Statuses</option>
                 <option value="active">Active Regular</option>
                 <option value="care">Under Pastoral Care</option>
                 <option value="homebound">Homebound / Convalescent</option>
               </select>
-              <span className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
+              <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
                 expand_more
               </span>
             </div>
 
             <div className="relative min-w-[160px] flex-1 sm:flex-initial">
-              <select
+              <select aria-label="Church location filter"
                 value={parishFilter}
                 onChange={(e) => setParishFilter(e.target.value)}
-                className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-[#9b2f00]/20"
+                className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none"
               >
-                <option value="">All Parishes</option>
-                <option value="downtown">Downtown Sanctuary #01</option>
-                <option value="north">North Annex Chapel</option>
-                <option value="valley">Valley Creek Fellowship</option>
+                <option value="">All Churches</option>
+                {LOCATIONS.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
               </select>
-              <span className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
+              <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
                 expand_more
               </span>
             </div>
@@ -258,7 +260,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                     : 'text-[#59413a] hover:text-[#1e1b19]'
                 }`}
               >
-                <span className="material-symbols-outlined text-[16px]">density_small</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">density_small</span>
                 <span>Compact</span>
               </button>
               <button
@@ -270,13 +272,13 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                     : 'text-[#59413a] hover:text-[#1e1b19]'
                 }`}
               >
-                <span className="material-symbols-outlined text-[16px]">density_medium</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">density_medium</span>
                 <span>Comfortable</span>
               </button>
             </div>
 
             <span className="ml-2 hidden lg:inline-flex items-center gap-1 rounded-md bg-[#ffdcc3]/40 px-2 py-0.5 font-mono text-xs text-[#6e3900]">
-              Showing: Grace Valley Roll 2024
+              Showing: Destiny Sanctuary Roll 2025
             </span>
           </div>
 
@@ -285,27 +287,27 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               type="button"
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#faf2ee] hover:bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] transition-colors shadow-sm cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[18px]">view_column</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">view_column</span>
               <span>Columns (7/7)</span>
             </button>
 
             <div className="inline-flex items-center rounded-lg bg-[#faf2ee] shadow-sm border border-[#e1bfb5]/30">
               <button
                 type="button"
-                onClick={() => alert('Exporting parish roll census as CSV file...')}
+                onClick={() => alert('Exporting members register census as CSV file...')}
                 className="inline-flex items-center gap-1 px-3 py-1.5 hover:bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] transition-colors rounded-l-lg cursor-pointer"
                 title="Export current roll filtered view"
               >
-                <span className="material-symbols-outlined text-[18px]">download</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">download</span>
                 <span>Export CSV</span>
               </button>
               <button
                 type="button"
                 onClick={() => window.print()}
                 className="p-1.5 hover:bg-[#f4ece8] text-[#59413a] transition-colors rounded-r-lg border-l border-[#e1bfb5]/40 cursor-pointer"
-                title="Print Sacrament Register"
+                title="Print Baptism & Communion Register"
               >
-                <span className="material-symbols-outlined text-[18px]">print</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">print</span>
               </button>
             </div>
 
@@ -314,7 +316,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               onClick={onNavigateToAdd}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#9b2f00] hover:bg-[#c2410c] text-white font-headline text-xs font-bold shadow-md transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[18px]">person_add</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person_add</span>
               <span>+ Add Christian</span>
             </button>
           </div>
@@ -343,21 +345,21 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                 onClick={() => alert(`Batch email composer initialized for ${selectedIds.length} members.`)}
                 className="px-2.5 py-1 rounded bg-white text-[#1e1b19] font-headline text-xs font-semibold hover:bg-[#fff8f5] shadow-sm flex items-center gap-1 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">mail</span> Batch Email
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">mail</span> Batch Email
               </button>
               <button
                 type="button"
                 onClick={() => alert(`Printing nametags for ${selectedIds.length} members...`)}
                 className="px-2.5 py-1 rounded bg-white text-[#1e1b19] font-headline text-xs font-semibold hover:bg-[#fff8f5] shadow-sm flex items-center gap-1 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">label</span> Print Nametags
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">label</span> Print Nametags
               </button>
               <button
                 type="button"
                 onClick={() => alert(`Marked attendance for ${selectedIds.length} selected believers.`)}
                 className="px-2.5 py-1 rounded bg-white text-[#1e1b19] font-headline text-xs font-semibold hover:bg-[#fff8f5] shadow-sm flex items-center gap-1 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">assignment_turned_in</span> Mark Attendance
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">assignment_turned_in</span> Mark Attendance
               </button>
             </div>
           </div>
@@ -368,7 +370,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             <thead>
               <tr className="bg-[#f8f1e9] font-headline text-xs font-semibold text-[#59413a] uppercase tracking-wider select-none border-b border-[#EAE1D7]">
                 <th className="w-12 px-4 py-3 text-center">
-                  <input
+                  <input aria-label="Select all members"
                     type="checkbox"
                     checked={selectedIds.length > 0 && selectedIds.length === filteredMembers.length}
                     onChange={handleSelectAll}
@@ -378,7 +380,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                 <th className="px-4 py-3">
                   <div className="flex items-center gap-1 cursor-pointer hover:text-[#1e1b19]">
                     <span>Member Name & ID</span>
-                    <span className="material-symbols-outlined text-[16px] text-[#9b2f00]">arrow_downward</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#9b2f00]">arrow_downward</span>
                   </div>
                 </th>
                 <th className="px-4 py-3">Membership Tier</th>
@@ -404,7 +406,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                     }`}
                   >
                     <td className={`px-4 text-center ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
-                      <input
+                      <input aria-label="Select member"
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => handleToggleRow(member.id)}
@@ -424,31 +426,31 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                           <div className="flex items-center gap-1.5 font-mono text-[11px] text-[#59413a]">
                             <span className="bg-[#f4ece8] px-1 rounded">{member.memberId}</span>
                             <span>•</span>
-                            <span>{member.roleDescription || member.parish}</span>
+                            <span>{member.roleDescription || member.church}</span>
                           </div>
                         </div>
                       </div>
                     </td>
 
                     <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
-                      {member.membershipTier === 'covenant' && (
+                      {member.membershipTier === 'member' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#c2410c] text-white font-headline text-xs font-semibold shadow-sm">
-                          <span className="material-symbols-outlined text-[14px]">verified</span> Covenant Partner
+                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span> Member
                         </span>
                       )}
-                      {member.membershipTier === 'communicant' && (
+                      {member.membershipTier === 'active-member' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#eee7e3] text-[#1e1b19] font-headline text-xs font-semibold border border-[#e1bfb5]/50">
-                          <span className="material-symbols-outlined text-[14px]">church</span> Communicant
+                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">church</span> Active Member
                         </span>
                       )}
                       {member.membershipTier === 'youth' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ffdcc3] text-[#2f1500] font-headline text-xs font-semibold">
-                          <span className="material-symbols-outlined text-[14px]">school</span> Youth Confirmand
+                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">school</span> Youth Discipleship Class
                         </span>
                       )}
-                      {member.membershipTier === 'inquirer' && (
+                      {member.membershipTier === 'first-timer' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] font-headline text-xs font-semibold">
-                          <span className="material-symbols-outlined text-[14px]">help</span> Inquirer / Adherent
+                          <span aria-hidden="true" className="material-symbols-outlined text-[14px]">help</span> First Timer / Visitor
                         </span>
                       )}
                     </td>
@@ -456,21 +458,21 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                     <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
                       <div className="flex flex-col">
                         <span className="font-headline text-xs text-[#1e1b19] font-bold flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[15px] text-[#006243]">water_drop</span>
-                          {member.baptismType === 'baptized' ? 'Baptized (Believer)' : member.baptismType === 'dedicated' ? 'Infant Dedication' : 'Sacrament Pending'}
+                          <span aria-hidden="true" className="material-symbols-outlined text-[15px] text-[#006243]">water_drop</span>
+                          {member.baptismType === 'baptized' ? 'Baptized (Believer)' : member.baptismType === 'dedicated' ? 'Child Dedication' : 'Baptism & Communion Pending'}
                         </span>
                         <span className="text-[#59413a] font-mono text-[11px]">
-                          {member.baptismDate || 'Nov 12, 2024'} • {member.baptismOfficiant || 'Rev. Vance'}
+                          {member.baptismDate || 'Jan 12, 2025'} • {member.baptismOfficiant || 'Bishop Sammy'}
                         </span>
                       </div>
                     </td>
 
                     <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
                       <div
-                        onClick={() => onNavigateToFamilyUnit && onNavigateToFamilyUnit()}
+                        {...interactiveCard(() => onNavigateToFamilyUnit && onNavigateToFamilyUnit())}
                         className="flex items-center gap-1.5 group/unit cursor-pointer"
                       >
-                        <span className="material-symbols-outlined text-[16px] text-[#fe932c]">home</span>
+                        <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#fe932c]">home</span>
                         <div className="flex flex-col">
                           <span className="font-headline text-xs text-[#1e1b19] font-bold group-hover/unit:text-[#9b2f00] underline decoration-dotted">
                             {member.householdName}
@@ -495,7 +497,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                             title="Quick Call or SMS"
                             onClick={() => alert(`Calling ${member.phone}`)}
                           >
-                            <span className="material-symbols-outlined text-[13px]">edit</span>
+                            <span aria-hidden="true" className="material-symbols-outlined text-[13px]">edit</span>
                           </button>
                         </div>
                       </div>
@@ -504,7 +506,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                     <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
                       {member.pastoralStatus === 'homebound' ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#ffdcc3]/80 text-[#6e3900] font-headline text-xs font-bold border border-[#fe932c]/40">
-                          <span className="material-symbols-outlined text-[14px] text-[#904d00]">local_hospital</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-[#904d00]">local_hospital</span>
                           Homebound Care
                         </div>
                       ) : (
@@ -523,7 +525,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                           className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#9b2f00] transition-colors cursor-pointer"
                           title="View Care Log"
                         >
-                          <span className="material-symbols-outlined text-[18px]">clinical_notes</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">clinical_notes</span>
                         </button>
                         <button
                           type="button"
@@ -531,15 +533,15 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                           className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#1e1b19] transition-colors cursor-pointer"
                           title="Manage Household"
                         >
-                          <span className="material-symbols-outlined text-[18px]">family_restroom</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">family_restroom</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => onSelectMemberForArchive && onSelectMemberForArchive(member)}
                           className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#ba1a1a] transition-colors cursor-pointer"
-                          title="Canonical Archival / Delete"
+                          title="Official Archival / Delete"
                         >
-                          <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete_sweep</span>
                         </button>
                         <button
                           type="button"
@@ -547,7 +549,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                           className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#1e1b19] transition-colors cursor-pointer"
                           title="More Actions"
                         >
-                          <span className="material-symbols-outlined text-[18px]">more_vert</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">more_vert</span>
                         </button>
                       </div>
                     </td>
@@ -568,7 +570,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             <span className="text-[#8d7168]/40">•</span>
             <div className="flex items-center gap-1">
               <span>Per page:</span>
-              <select className="bg-white rounded px-2 py-0.5 font-bold text-[#1e1b19] border border-[#e1bfb5] focus:outline-none cursor-pointer">
+              <select aria-label="Rows per page" className="bg-white rounded px-2 py-0.5 font-bold text-[#1e1b19] border border-[#e1bfb5] focus:outline-none cursor-pointer">
                 <option>8</option>
                 <option defaultValue="25">25</option>
                 <option>50</option>
@@ -581,9 +583,10 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             <button
               type="button"
               disabled
+              aria-label="Previous page"
               className="w-8 h-8 rounded-lg bg-white text-[#59413a] flex items-center justify-center shadow-sm disabled:opacity-50 border border-[#e1bfb5]/50"
             >
-              <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">chevron_left</span>
             </button>
             <button
               type="button"
@@ -612,9 +615,10 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             </button>
             <button
               type="button"
+              aria-label="Next page"
               className="w-8 h-8 rounded-lg bg-white text-[#1e1b19] hover:text-[#9b2f00] flex items-center justify-center shadow-sm border border-[#e1bfb5]/50 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">chevron_right</span>
             </button>
           </div>
         </div>
@@ -622,14 +626,14 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
 
       {/* Quick Care Log View Modal */}
       {activeCareModalMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs" {...dialogProps(() => setActiveCareModalMember(null), "Member Care Record")}>
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-150">
             <button
               type="button"
               onClick={() => setActiveCareModalMember(null)}
               className="absolute top-4 right-4 p-1 rounded-lg text-[#59413a] hover:bg-[#f4ece8] cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[20px]">close</span>
+           aria-label="Close">
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
             </button>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-[#ffdbd0] text-[#390c00] flex items-center justify-center font-bold">
@@ -647,12 +651,12 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               <div className="p-3 bg-[#faf2ee] rounded-lg">
                 <span className="font-bold text-[#1e1b19] block mb-1">Pastoral Triage & Notes:</span>
                 <p className="text-[#59413a] leading-relaxed">
-                  {activeCareModalMember.pastoralNotes || 'Active regular communicant in good standing. Assigned to Elder Circle #4 for quarterly pastoral communion visitation.'}
+                  {activeCareModalMember.pastoralNotes || 'Active member in good standing. Assigned to Elder Circle #4 for quarterly pastoral communion visitation.'}
                 </p>
               </div>
               <div className="flex items-center justify-between text-[#59413a]">
-                <span>Sacramental Date:</span>
-                <span className="font-bold text-[#1e1b19]">{activeCareModalMember.baptismDate || 'Nov 12, 2024'}</span>
+                <span>Membership Date:</span>
+                <span className="font-bold text-[#1e1b19]">{activeCareModalMember.baptismDate || 'Jan 12, 2025'}</span>
               </div>
               <div className="flex items-center justify-between text-[#59413a]">
                 <span>Household Unit:</span>

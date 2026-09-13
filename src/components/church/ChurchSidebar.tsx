@@ -30,7 +30,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
         {/* Brand / Church Mark */}
         <div className="h-20 px-4 flex items-center gap-3 border-b border-[#E7E5E4]">
           <div className="w-9 h-9 rounded-[9px] bg-[#C2410C] flex items-center justify-center text-white shrink-0 shadow-[0_2px_8px_rgba(194,65,12,0.25)]">
-            <span className="material-symbols-outlined text-[22px]">church</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[22px]">church</span>
           </div>
           {!collapsed && (
             <div className="flex flex-col min-w-0">
@@ -38,7 +38,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                 Praxis Church OS
               </span>
               <span className="font-headline text-[11px] font-semibold text-[#57534E] truncate">
-                Grace Valley Fellowship
+                Destiny Sanctuary Int'L
               </span>
             </div>
           )}
@@ -49,7 +49,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
           <div>
             {!collapsed && (
               <div className="px-3 mb-2 font-headline text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">
-                Parish Management
+                Church Management
               </div>
             )}
             <nav className="flex flex-col gap-1">
@@ -62,7 +62,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                 }`}
                 title="Home"
               >
-                <span className="material-symbols-outlined text-[20px]">cottage</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">cottage</span>
                 {!collapsed && <span>Home</span>}
               </button>
 
@@ -76,9 +76,9 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                     ? 'bg-[#C2410C]/15 text-[#C2410C] font-bold shadow-[0_0_15px_rgba(194,65,12,0.25)] ring-1 ring-[#C2410C]/40'
                     : 'text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917]'
                 }`}
-                title="Members & Pastoral Care"
+                title="Members & Believers"
               >
-                <span className="material-symbols-outlined text-[20px]">diversity_1</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">diversity_1</span>
                 {!collapsed && <span>Members</span>}
               </button>
 
@@ -91,7 +91,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                 }`}
                 title="Services & Worship"
               >
-                <span className="material-symbols-outlined text-[20px]">menu_book</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">menu_book</span>
                 {!collapsed && <span>Services & Worship</span>}
               </button>
 
@@ -102,10 +102,10 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                     ? 'bg-[#C2410C]/15 text-[#C2410C] font-bold shadow-[0_0_15px_rgba(194,65,12,0.25)] ring-1 ring-[#C2410C]/40'
                     : 'text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917]'
                 }`}
-                title="Governance"
+                title="Church Council"
               >
-                <span className="material-symbols-outlined text-[20px]">account_balance</span>
-                {!collapsed && <span>Governance</span>}
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">account_balance</span>
+                {!collapsed && <span>Church Council</span>}
               </button>
 
               <button
@@ -117,7 +117,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                 }`}
                 title="Giving & Stewardship"
               >
-                <span className="material-symbols-outlined text-[20px]">volunteer_activism</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">volunteer_activism</span>
                 {!collapsed && <span>Giving & Stewardship</span>}
               </button>
 
@@ -128,10 +128,10 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                     ? 'bg-[#C2410C]/15 text-[#C2410C] font-bold shadow-[0_0_15px_rgba(194,65,12,0.25)] ring-1 ring-[#C2410C]/40'
                     : 'text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917]'
                 }`}
-                title="Ministries & Groups"
+                title="Groups & Fellowships"
               >
-                <span className="material-symbols-outlined text-[20px]">groups_2</span>
-                {!collapsed && <span>Ministries & Groups</span>}
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">groups_2</span>
+                {!collapsed && <span>Groups & Fellowships</span>}
               </button>
 
               <button
@@ -143,7 +143,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                 }`}
                 title="Reports & Certs"
               >
-                <span className="material-symbols-outlined text-[20px]">verified</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">verified</span>
                 {!collapsed && <span>Reports & Certs</span>}
               </button>
 
@@ -156,7 +156,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                 }`}
                 title="Communications"
               >
-                <span className="material-symbols-outlined text-[20px]">outgoing_mail</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">outgoing_mail</span>
                 {!collapsed && <span>Communications</span>}
               </button>
             </nav>
@@ -178,7 +178,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                 }`}
                 title="Settings & Profile"
               >
-                <span className="material-symbols-outlined text-[20px]">tune</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">tune</span>
                 {!collapsed && <span>Settings & Profile</span>}
               </button>
 
@@ -191,7 +191,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                 }`}
                 title="Admin Portal"
               >
-                <span className="material-symbols-outlined text-[20px]">shield_person</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">shield_person</span>
                 {!collapsed && <span>Admin</span>}
               </button>
             </nav>
@@ -203,16 +203,16 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
       <div className="p-3 border-t border-[#E7E5E4] bg-[#F8F1E9]">
         <div className="flex items-center gap-3 p-2.5 rounded-[14px] bg-[#FFFFFF] shadow-[0_2px_8px_rgba(87,83,78,0.06)] border border-[#E7E5E4]">
           <div className="w-9 h-9 rounded-full bg-[#C2410C] flex items-center justify-center shrink-0 text-white shadow-sm">
-            <span className="material-symbols-outlined text-[18px]">person</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person</span>
           </div>
           {!collapsed && (
             <>
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="font-headline text-[13px] text-[#1C1917] font-bold truncate">
-                  Pastor David
+                  Bishop Sammy
                 </span>
                 <span className="font-headline text-[11px] text-[#57534E] truncate">
-                  Senior Pastor & Moderator
+                  Bishop & Visionary Leader
                 </span>
               </div>
               <button 
@@ -220,7 +220,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                 className="text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4] p-1 rounded-[9px] transition-colors"
                 title="User Menu"
               >
-                <span className="material-symbols-outlined text-[18px]">unfold_more</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">unfold_more</span>
               </button>
             </>
           )}

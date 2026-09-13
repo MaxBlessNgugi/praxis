@@ -1,8 +1,19 @@
 import React, { useState } from 'react';
 
+/** The roster matrix renders one card per team, in this order. */
+const TEAMS = [
+  'Welcome & Hospitality',
+  'Audio/Visual & Tech Production',
+  'Children’s Church Care',
+  'Worship Band & Vocalists',
+  'Campus Safety & First Aid',
+] as const;
+type Team = (typeof TEAMS)[number];
+const ALL_TEAMS = `All Volunteer Teams (${TEAMS.length} Teams)`;
+
 export const MinistriesVolunteerPanel: React.FC = () => {
   const [selectedServiceTime, setSelectedServiceTime] = useState<'9:00' | '11:00' | '6:00'>('9:00');
-  const [teamFilter, setTeamFilter] = useState('All Volunteer Teams (5 Teams)');
+  const [teamFilter, setTeamFilter] = useState(ALL_TEAMS);
   const [searchFilter, setSearchFilter] = useState('');
   const [viewMode, setViewMode] = useState<'matrix' | 'list'>('matrix');
 
@@ -10,16 +21,16 @@ export const MinistriesVolunteerPanel: React.FC = () => {
   const [swaps, setSwaps] = useState([
     {
       id: 'swap-1',
-      name: 'Sarah Jenkins',
+      name: 'Sarah Kamau',
       role: 'Welcome Desk • 11:00 AM',
       reason: 'Family Travel',
-      note: '"Requested swap with Jeremy Adams (Qualified Greeter)."',
+      note: '"Requested swap with Jeremy Adhiambo (Qualified Greeter)."',
       approved: false,
     },
     {
       id: 'swap-2',
-      name: 'Rachel Adams',
-      role: 'Pre-K Lead • 11:00 AM',
+      name: 'Rachel Adhiambo',
+      role: 'Kindergarten Lead • 11:00 AM',
       reason: 'Sick Leave',
       note: '"Sudden fever, need experienced backup for Preschool room."',
       approved: false,
@@ -33,6 +44,8 @@ export const MinistriesVolunteerPanel: React.FC = () => {
       approved: false,
     },
   ]);
+
+  const showsTeam = (team: Team) => teamFilter === ALL_TEAMS || teamFilter === team;
 
   const handleApproveSwap = (id: string) => {
     setSwaps(swaps.map(s => s.id === id ? { ...s, approved: true } : s));
@@ -49,26 +62,26 @@ export const MinistriesVolunteerPanel: React.FC = () => {
               Total Active Pool
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#9b2f00] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">groups</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">groups</span>
             </span>
           </div>
           <div>
             <div className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight">248</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span className="material-symbols-outlined text-[16px]">trending_up</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">trending_up</span>
               <span>+14 newly onboarded this term</span>
             </div>
           </div>
         </div>
 
-        {/* Stat 2: Oct 27 Scheduled */}
+        {/* Stat 2: Feb 16 Scheduled */}
         <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              Oct 27 Scheduled
+              Feb 16 Scheduled
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#904d00] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">event_available</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">event_available</span>
             </span>
           </div>
           <div>
@@ -89,7 +102,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
               Critical Roster Gaps
             </span>
             <span className="p-2 rounded-xl bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">error</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">error</span>
             </span>
           </div>
           <div>
@@ -110,13 +123,13 @@ export const MinistriesVolunteerPanel: React.FC = () => {
               Safeguarding (CPP)
             </span>
             <span className="p-2 rounded-xl bg-[#85f8c4]/40 text-[#002114] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">verified_user</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">verified_user</span>
             </span>
           </div>
           <div>
             <div className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight">98.4%</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span className="material-symbols-outlined text-[16px]">check_circle</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span>
               <span>Background verified active</span>
             </div>
           </div>
@@ -134,7 +147,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                 viewMode === 'matrix' ? 'bg-white text-[#1e1b19] shadow-xs' : 'text-[#59413a] hover:text-[#1e1b19]'
               }`}
             >
-              <span className="material-symbols-outlined text-[18px] text-[#c2410c]">calendar_view_week</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#c2410c]">calendar_view_week</span>
               <span>Matrix View</span>
             </button>
             <button
@@ -143,25 +156,23 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                 viewMode === 'list' ? 'bg-white text-[#1e1b19] shadow-xs' : 'text-[#59413a] hover:text-[#1e1b19]'
               }`}
             >
-              <span className="material-symbols-outlined text-[18px]">format_list_bulleted</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">format_list_bulleted</span>
               <span>List View</span>
             </button>
           </div>
 
           <div className="relative">
-            <select
+            <select aria-label="Team filter"
               value={teamFilter}
               onChange={(e) => setTeamFilter(e.target.value)}
               className="h-10 pl-3 pr-8 rounded-xl bg-[#faf2ee] text-[#1e1b19] text-xs font-medium border border-[#EAE1D7] appearance-none outline-none cursor-pointer"
             >
-              <option>All Volunteer Teams (5 Teams)</option>
-              <option>Welcome & Hospitality</option>
-              <option>Audio/Visual & Tech Production</option>
-              <option>Kingdom Kids Care</option>
-              <option>Worship Band & Vocalists</option>
-              <option>Campus Safety & First Aid</option>
+              <option>{ALL_TEAMS}</option>
+              {TEAMS.map((team) => (
+                <option key={team}>{team}</option>
+              ))}
             </select>
-            <span className="material-symbols-outlined absolute right-2.5 top-2.5 text-[#8d7168] pointer-events-none text-[18px]">
+            <span aria-hidden="true" className="material-symbols-outlined absolute right-2.5 top-2.5 text-[#8d7168] pointer-events-none text-[18px]">
               expand_more
             </span>
           </div>
@@ -170,17 +181,17 @@ export const MinistriesVolunteerPanel: React.FC = () => {
         {/* Center: Date Selector & Quick Jump */}
         <div className="flex flex-wrap items-center justify-center gap-2 bg-[#faf2ee] px-3 py-1.5 rounded-xl border border-[#EAE1D7]">
           <button className="p-1 rounded-md text-[#59413a] hover:bg-[#f4ece8] transition-colors" title="Previous">
-            <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">chevron_left</span>
           </button>
           <div className="flex items-center gap-2 px-1">
-            <span className="material-symbols-outlined text-[#c2410c] text-[18px]">event</span>
-            <span className="font-headline text-xs font-bold text-[#1e1b19]">Sun, Oct 27, 2024</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[#c2410c] text-[18px]">event</span>
+            <span className="font-headline text-xs font-bold text-[#1e1b19]">Sun, Feb 16, 2025</span>
             <span className="px-2 py-0.5 rounded-full bg-[#ffdcc3] text-[#2f1500] font-mono text-[10px] font-bold">
               Upcoming
             </span>
           </div>
           <button className="p-1 rounded-md text-[#59413a] hover:bg-[#f4ece8] transition-colors" title="Next">
-            <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">chevron_right</span>
           </button>
           <div className="h-4 w-px bg-[#EAE1D7] mx-1 hidden sm:block"></div>
           <div className="hidden sm:flex items-center gap-1">
@@ -214,8 +225,8 @@ export const MinistriesVolunteerPanel: React.FC = () => {
         {/* Right: Search & Action CTAs */}
         <div className="flex flex-wrap items-center gap-2 justify-end">
           <div className="relative">
-            <span className="material-symbols-outlined absolute left-3 top-2.5 text-[#8d7168] text-[18px]">search</span>
-            <input
+            <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2.5 text-[#8d7168] text-[18px]">search</span>
+            <input aria-label="Filter person or role"
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
@@ -224,11 +235,11 @@ export const MinistriesVolunteerPanel: React.FC = () => {
             />
           </div>
           <button className="h-10 px-3 rounded-xl bg-[#faf2ee] hover:bg-[#f4ece8] text-[#1e1b19] text-xs font-semibold flex items-center gap-1.5 border border-[#EAE1D7] transition-colors">
-            <span className="material-symbols-outlined text-[18px] text-[#904d00]">smart_toy</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#904d00]">smart_toy</span>
             <span className="hidden md:inline">Auto-Schedule</span>
           </button>
           <button className="h-10 px-4 rounded-xl bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer">
-            <span className="material-symbols-outlined text-[18px]">person_add</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person_add</span>
             <span>Quick Assign</span>
           </button>
         </div>
@@ -252,11 +263,11 @@ export const MinistriesVolunteerPanel: React.FC = () => {
           </div>
 
           {/* TEAM 1: Welcome & Hospitality */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden">
+          <div className={`bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden ${showsTeam('Welcome & Hospitality') ? '' : 'hidden'}`}>
             <div className="px-5 py-3 bg-[#faf2ee]/70 border-b border-[#EAE1D7] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-[#ffdbd0] text-[#9b2f00] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">door_front</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">door_front</span>
                 </div>
                 <span className="font-headline text-sm font-bold text-[#1e1b19]">Welcome & Hospitality</span>
                 <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-semibold">
@@ -264,7 +275,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                 </span>
               </div>
               <span className="text-xs text-[#006243] flex items-center gap-1 font-semibold">
-                <span className="material-symbols-outlined text-[16px]">check</span> 1 Swap Requested
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check</span> 1 Swap Requested
               </span>
             </div>
 
@@ -280,14 +291,14 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     MV
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Marcus Vance</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Marcus Mwangi</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
                   </div>
                 </div>
                 <button className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]" title="Swap">
-                  <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
                 </button>
               </div>
               <div className="col-span-5 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
@@ -296,7 +307,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     AM
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Arthur Miller</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Arthur Wanjala</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
@@ -304,10 +315,10 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1">
                   <button className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]" title="Swap">
-                    <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
                   </button>
                   <button className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]" title="Send SMS">
-                    <span className="material-symbols-outlined text-[16px]">sms</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">sms</span>
                   </button>
                 </div>
               </div>
@@ -325,14 +336,14 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     CS
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Chloe Sterling</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Chloe Otieno</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
                   </div>
                 </div>
-                <button className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]">
-                  <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                <button aria-label="Swap volunteer" className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]">
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
                 </button>
               </div>
               {/* 11:00 AM - REPLACEMENT REQUESTED */}
@@ -342,14 +353,14 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     SJ
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Sarah Jenkins</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Sarah Kamau</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#ffdad6] text-[#93000a] text-[10px] font-bold w-fit">
                       Replacement Needed
                     </span>
                   </div>
                 </div>
                 <button className="h-7 px-2.5 rounded-lg bg-[#9b2f00] text-white hover:bg-[#c2410c] text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer">
-                  <span className="material-symbols-outlined text-[14px]">swap_calls</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[14px]">swap_calls</span>
                   <span>Swap</span>
                 </button>
               </div>
@@ -357,11 +368,11 @@ export const MinistriesVolunteerPanel: React.FC = () => {
           </div>
 
           {/* TEAM 2: Audio/Visual & Tech Production */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden">
+          <div className={`bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden ${showsTeam('Audio/Visual & Tech Production') ? '' : 'hidden'}`}>
             <div className="px-5 py-3 bg-[#faf2ee]/70 border-b border-[#EAE1D7] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-[#ffdcc3] text-[#904d00] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">mic_external_on</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">mic_external_on</span>
                 </div>
                 <span className="font-headline text-sm font-bold text-[#1e1b19]">Audio/Visual & Tech Production</span>
                 <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-semibold">
@@ -369,7 +380,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                 </span>
               </div>
               <span className="text-xs text-[#ba1a1a] font-bold flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">warning</span> 1 Vacancy
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">warning</span> 1 Vacancy
               </span>
             </div>
 
@@ -385,14 +396,14 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     CV
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Caleb Vance</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Caleb Mwangi</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
                   </div>
                 </div>
-                <button className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]">
-                  <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                <button aria-label="Swap volunteer" className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]">
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
                 </button>
               </div>
               <div className="col-span-5 p-2.5 rounded-xl bg-[#ffdcc3]/40 flex items-center justify-between border border-[#fe932c]/40">
@@ -408,7 +419,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                   </div>
                 </div>
                 <button className="p-1.5 rounded-lg bg-white border border-[#EAE1D7] text-[#59413a] hover:text-[#1e1b19]" title="Resend Notification">
-                  <span className="material-symbols-outlined text-[16px]">notifications_active</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">notifications_active</span>
                 </button>
               </div>
             </div>
@@ -425,21 +436,21 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     LC
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Leo Chen</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Leo Chebet</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
                   </div>
                 </div>
-                <button className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]">
-                  <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                <button aria-label="Swap volunteer" className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]">
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
                 </button>
               </div>
               {/* CRITICAL OPEN SLOT */}
               <div className="col-span-5 p-2.5 rounded-xl bg-[#ffdad6]/40 flex items-center justify-between border border-[#ba1a1a]/40 shadow-xs">
                 <div className="flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-white text-[#ba1a1a] flex items-center justify-center font-bold">
-                    <span className="material-symbols-outlined text-[18px]">person_off</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person_off</span>
                   </span>
                   <div className="flex flex-col">
                     <span className="text-xs font-bold text-[#ba1a1a]">OPEN VACANCY</span>
@@ -447,21 +458,21 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                   </div>
                 </div>
                 <button className="h-8 px-3 rounded-xl bg-[#9b2f00] text-white hover:bg-[#c2410c] text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer">
-                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add</span>
                   <span>Assign</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* TEAM 3: Kingdom Kids Check-in & Care */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden">
+          {/* TEAM 3: Children’s Church Check-in & Care */}
+          <div className={`bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden ${showsTeam('Children’s Church Care') ? '' : 'hidden'}`}>
             <div className="px-5 py-3 bg-[#faf2ee]/70 border-b border-[#EAE1D7] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-[#85f8c4]/40 text-[#006243] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">child_care</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">child_care</span>
                 </div>
-                <span className="font-headline text-sm font-bold text-[#1e1b19]">Kingdom Kids Check-in & Care</span>
+                <span className="font-headline text-sm font-bold text-[#1e1b19]">Children’s Church Check-in & Care</span>
                 <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-semibold">
                   6 Slots Active
                 </span>
@@ -481,7 +492,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     EV
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Elena Vance</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Elena Mwangi</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
@@ -494,7 +505,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     MJ
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Maya Jenkins</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Maya Kamau</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
@@ -503,10 +514,10 @@ export const MinistriesVolunteerPanel: React.FC = () => {
               </div>
             </div>
 
-            {/* Role 2: Pre-K Lead Teacher */}
+            {/* Role 2: Kindergarten Lead Teacher */}
             <div className="p-4 grid grid-cols-12 gap-3 items-center hover:bg-[#faf2ee]/40 transition-colors">
               <div className="col-span-3">
-                <div className="font-semibold text-xs text-[#1e1b19]">Pre-K Lead</div>
+                <div className="font-semibold text-xs text-[#1e1b19]">Kindergarten Lead</div>
                 <div className="font-mono text-[10px] text-[#59413a]">Classroom 104</div>
               </div>
               <div className="col-span-4 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
@@ -515,7 +526,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     HA
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Hannah Alistair</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Hannah Kimani</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
@@ -529,14 +540,14 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     RA
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Rachel Adams</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Rachel Adhiambo</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#ffdad6] text-[#93000a] text-[10px] font-bold w-fit">
                       Swap Requested
                     </span>
                   </div>
                 </div>
                 <button className="h-7 px-2.5 rounded-lg bg-[#9b2f00] text-white hover:bg-[#c2410c] text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer">
-                  <span className="material-symbols-outlined text-[14px]">volunteer_activism</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[14px]">volunteer_activism</span>
                   <span>Fill</span>
                 </button>
               </div>
@@ -544,11 +555,11 @@ export const MinistriesVolunteerPanel: React.FC = () => {
           </div>
 
           {/* TEAM 4: Worship Band & Vocals */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden">
+          <div className={`bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden ${showsTeam('Worship Band & Vocalists') ? '' : 'hidden'}`}>
             <div className="px-5 py-3 bg-[#faf2ee]/70 border-b border-[#EAE1D7] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-[#ffdbd0] text-[#390c00] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">piano</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">piano</span>
                 </div>
                 <span className="font-headline text-sm font-bold text-[#1e1b19]">Worship Band & Vocals</span>
                 <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-semibold">
@@ -556,7 +567,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                 </span>
               </div>
               <span className="text-xs text-[#006243] font-bold flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">check_circle</span> All Roster Confirmed
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span> All Roster Confirmed
               </span>
             </div>
 
@@ -571,7 +582,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     TV
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Timothy Vance</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Timothy Mwangi</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
@@ -584,7 +595,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     TV
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Timothy Vance</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Timothy Mwangi</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed (Dual Service)
                     </span>
@@ -604,7 +615,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     SA
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Sarah Alistair</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Sarah Kimani</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
@@ -628,11 +639,11 @@ export const MinistriesVolunteerPanel: React.FC = () => {
           </div>
 
           {/* TEAM 5: Campus Safety & First Aid */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden">
+          <div className={`bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden ${showsTeam('Campus Safety & First Aid') ? '' : 'hidden'}`}>
             <div className="px-5 py-3 bg-[#faf2ee]/70 border-b border-[#EAE1D7] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">medical_services</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">medical_services</span>
                 </div>
                 <span className="font-headline text-sm font-bold text-[#1e1b19]">Campus Safety & First Aid</span>
                 <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-semibold">
@@ -653,7 +664,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                     KW
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Kevin Wright</span>
+                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Kevin Njoki</span>
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
                       Confirmed
                     </span>
@@ -664,7 +675,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
               <div className="col-span-5 p-2.5 rounded-xl bg-[#ffdad6]/40 flex items-center justify-between border border-[#ba1a1a]/40 shadow-xs">
                 <div className="flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-white text-[#9b2f00] flex items-center justify-center font-bold">
-                    <span className="material-symbols-outlined text-[18px]">person_pin_circle</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person_pin_circle</span>
                   </span>
                   <div className="flex flex-col">
                     <span className="text-xs font-bold text-[#9b2f00]">OPEN USHER</span>
@@ -672,7 +683,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                   </div>
                 </div>
                 <button className="h-8 px-3 rounded-xl bg-[#9b2f00] text-white hover:bg-[#c2410c] text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer">
-                  <span className="material-symbols-outlined text-[16px]">flash_on</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">flash_on</span>
                   <span>Quick Fill</span>
                 </button>
               </div>
@@ -687,7 +698,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-[#ffdcc3] text-[#2f1500] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">sync_problem</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">sync_problem</span>
                 </div>
                 <div>
                   <h2 className="font-headline text-sm font-bold text-[#1e1b19]">Pending Swaps</h2>
@@ -716,7 +727,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                   
                   {swap.approved ? (
                     <div className="flex items-center gap-1.5 text-xs text-[#006243] font-semibold pt-1">
-                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span>
                       <span>Swap Approved & Updated</span>
                     </div>
                   ) : (
@@ -741,7 +752,7 @@ export const MinistriesVolunteerPanel: React.FC = () => {
           <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7] flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#006243] text-[22px]">tune</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[22px]">tune</span>
                 <h3 className="font-headline text-sm font-bold text-[#1e1b19]">Scheduling Policies</h3>
               </div>
               <span className="font-mono text-[11px] text-[#006243] font-bold">ACTIVE</span>
@@ -753,35 +764,35 @@ export const MinistriesVolunteerPanel: React.FC = () => {
                   <span className="font-semibold text-[#1e1b19]">Max Serving Frequency</span>
                   <span className="font-mono text-[10px] text-[#59413a]">Max 2 Sundays/Month</span>
                 </div>
-                <span className="material-symbols-outlined text-[#006243] text-[18px]">check_circle</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[18px]">check_circle</span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
                 <div className="flex flex-col">
                   <span className="font-semibold text-[#1e1b19]">Dual-Shift Conflict Warning</span>
                   <span className="font-mono text-[10px] text-[#59413a]">Flag consecutive services</span>
                 </div>
-                <span className="material-symbols-outlined text-[#006243] text-[18px]">check_circle</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[18px]">check_circle</span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
                 <div className="flex flex-col">
                   <span className="font-semibold text-[#1e1b19]">Child Protection Compliance</span>
                   <span className="font-mono text-[10px] text-[#59413a]">Auto-lock unverified volunteers</span>
                 </div>
-                <span className="material-symbols-outlined text-[#006243] text-[18px]">verified</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[18px]">verified</span>
               </div>
             </div>
 
             {/* Weekly Blast Call-To-Action */}
             <div className="p-4 rounded-xl bg-[#faf2ee] border border-[#EAE1D7] flex flex-col gap-2 mt-1">
               <div className="flex items-center gap-2 text-[#9b2f00] text-xs font-bold">
-                <span className="material-symbols-outlined text-[18px]">forward_to_inbox</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">forward_to_inbox</span>
                 <span>Sunday Reminder Blast</span>
               </div>
               <p className="text-[11px] text-[#59413a] leading-relaxed">
                 Automated WhatsApp & SMS reminders scheduled for Friday 4:00 PM to all 64 confirmed servants.
               </p>
               <button className="w-full h-8 rounded-lg bg-white border border-[#EAE1D7] hover:bg-[#f4ece8] text-[#1e1b19] text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 mt-1">
-                <span className="material-symbols-outlined text-[16px]">schedule_send</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">schedule_send</span>
                 <span>Review Scheduled Messages</span>
               </button>
             </div>

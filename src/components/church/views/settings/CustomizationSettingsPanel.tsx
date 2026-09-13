@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CustomizationSettings } from '../../../../types';
 import { INITIAL_CUSTOMIZATION_SETTINGS } from '../../../../data/churchMockData';
+import { interactiveCard } from '../../interactiveCard';
 
 export const CustomizationSettingsPanel: React.FC = () => {
   const [settings, setSettings] = useState<CustomizationSettings>(INITIAL_CUSTOMIZATION_SETTINGS);
@@ -13,7 +14,7 @@ export const CustomizationSettingsPanel: React.FC = () => {
   };
 
   const themeColors = [
-    { id: '#C2410C', label: 'Warm Ember (Canonical Default)', bg: 'bg-[#C2410C]' },
+    { id: '#C2410C', label: 'Warm Ember (Official Default)', bg: 'bg-[#C2410C]' },
     { id: '#881337', label: 'Westminster Crimson', bg: 'bg-[#881337]' },
     { id: '#1E3A8A', label: 'Genevan Navy', bg: 'bg-[#1E3A8A]' },
     { id: '#14532D', label: 'Cedars Olive', bg: 'bg-[#14532D]' },
@@ -24,8 +25,8 @@ export const CustomizationSettingsPanel: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4]">
         <div>
           <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-            <span className="material-symbols-outlined text-[20px] text-[#C2410C]">palette</span>
-            Ecclesiastical Nomenclature & Visual Customization
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">palette</span>
+            Church Nomenclature & Visual Customization
           </h3>
           <p className="text-xs text-[#57534E] mt-0.5">
             Adapt terminology to your tradition (Presbyterian, Anglican, Baptist, Reformed) and customize interface density.
@@ -34,7 +35,7 @@ export const CustomizationSettingsPanel: React.FC = () => {
 
         {isSaved && (
           <div className="px-3 py-1 rounded-[8px] bg-[#059669]/10 border border-[#059669]/30 text-[#059669] text-xs font-bold flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span>
             Preferences Saved
           </div>
         )}
@@ -44,7 +45,7 @@ export const CustomizationSettingsPanel: React.FC = () => {
         {/* Color Theme Selector */}
         <div className="space-y-3">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Liturgical Theme & Accent Palette
+            Service Theme & Accent Palette
           </h4>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -53,7 +54,7 @@ export const CustomizationSettingsPanel: React.FC = () => {
               return (
                 <div
                   key={theme.id}
-                  onClick={() => setSettings({ ...settings, themeColor: theme.id })}
+                  {...interactiveCard(() => setSettings({ ...settings, themeColor: theme.id }))}
                   className={`p-3.5 rounded-[12px] border transition-all cursor-pointer flex items-center justify-between ${
                     isSelected
                       ? 'bg-[#FDF8F3] border-[#C2410C] ring-2 ring-[#C2410C]/20 shadow-xs'
@@ -66,7 +67,7 @@ export const CustomizationSettingsPanel: React.FC = () => {
                   </div>
 
                   {isSelected && (
-                    <span className="material-symbols-outlined text-[18px] text-[#C2410C]">check_circle</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#C2410C]">check_circle</span>
                   )}
                 </div>
               );
@@ -82,15 +83,15 @@ export const CustomizationSettingsPanel: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">
+              <label htmlFor="terminology-congregant" className="block text-xs font-bold text-[#1C1917] mb-1">
                 Congregant Terminology
               </label>
-              <select
+              <select id="terminology-congregant" aria-label="Congregant Terminology"
                 value={settings.memberTerminology}
                 onChange={(e) => setSettings({ ...settings, memberTerminology: e.target.value as any })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
               >
-                <option value="Covenant Partners">Covenant Partners (Reformed/Presbyterian)</option>
+                <option value="Members">Members (Reformed/Presbyterian)</option>
                 <option value="Parishioners">Parishioners (Anglican/Episcopal)</option>
                 <option value="Members">Members (General Evangelical)</option>
                 <option value="Communicants">Communicants (Historic Liturgical)</option>
@@ -98,15 +99,15 @@ export const CustomizationSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">
-                Governance Body
+              <label htmlFor="terminology-council" className="block text-xs font-bold text-[#1C1917] mb-1">
+                Church Council Body
               </label>
-              <select
+              <select id="terminology-council" aria-label="Church Council Body"
                 value={settings.leadershipTerminology}
                 onChange={(e) => setSettings({ ...settings, leadershipTerminology: e.target.value as any })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
               >
-                <option value="Session of Elders">Session of Elders (Presbyterian)</option>
+                <option value="Church Council">Church Council (Presbyterian)</option>
                 <option value="Board of Deacons">Board of Deacons (Baptist)</option>
                 <option value="Vestry">Vestry / Wardens (Anglican)</option>
                 <option value="Council of Stewards">Council of Stewards (Methodist)</option>
@@ -114,10 +115,10 @@ export const CustomizationSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">
+              <label htmlFor="terminology-stewardship" className="block text-xs font-bold text-[#1C1917] mb-1">
                 Stewardship Terminology
               </label>
-              <select
+              <select id="terminology-stewardship" aria-label="Stewardship Terminology"
                 value={settings.givingTerminology}
                 onChange={(e) => setSettings({ ...settings, givingTerminology: e.target.value as any })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -139,8 +140,8 @@ export const CustomizationSettingsPanel: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Currency Code</label>
-              <input
+              <label htmlFor="settings-currency-code" className="block text-xs font-bold text-[#1C1917] mb-1">Currency Code</label>
+              <input id="settings-currency-code" aria-label="Currency Code"
                 type="text"
                 value={settings.currencySymbol}
                 onChange={(e) => setSettings({ ...settings, currencySymbol: e.target.value })}
@@ -149,15 +150,15 @@ export const CustomizationSettingsPanel: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] mb-1">Date Display Format</label>
-              <select
+              <label htmlFor="settings-date-format" className="block text-xs font-bold text-[#1C1917] mb-1">Date Display Format</label>
+              <select id="settings-date-format" aria-label="Date Display Format"
                 value={settings.dateFormat}
                 onChange={(e) => setSettings({ ...settings, dateFormat: e.target.value })}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
               >
-                <option value="MMM D, YYYY">MMM D, YYYY (Oct 14, 2026)</option>
-                <option value="YYYY-MM-DD">YYYY-MM-DD (2026-10-14)</option>
-                <option value="DD/MM/YYYY">DD/MM/YYYY (14/10/2026)</option>
+                <option value="MMM D, YYYY">MMM D, YYYY (Oct 14, 2025)</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD (2025-10-14)</option>
+                <option value="DD/MM/YYYY">DD/MM/YYYY (14/10/2025)</option>
               </select>
             </div>
           </div>
@@ -181,7 +182,7 @@ export const CustomizationSettingsPanel: React.FC = () => {
             type="submit"
             className="px-5 py-2.5 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px]">save</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">save</span>
             Save Customizations
           </button>
         </div>

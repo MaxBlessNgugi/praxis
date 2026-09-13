@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MinistriesSubTab } from '../../../types';
-import { MinistriesDepartmentalPanel } from './MinistriesDepartmentalPanel';
-import { MinistriesLeadershipPanel } from './MinistriesLeadershipPanel';
+import { MinistriesDepartmentalPanel, DEPARTMENT_COUNT } from './MinistriesDepartmentalPanel';
+import { MinistriesLeadershipPanel, LEADER_COUNT } from './MinistriesLeadershipPanel';
 import { MinistriesVolunteerPanel } from './MinistriesVolunteerPanel';
 
 interface MinistriesViewProps {
@@ -29,10 +29,10 @@ export const MinistriesView: React.FC<MinistriesViewProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-1.5 rounded-[9px] bg-[#F8F1E9] text-[#C2410C] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">groups_2</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">groups_2</span>
             </span>
             <span className="text-xs font-bold uppercase tracking-wider text-[#C2410C]">
-              Ecclesiastical Body & Roster
+              Church Body & Roster
             </span>
           </div>
           <h1 className="font-headline text-2xl font-extrabold text-[#1C1917] tracking-tight">
@@ -53,12 +53,12 @@ export const MinistriesView: React.FC<MinistriesViewProps> = ({
                 : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]'
             }`}
           >
-            <span className="material-symbols-outlined text-[18px]">domain</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">domain</span>
             <span>Departmental</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'ministries-departmental' ? 'bg-white/20 text-white' : 'bg-[#E7E5E4] text-[#57534E]'
             }`}>
-              7
+              {DEPARTMENT_COUNT}
             </span>
           </button>
 
@@ -70,12 +70,12 @@ export const MinistriesView: React.FC<MinistriesViewProps> = ({
                 : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]'
             }`}
           >
-            <span className="material-symbols-outlined text-[18px]">military_tech</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">military_tech</span>
             <span>Leadership Roles</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'ministries-leadership' ? 'bg-white/20 text-white' : 'bg-[#E7E5E4] text-[#57534E]'
             }`}>
-              28
+              {LEADER_COUNT}
             </span>
           </button>
 
@@ -87,7 +87,7 @@ export const MinistriesView: React.FC<MinistriesViewProps> = ({
                 : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]'
             }`}
           >
-            <span className="material-symbols-outlined text-[18px]">event_seat</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">event_seat</span>
             <span>Volunteer Roles</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'ministries-volunteers' ? 'bg-white/20 text-white' : 'bg-[#DC2626] text-white'

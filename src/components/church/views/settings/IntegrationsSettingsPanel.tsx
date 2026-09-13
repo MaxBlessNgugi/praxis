@@ -39,8 +39,8 @@ export const IntegrationsSettingsPanel: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4]">
         <div>
           <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-            <span className="material-symbols-outlined text-[20px] text-[#C2410C]">hub</span>
-            Ecclesiastical Integrations & Third-Party Bridges
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">hub</span>
+            Church Integrations & Third-Party Bridges
           </h3>
           <p className="text-xs text-[#57534E] mt-0.5">
             Connect merchant giving processors, sanctuary presentation software, financial ledgers, and SMS telecom relays.
@@ -48,7 +48,7 @@ export const IntegrationsSettingsPanel: React.FC = () => {
         </div>
 
         <span className="px-2.5 py-1 rounded-[8px] bg-[#059669]/10 text-[#059669] text-xs font-bold border border-[#059669]/20 flex items-center gap-1.5 self-start sm:self-auto">
-          <span className="material-symbols-outlined text-[16px]">verified_user</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">verified_user</span>
           PCI-DSS Tier 1 Compliant
         </span>
       </div>
@@ -72,7 +72,7 @@ export const IntegrationsSettingsPanel: React.FC = () => {
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2">
                     <span className="w-8 h-8 rounded-[8px] bg-[#F8F1E9] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-                      <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[20px]">{item.icon}</span>
                     </span>
                     <div>
                       <h4 className="font-headline text-xs font-bold text-[#1C1917]">
@@ -116,7 +116,7 @@ export const IntegrationsSettingsPanel: React.FC = () => {
                       className="p-1.5 rounded-[6px] bg-[#FFFFFF] hover:bg-[#E7E5E4] text-[#1C1917] border border-[#E7E5E4] transition-all cursor-pointer"
                       title="Sync Now"
                     >
-                      <span className={`material-symbols-outlined text-[16px] ${isSyncing ? 'animate-spin' : ''}`}>
+                      <span aria-hidden="true" className={`material-symbols-outlined text-[16px] ${isSyncing ? 'animate-spin' : ''}`}>
                         sync
                       </span>
                     </button>

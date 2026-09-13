@@ -31,7 +31,7 @@ export const CommunicationsView: React.FC<CommunicationsViewProps> = ({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="px-2 py-0.5 rounded-md bg-[#C2410C]/10 text-[#C2410C] text-[11px] font-bold uppercase tracking-wider">
-                Parish Communications & Outreach
+                Church Communications & Outreach
               </span>
               <span className="text-xs text-[#A8A29E] font-medium">· Multichannel Pastoral Hub</span>
             </div>
@@ -57,7 +57,7 @@ export const CommunicationsView: React.FC<CommunicationsViewProps> = ({
                       : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]/70'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[16px]">{tab.icon}</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">{tab.icon}</span>
                   {tab.label}
                 </button>
               );

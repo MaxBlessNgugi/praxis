@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FinancesSubTab } from '../../../types';
+import { CHURCH } from '../../../data/churchDomain';
 import { FinancesTithesPanel } from './FinancesTithesPanel';
 import { FinancesOfferingsPanel } from './FinancesOfferingsPanel';
 import { FinancesProjectFundingPanel } from './FinancesProjectFundingPanel';
@@ -31,7 +32,7 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-1.5 rounded-[9px] bg-[#F8F1E9] text-[#C2410C] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">volunteer_activism</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">volunteer_activism</span>
             </span>
             <span className="text-xs font-bold uppercase tracking-wider text-[#C2410C]">
               Stewardship & Treasury Ledger
@@ -41,8 +42,18 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
             Giving & Stewardship
           </h1>
           <p className="text-xs text-[#57534E] mt-0.5">
-            Covenant tithes, audited Sunday plate counts, capital building campaign, and confidential deacon welfare.
+            Member tithes, audited Sunday plate counts, capital building campaign, and confidential deacon welfare.
           </p>
+          {/* Destiny Sanctuary's own giving page (give.html on their site). */}
+          <a
+            href={CHURCH.givingUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-2 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">volunteer_activism</span>
+            Give Online · Destiny Sanctuary
+          </a>
         </div>
 
         {/* Subtab Segmented Pill */}
@@ -55,12 +66,12 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
                 : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]'
             }`}
           >
-            <span className="material-symbols-outlined text-[17px]">credit_card</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[17px]">credit_card</span>
             <span>Tithes</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'tithes' ? 'bg-white/20 text-white' : 'bg-[#E7E5E4] text-[#57534E]'
             }`}>
-              $142.8k
+              KSh 142.8k
             </span>
           </button>
 
@@ -72,7 +83,7 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
                 : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]'
             }`}
           >
-            <span className="material-symbols-outlined text-[17px]">shopping_basket</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[17px]">shopping_basket</span>
             <span>Offerings</span>
           </button>
 
@@ -84,7 +95,7 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
                 : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]'
             }`}
           >
-            <span className="material-symbols-outlined text-[17px]">foundation</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[17px]">foundation</span>
             <span>Project Funding</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'project-funding' ? 'bg-white/20 text-white' : 'bg-[#D97706]/15 text-[#D97706]'
@@ -101,7 +112,7 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
                 : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]'
             }`}
           >
-            <span className="material-symbols-outlined text-[17px]">shield_with_heart</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[17px]">shield_with_heart</span>
             <span>Welfare</span>
           </button>
 
@@ -113,7 +124,7 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
                 : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]'
             }`}
           >
-            <span className="material-symbols-outlined text-[17px]">diversity_1</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[17px]">diversity_1</span>
             <span>Charity Activities</span>
           </button>
         </div>

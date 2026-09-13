@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { HouseholdUnit } from '../../../types';
 import { INITIAL_HOUSEHOLDS } from '../../../data/churchMockData';
+import { dialogProps } from '../dialog';
+import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain'
+;
+
+/** The statuses the mock households actually carry, so the filter cannot go dead. */
+const HOUSEHOLD_STATUSES = [...new Set(INITIAL_HOUSEHOLDS.map((household) => household.statusBadge))];
 
 interface FamilyUnitViewProps {
   onNavigateToAddChristian?: () => void;
@@ -18,7 +24,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
   const [newHead, setNewHead] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [newPhone, setNewPhone] = useState('');
-  const [newCampus, setNewCampus] = useState('Main Sanctuary · Downtown');
+  const [newCampus, setNewCampus] = useState<string>(DEFAULT_LOCATION);
 
   const filteredHouseholds = households.filter((h) => {
     const matchSearch =
@@ -28,15 +34,8 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
       h.headName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       h.address.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchCampus =
-      campusFilter === 'all' ||
-      (campusFilter === 'downtown' && h.campus.includes('Downtown')) ||
-      (campusFilter === 'annex' && h.campus.includes('Annex'));
-
-    const matchStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'covenant' && h.statusBadge.includes('Covenant')) ||
-      (statusFilter === 'relocation' && h.statusBadge.includes('Relocation'));
+    const matchCampus = campusFilter === 'all' || h.campus === campusFilter;
+    const matchStatus = statusFilter === 'all' || h.statusBadge === statusFilter;
 
     return matchSearch && matchCampus && matchStatus;
   });
@@ -50,15 +49,15 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
       name: `The ${newSurname} Household`,
       unitNumber: `#${Math.floor(100 + Math.random() * 899)}`,
       campus: newCampus,
-      statusBadge: 'Covenant Head',
+      statusBadge: 'Family Head',
       statusType: 'secondary',
       headName: newHead,
       headInitials: newHead.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase(),
-      headDob: 'Active Communicant',
+      headDob: 'Active Member',
       headTitle: 'Household Head',
       dependents: [],
-      address: newAddress || '100 Parish Way',
-      phone: newPhone || '(555) 000-0000',
+      address: newAddress || 'Plot 100, Milimani Estate, Nyahururu',
+      phone: newPhone || '+254 700 000 000',
     };
 
     setHouseholds([newUnit, ...households]);
@@ -80,13 +79,13 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
               Active Households
             </span>
             <div className="w-10 h-10 rounded-lg bg-[#f4ece8] flex items-center justify-center text-[#9b2f00]">
-              <span className="material-symbols-outlined text-[22px]">roofing</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[22px]">roofing</span>
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold">412</span>
             <span className="font-headline text-xs text-[#006243] flex items-center font-bold">
-              <span className="material-symbols-outlined text-[16px]">arrow_upward</span>+14 this qtr
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_upward</span>+14 this qtr
             </span>
           </div>
           <p className="font-body text-xs text-[#59413a] mt-1">Total verified residential covenants</p>
@@ -100,13 +99,13 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
               Avg Members / Unit
             </span>
             <div className="w-10 h-10 rounded-lg bg-[#ffdcc3] flex items-center justify-center text-[#904d00]">
-              <span className="material-symbols-outlined text-[22px]">family_restroom</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[22px]">family_restroom</span>
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold">3.2</span>
             <span className="font-headline text-xs text-[#904d00] flex items-center font-bold">
-              <span className="material-symbols-outlined text-[16px]">horizontal_rule</span>steady
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">horizontal_rule</span>steady
             </span>
           </div>
           <p className="font-body text-xs text-[#59413a] mt-1">1,318 total linked souls on roll</p>
@@ -120,12 +119,12 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
               Single Member Homes
             </span>
             <div className="w-10 h-10 rounded-lg bg-[#f4ece8] flex items-center justify-center text-[#59413a]">
-              <span className="material-symbols-outlined text-[22px]">person_outline</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[22px]">person_outline</span>
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold">88</span>
-            <span className="font-headline text-xs text-[#59413a]/80 font-medium">21.3% of parish</span>
+            <span className="font-headline text-xs text-[#59413a]/80 font-medium">21.3% of church</span>
           </div>
           <p className="font-body text-xs text-[#59413a] mt-1">Young adults, seniors & solo stewards</p>
           <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#e1bfb5]/10 rounded-full pointer-events-none group-hover:scale-125 transition-transform"></div>
@@ -138,13 +137,13 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
               Multi-Generational
             </span>
             <div className="w-10 h-10 rounded-lg bg-[#85f8c4] flex items-center justify-center text-[#006243]">
-              <span className="material-symbols-outlined text-[22px]">diversity_3</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[22px]">diversity_3</span>
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold">54</span>
             <span className="font-headline text-xs text-[#006243] flex items-center font-bold">
-              <span className="material-symbols-outlined text-[16px]">verified</span>13% active
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">verified</span>13% active
             </span>
           </div>
           <p className="font-body text-xs text-[#59413a] mt-1">Homes with elders & children linked</p>
@@ -156,10 +155,10 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
       <div className="bg-white p-4 rounded-xl shadow-sm border border-[#EAE1D7]/60 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 flex-1 min-w-0">
           <div className="relative flex-1 min-w-0 max-w-lg">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
+            <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
               search
             </span>
-            <input
+            <input aria-label="Search household surname, address, member ID"
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -170,31 +169,37 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
 
           <div className="flex items-center gap-2">
             <div className="relative">
-              <select
+              <select aria-label="Church campus filter"
                 value={campusFilter}
                 onChange={(e) => setCampusFilter(e.target.value)}
                 className="appearance-none h-10 pl-3 pr-8 rounded-lg bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer focus:outline-none border border-[#e1bfb5]/40"
               >
                 <option value="all">All Campuses</option>
-                <option value="downtown">Downtown Campus #01</option>
-                <option value="annex">West Parish Annex</option>
+                {LOCATIONS.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
               </select>
-              <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[16px] text-[#59413a] pointer-events-none">
+              <span aria-hidden="true" className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[16px] text-[#59413a] pointer-events-none">
                 expand_more
               </span>
             </div>
 
             <div className="relative">
-              <select
+              <select aria-label="Household status filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="appearance-none h-10 pl-3 pr-8 rounded-lg bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer focus:outline-none border border-[#e1bfb5]/40"
               >
                 <option value="all">All Statuses</option>
-                <option value="covenant">Covenant Household</option>
-                <option value="relocation">Transfer Pending</option>
+                {HOUSEHOLD_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
               </select>
-              <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[16px] text-[#59413a] pointer-events-none">
+              <span aria-hidden="true" className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[16px] text-[#59413a] pointer-events-none">
                 expand_more
               </span>
             </div>
@@ -204,10 +209,10 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
         <div className="flex items-center gap-2 justify-end">
           <button
             type="button"
-            onClick={() => alert('Parish geographical GIS map view toggle')}
+            onClick={() => alert('Church geographical GIS map view toggle')}
             className="h-10 px-3.5 rounded-lg bg-[#f4ece8] hover:bg-[#eee7e3] font-headline text-xs font-bold text-[#1e1b19] transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer border border-[#e1bfb5]/40"
           >
-            <span className="material-symbols-outlined text-[18px]">filter_list</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">filter_list</span>
             <span>Map View</span>
           </button>
 
@@ -216,7 +221,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
             onClick={() => setIsCreateModalOpen(true)}
             className="h-10 px-4 rounded-lg bg-[#c2410c] text-white font-headline text-xs font-bold hover:bg-[#9b2f00] transition-colors flex items-center gap-2 shadow-md hover:shadow-lg cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[20px]">add_home</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">add_home</span>
             <span>+ Create New Household</span>
           </button>
         </div>
@@ -242,7 +247,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                     </span>
                   </div>
                   <p className="font-body text-xs text-[#59413a] flex items-center gap-1 mt-0.5">
-                    <span className="material-symbols-outlined text-[14px]">church</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[14px]">church</span>
                     <span>{unit.campus}</span>
                   </p>
                 </div>
@@ -256,8 +261,8 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                       : 'bg-[#f4ece8] text-[#1e1b19]'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[13px]">
-                    {unit.statusBadge.includes('Star') || unit.statusBadge.includes('Covenant') ? 'star' : 'badge'}
+                  <span aria-hidden="true" className="material-symbols-outlined text-[13px]">
+                    {unit.statusBadge.includes('Star') || unit.statusBadge.includes('Member') ? 'star' : 'badge'}
                   </span>
                   {unit.statusBadge}
                 </span>
@@ -274,7 +279,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                       <span className="font-headline text-sm text-[#1e1b19] font-bold truncate">
                         {unit.headName}
                       </span>
-                      <span className="material-symbols-outlined text-[#fe932c] text-[16px]">verified</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[#fe932c] text-[16px]">verified</span>
                     </div>
                     <p className="font-body text-xs text-[#59413a] truncate">{unit.headDob}</p>
                   </div>
@@ -327,7 +332,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                   </div>
                 ) : (
                   <div className="p-4 rounded-lg bg-[#faf2ee] flex flex-col items-center justify-center text-center gap-1 border border-[#e1bfb5]/30">
-                    <span className="material-symbols-outlined text-[#8d7168] text-[24px]">group_add</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[#8d7168] text-[24px]">group_add</span>
                     <p className="text-xs font-body text-[#59413a]">
                       No dependents linked · Can link roommates or relatives anytime
                     </p>
@@ -336,7 +341,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                       onClick={() => onNavigateToAddChristian && onNavigateToAddChristian()}
                       className="mt-1 font-headline text-xs text-[#9b2f00] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
                     >
-                      <span className="material-symbols-outlined text-[14px]">add_link</span> + Link Existing Christian
+                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">add_link</span> + Link Existing Christian
                     </button>
                   </div>
                 )}
@@ -345,11 +350,11 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
               {/* Address & Phone */}
               <div className="pt-2 mb-4 text-[#59413a] font-body text-xs flex flex-col gap-1 border-t border-[#f4ece8]">
                 <div className="flex items-center gap-2 truncate">
-                  <span className="material-symbols-outlined text-[16px] text-[#8d7168]">home_pin</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#8d7168]">home_pin</span>
                   <span className="truncate">{unit.address}</span>
                 </div>
                 <div className="flex items-center gap-2 truncate">
-                  <span className="material-symbols-outlined text-[16px] text-[#8d7168]">call</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#8d7168]">call</span>
                   <span>{unit.phone}</span>
                 </div>
               </div>
@@ -375,7 +380,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                 }}
                 className="flex-1 py-2 px-3 rounded-lg bg-[#ffdcc3] hover:bg-[#ffb77d] text-[#2f1500] font-headline text-xs font-bold transition-colors flex items-center justify-center gap-1 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">person_add</span> + Add Dependent
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">person_add</span> + Add Dependent
               </button>
             </div>
           </div>
@@ -395,14 +400,14 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
               onClick={() => alert('Exporting Household Directory as CSV...')}
               className="px-3 py-1.5 rounded-lg bg-[#f4ece8] hover:bg-[#eee7e3] font-headline text-xs font-semibold text-[#1e1b19] transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">file_download</span> Export Roll (CSV)
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">file_download</span> Export Roll (CSV)
             </button>
             <button
               type="button"
               onClick={() => window.print()}
               className="px-3 py-1.5 rounded-lg bg-[#f4ece8] hover:bg-[#eee7e3] font-headline text-xs font-semibold text-[#1e1b19] transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">print</span> Print Directory
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">print</span> Print Directory
             </button>
           </div>
         </div>
@@ -411,9 +416,10 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
           <button
             type="button"
             disabled
+            aria-label="Previous page"
             className="w-9 h-9 rounded-lg bg-[#f4ece8] text-[#59413a] flex items-center justify-center hover:bg-[#eee7e3] disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">chevron_left</span>
           </button>
           <button
             type="button"
@@ -442,102 +448,105 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
           </button>
           <button
             type="button"
+            aria-label="Next page"
             className="w-9 h-9 rounded-lg bg-[#f4ece8] text-[#1e1b19] hover:bg-[#eee7e3] flex items-center justify-center cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">chevron_right</span>
           </button>
         </div>
       </div>
 
       {/* Create New Household Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreateModalOpen(false), "Create New Household")}>
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-150">
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(false)}
               className="absolute top-4 right-4 p-1 rounded-lg text-[#59413a] hover:bg-[#f4ece8] cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[20px]">close</span>
+            aria-label="Close">
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
             </button>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-[#c2410c] text-white flex items-center justify-center shadow-sm">
-                <span className="material-symbols-outlined text-[24px]">add_home</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[24px]">add_home</span>
               </div>
               <div>
                 <h3 className="font-headline text-base font-bold text-[#1e1b19]">
                   Create New Household
                 </h3>
-                <span className="text-xs text-[#59413a]">Parish residential covenant registry</span>
+                <span className="text-xs text-[#59413a]">Church residential member registry</span>
               </div>
             </div>
 
             <form onSubmit={handleCreateHousehold} className="space-y-4 text-xs font-body">
               <div>
-                <label className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                <label htmlFor="household-surname" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
                   Household Surname *
                 </label>
-                <input
+                <input id="household-surname" aria-label="Household Surname"
                   type="text"
                   required
                   value={newSurname}
                   onChange={(e) => setNewSurname(e.target.value)}
-                  placeholder="e.g. Vance"
+                  placeholder="e.g. Mwangi"
                   className="w-full h-9 px-3 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 />
               </div>
 
               <div>
-                <label className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
-                  Primary Covenant Head *
+                <label htmlFor="household-head" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                  Primary Family Head *
                 </label>
-                <input
+                <input id="household-head" aria-label="Primary Family Head"
                   type="text"
                   required
                   value={newHead}
                   onChange={(e) => setNewHead(e.target.value)}
-                  placeholder="e.g. Timothy Vance"
+                  placeholder="e.g. Timothy Mwangi"
                   className="w-full h-9 px-3 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 />
               </div>
 
               <div>
-                <label className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
-                  Parish Campus
+                <label htmlFor="household-campus" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                  Church Campus
                 </label>
-                <select
+                <select id="household-campus" aria-label="Church Campus"
                   value={newCampus}
                   onChange={(e) => setNewCampus(e.target.value)}
                   className="w-full h-9 px-2.5 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 >
-                  <option value="Main Sanctuary · Downtown">Main Sanctuary · Downtown</option>
-                  <option value="Downtown Campus #01">Downtown Campus #01</option>
-                  <option value="West Parish Annex">West Parish Annex</option>
+                  {LOCATIONS.map((location) => (
+                    <option key={location} value={location}>
+                      {location}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div>
-                <label className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                <label htmlFor="household-address" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
                   Residential Address
                 </label>
-                <input
+                <input id="household-address" aria-label="Residential Address"
                   type="text"
                   value={newAddress}
                   onChange={(e) => setNewAddress(e.target.value)}
-                  placeholder="Street Address, City"
+                  placeholder="Street Address, Estate, Town"
                   className="w-full h-9 px-3 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 />
               </div>
 
               <div>
-                <label className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                <label htmlFor="household-phone" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
                   Primary Contact Phone
                 </label>
-                <input
+                <input id="household-phone" aria-label="Primary Contact Phone"
                   type="tel"
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}
-                  placeholder="(555) 000-0000"
+                  placeholder="+254 700 000 000"
                   className="w-full h-9 px-3 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 />
               </div>

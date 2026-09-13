@@ -1,6 +1,22 @@
 import React, { useState } from 'react';
 import { ChurchEventItem } from '../../../../types';
 import { INITIAL_CHURCH_EVENTS } from '../../../../data/churchMockData';
+import { dialogProps } from '../../dialog';
+import { DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain'
+;
+
+/** The published dates, e.g. "April 16 – 19, 2025"; a single-day event reads "November 24, 2025".
+ *  `en-US` because that is the month-first order the rest of the mockup and the church's own
+ *  website use; `UTC` because these are calendar dates, not instants. */
+const formatEventDate = (date: string, endDate?: string) => {
+  const part = (iso: string, options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat('en-US', { ...options, timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+  const year = part(date, { year: 'numeric' });
+  const first = part(date, { month: 'long', day: 'numeric' });
+  if (!endDate) return `${first}, ${year}`;
+  const sameMonth = date.slice(0, 7) === endDate.slice(0, 7);
+  return `${first} – ${part(endDate, sameMonth ? { day: 'numeric' } : { month: 'long', day: 'numeric' })}, ${year}`;
+};
 
 export const EventsCalendarPanel: React.FC = () => {
   const [events, setEvents] = useState<ChurchEventItem[]>(INITIAL_CHURCH_EVENTS);
@@ -11,16 +27,16 @@ export const EventsCalendarPanel: React.FC = () => {
   // New Event Form State
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<ChurchEventItem['category']>('fellowship');
-  const [ministry, setMinistry] = useState('Parish Life Guild');
-  const [date, setDate] = useState('2026-10-10');
+  const [ministry, setMinistry] = useState('Groups & Fellowships');
+  const [date, setDate] = useState('2025-03-09');
   const [startTime, setStartTime] = useState('06:00 PM');
   const [endTime, setEndTime] = useState('08:00 PM');
-  const [location, setLocation] = useState('Fellowship Hall · Downtown');
-  const [campus, setCampus] = useState('Downtown Campus');
+  const [location, setLocation] = useState('Fellowship Hall · Nyahururu');
+  const [campus, setCampus] = useState<string>(DEFAULT_LOCATION);
   const [description, setDescription] = useState('');
   const [rsvpRequired, setRsvpRequired] = useState(true);
   const [capacity, setCapacity] = useState<number>(60);
-  const [contactPerson, setContactPerson] = useState('Arthur Miller');
+  const [contactPerson, setContactPerson] = useState('Arthur Wanjala');
 
   const filteredEvents = events.filter((evt) => {
     if (selectedCategory !== 'all' && evt.category !== selectedCategory) return false;
@@ -81,12 +97,12 @@ export const EventsCalendarPanel: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Scheduled Events</span>
             <div className="text-2xl font-black text-[#1C1917] mt-0.5">{events.length} Upcoming</div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">calendar_today</span>
               Master Calendar Active
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span className="material-symbols-outlined text-[24px]">event</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">event</span>
           </div>
         </div>
 
@@ -97,28 +113,28 @@ export const EventsCalendarPanel: React.FC = () => {
               {events.reduce((acc, e) => acc + e.rsvpsCount, 0)} Registrations
             </div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">how_to_reg</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">how_to_reg</span>
               Community Engagement High
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span className="material-symbols-outlined text-[24px]">confirmation_number</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">confirmation_number</span>
           </div>
         </div>
 
         <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Outreach & Mercy</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">National Conferences</span>
             <div className="text-2xl font-black text-[#2563EB] mt-0.5">
-              {events.filter((e) => e.category === 'outreach').length} Missions
+              {events.filter((e) => e.title.includes('Conference')).length} Conventions
             </div>
             <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">volunteer_activism</span>
-              Diaconal Pantry relief
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">public</span>
+              AGM, Women’s & Youth
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#2563EB]">
-            <span className="material-symbols-outlined text-[24px]">handshake</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">handshake</span>
           </div>
         </div>
 
@@ -129,12 +145,12 @@ export const EventsCalendarPanel: React.FC = () => {
               {events.filter((e) => e.category === 'youth' || e.category === 'fellowship').length} Gatherings
             </div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-[14px]">groups</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">groups</span>
               All ages represented
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#D97706]">
-            <span className="material-symbols-outlined text-[24px]">diversity_3</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">diversity_3</span>
           </div>
         </div>
       </div>
@@ -145,8 +161,8 @@ export const EventsCalendarPanel: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4] mb-4">
           <div>
             <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-[#C2410C]">calendar_month</span>
-              Parish Events & Facilities Calendar
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">calendar_month</span>
+              Church Events & Facilities Calendar
             </h3>
             <p className="text-xs text-[#57534E] mt-0.5">
               Schedule church gatherings, track RSVP headcounts, and coordinate campus hall reservations.
@@ -154,17 +170,17 @@ export const EventsCalendarPanel: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <select aria-label="Event category filter"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="px-3 py-1.5 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
             >
               <option value="all">All Categories</option>
-              <option value="worship">Worship Liturgy</option>
-              <option value="fellowship">Fellowship & Guilds</option>
-              <option value="youth">Youth & Confirmands</option>
+              <option value="worship">Worship Service</option>
+              <option value="fellowship">Groups & Fellowships</option>
+              <option value="youth">Youth & Discipleship Class</option>
               <option value="outreach">Outreach & Mercy</option>
-              <option value="governance">Session Governance</option>
+              <option value="governance">Church Council</option>
               <option value="training">Training / Seminars</option>
             </select>
 
@@ -173,7 +189,7 @@ export const EventsCalendarPanel: React.FC = () => {
               onClick={() => setIsCreatingEvent(true)}
               className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">add_circle</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
               Schedule Event
             </button>
           </div>
@@ -199,8 +215,8 @@ export const EventsCalendarPanel: React.FC = () => {
                       {evt.category}
                     </span>
 
-                    <span className="text-xs font-mono font-bold text-[#1C1917] bg-[#FFFFFF] px-2 py-0.5 rounded border border-[#E7E5E4]">
-                      {evt.date}
+                    <span className="text-xs font-bold text-[#1C1917] bg-[#FFFFFF] px-2 py-0.5 rounded border border-[#E7E5E4]">
+                      {formatEventDate(evt.date, evt.endDate)}
                     </span>
                   </div>
 
@@ -209,10 +225,10 @@ export const EventsCalendarPanel: React.FC = () => {
                   </h4>
 
                   <div className="text-xs text-[#57534E] flex items-center gap-1.5 mb-2">
-                    <span className="material-symbols-outlined text-[15px] text-[#A8A29E]">schedule</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[15px] text-[#A8A29E]">schedule</span>
                     {evt.startTime} – {evt.endTime}
                     <span className="text-[#A8A29E]">·</span>
-                    <span className="material-symbols-outlined text-[15px] text-[#A8A29E]">pin_drop</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[15px] text-[#A8A29E]">pin_drop</span>
                     <span className="truncate">{evt.location}</span>
                   </div>
 
@@ -261,7 +277,7 @@ export const EventsCalendarPanel: React.FC = () => {
 
       {/* MODAL: Schedule Event */}
       {isCreatingEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreatingEvent(false), "Schedule New Church Event")}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Schedule New Church Event</h3>
@@ -269,15 +285,15 @@ export const EventsCalendarPanel: React.FC = () => {
                 type="button"
                 onClick={() => setIsCreatingEvent(false)}
                 className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+              aria-label="Close">
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <form onSubmit={handleCreateEvent} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Event Title *</label>
-                <input
+                <label htmlFor="event-title" className="block text-xs font-bold text-[#1C1917] mb-1">Event Title *</label>
+                <input id="event-title" aria-label="Event Title"
                   type="text"
                   required
                   placeholder="e.g. Harvest Praise Feast & Hymn Festival"
@@ -289,23 +305,23 @@ export const EventsCalendarPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
-                  <select
+                  <label htmlFor="event-category" className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
+                  <select id="event-category" aria-label="Category"
                     value={category}
                     onChange={(e) => setCategory(e.target.value as any)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                   >
-                    <option value="worship">Worship & Liturgy</option>
-                    <option value="fellowship">Fellowship & Guilds</option>
-                    <option value="youth">Youth & Confirmands</option>
+                    <option value="worship">Worship & Service</option>
+                    <option value="fellowship">Groups & Fellowships</option>
+                    <option value="youth">Youth & Discipleship Class</option>
                     <option value="outreach">Outreach & Mercy</option>
-                    <option value="governance">Session Governance</option>
+                    <option value="governance">Church Council</option>
                     <option value="training">Training / Catechism</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Hosting Ministry</label>
-                  <input
+                  <label htmlFor="event-ministry" className="block text-xs font-bold text-[#1C1917] mb-1">Hosting Ministry</label>
+                  <input id="event-ministry" aria-label="Hosting Ministry"
                     type="text"
                     value={ministry}
                     onChange={(e) => setMinistry(e.target.value)}
@@ -316,8 +332,8 @@ export const EventsCalendarPanel: React.FC = () => {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Event Date</label>
-                  <input
+                  <label htmlFor="event-date" className="block text-xs font-bold text-[#1C1917] mb-1">Event Date</label>
+                  <input id="event-date" aria-label="Event Date"
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
@@ -325,8 +341,8 @@ export const EventsCalendarPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Start Time</label>
-                  <input
+                  <label htmlFor="event-start" className="block text-xs font-bold text-[#1C1917] mb-1">Start Time</label>
+                  <input id="event-start" aria-label="Start Time"
                     type="text"
                     placeholder="06:00 PM"
                     value={startTime}
@@ -335,8 +351,8 @@ export const EventsCalendarPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">End Time</label>
-                  <input
+                  <label htmlFor="event-end" className="block text-xs font-bold text-[#1C1917] mb-1">End Time</label>
+                  <input id="event-end" aria-label="End Time"
                     type="text"
                     placeholder="08:00 PM"
                     value={endTime}
@@ -348,8 +364,8 @@ export const EventsCalendarPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Location / Room</label>
-                  <input
+                  <label htmlFor="event-location" className="block text-xs font-bold text-[#1C1917] mb-1">Location / Room</label>
+                  <input id="event-location" aria-label="Location / Room"
                     type="text"
                     placeholder="e.g. Fellowship Hall"
                     value={location}
@@ -358,24 +374,26 @@ export const EventsCalendarPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1">Campus</label>
-                  <select
+                  <label htmlFor="event-campus" className="block text-xs font-bold text-[#1C1917] mb-1">Campus</label>
+                  <select id="event-campus" aria-label="Campus"
                     value={campus}
                     onChange={(e) => setCampus(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                   >
-                    <option value="Downtown Campus">Downtown Campus</option>
-                    <option value="West Parish Annex">West Parish Annex</option>
-                    <option value="North Chapel">North Chapel</option>
+                    {LOCATIONS.map((location) => (
+                      <option key={location} value={location}>
+                        {location}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1C1917] mb-1">Event Description</label>
-                <textarea
+                <label htmlFor="event-description" className="block text-xs font-bold text-[#1C1917] mb-1">Event Description</label>
+                <textarea id="event-description" aria-label="Event Description"
                   rows={3}
-                  placeholder="Details for parishioners and guests..."
+                  placeholder="Details for members and guests..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -398,8 +416,8 @@ export const EventsCalendarPanel: React.FC = () => {
 
                 {rsvpRequired && (
                   <div>
-                    <label className="block text-xs font-bold text-[#1C1917] mb-1">Capacity Limit</label>
-                    <input
+                    <label htmlFor="event-capacity" className="block text-xs font-bold text-[#1C1917] mb-1">Capacity Limit</label>
+                    <input id="event-capacity" aria-label="Capacity Limit"
                       type="number"
                       min={1}
                       value={capacity}

@@ -14,14 +14,14 @@ export const FinancesOfferingsPanel: React.FC = () => {
               Sunday Service Total
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#9b2f00] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">shopping_basket</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">shopping_basket</span>
             </span>
           </div>
           <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19]">$38,420</div>
+            <div className="font-headline text-3xl font-bold text-[#1e1b19]">KSh 38,420</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span className="material-symbols-outlined text-[16px]">trending_up</span>
-              <span>Oct 20 across 3 worship services</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">trending_up</span>
+              <span>Feb 02 across 3 worship services</span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
@@ -36,17 +36,17 @@ export const FinancesOfferingsPanel: React.FC = () => {
               Per Capita Avg
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#904d00] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">person_outline</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">person_outline</span>
             </span>
           </div>
           <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19]">$45.63</div>
+            <div className="font-headline text-3xl font-bold text-[#1e1b19]">KSh 45.63</div>
             <div className="flex items-center gap-1 mt-1 text-[#59413a] text-xs">
               <span>Based on 842 verified attendees</span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
-            Highest at 11:00 AM ($48.20/person)
+            Highest at 11:00 AM (KSh 48.20/person)
           </div>
         </div>
 
@@ -57,7 +57,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
               Cash vs Envelopes
             </span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#c2410c] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">pie_chart</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">pie_chart</span>
             </span>
           </div>
           <div>
@@ -84,14 +84,14 @@ export const FinancesOfferingsPanel: React.FC = () => {
               Weekly Variance
             </span>
             <span className="p-2 rounded-xl bg-[#85f8c4]/40 text-[#002114] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">query_stats</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">query_stats</span>
             </span>
           </div>
           <div>
-            <div className="font-headline text-3xl font-bold text-[#006243]">+$3,220</div>
+            <div className="font-headline text-3xl font-bold text-[#006243]">+KSh 3,220</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span className="material-symbols-outlined text-[16px]">check_circle</span>
-              <span>Baseline target: $35,200</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span>
+              <span>Baseline target: KSh 35,200</span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
@@ -108,7 +108,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
               12-Week Sunday Offering Inflow & Target Variance
             </h3>
             <p className="text-xs text-[#59413a]">
-              Plate collections, numbered envelopes, and kiosk contactless giving across Q3/Q4.
+              Plate collections, numbered envelopes, and kiosk contactless giving across Q1/Q2.
             </p>
           </div>
           <div className="flex items-center gap-4 text-xs font-medium">
@@ -116,7 +116,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
               <span className="w-3 h-3 rounded-md bg-[#c2410c]"></span> Actual Received
             </span>
             <span className="flex items-center gap-1.5 text-[#59413a]">
-              <span className="w-4 h-0.5 bg-[#8d7168] border-t border-dashed"></span> Budget Target ($35.2k)
+              <span className="w-4 h-0.5 bg-[#8d7168] border-t border-dashed"></span> Budget Target (KSh 35.2k)
             </span>
           </div>
         </div>
@@ -142,7 +142,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
               <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 group relative">
                 {/* Tooltip on hover */}
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-10 bg-[#1e1b19] text-white px-2 py-1 rounded text-[10px] font-mono whitespace-nowrap z-10 pointer-events-none">
-                  ${item.amt}k
+                  KSh {item.amt}k
                 </div>
                 <div className="w-full bg-[#f4ece8] rounded-t-lg h-36 flex items-end">
                   <div
@@ -165,9 +165,9 @@ export const FinancesOfferingsPanel: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden">
         <div className="p-4 border-b border-[#EAE1D7] bg-[#faf2ee]/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#9b2f00] text-[20px]">table_chart</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[20px]">table_chart</span>
             <h3 className="font-headline text-sm font-bold text-[#1e1b19]">
-              October 20 Service Collections Tally
+              February 02 Service Collections Tally
             </h3>
           </div>
           <button
@@ -175,7 +175,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
             className="text-xs font-bold text-[#9b2f00] hover:text-[#c2410c] flex items-center gap-1 cursor-pointer"
           >
             <span>{showDenominations ? 'Hide Cash Denominations' : 'View Cash Denomination Count'}</span>
-            <span className="material-symbols-outlined text-[16px]">
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
               {showDenominations ? 'expand_less' : 'expand_more'}
             </span>
           </button>
@@ -195,50 +195,50 @@ export const FinancesOfferingsPanel: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-[#EAE1D7] text-[#1e1b19]">
               <tr className="hover:bg-[#faf2ee]/40">
-                <td className="py-3.5 px-4 font-semibold">9:00 AM Traditional Liturgical</td>
+                <td className="py-3.5 px-4 font-semibold">8:00 AM First Service</td>
                 <td className="py-3.5 px-4 font-mono text-[#59413a]">310 attendees</td>
-                <td className="py-3.5 px-4 font-mono">$4,850.00</td>
-                <td className="py-3.5 px-4 font-mono">$9,620.00</td>
-                <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">$14,470.00</td>
+                <td className="py-3.5 px-4 font-mono">KSh 4,850.00</td>
+                <td className="py-3.5 px-4 font-mono">KSh 9,620.00</td>
+                <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">KSh 14,470.00</td>
                 <td className="py-3.5 px-4 text-right">
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold">
-                    <span className="material-symbols-outlined text-[14px]">verified</span> Dual Signed
+                    <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span> Dual Signed
                   </span>
                 </td>
               </tr>
               <tr className="hover:bg-[#faf2ee]/40">
-                <td className="py-3.5 px-4 font-semibold">11:00 AM Contemporary Family</td>
+                <td className="py-3.5 px-4 font-semibold">10:00 AM Praise & Worship</td>
                 <td className="py-3.5 px-4 font-mono text-[#59413a]">420 attendees</td>
-                <td className="py-3.5 px-4 font-mono">$6,120.00</td>
-                <td className="py-3.5 px-4 font-mono">$12,480.00</td>
-                <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">$18,600.00</td>
+                <td className="py-3.5 px-4 font-mono">KSh 6,120.00</td>
+                <td className="py-3.5 px-4 font-mono">KSh 12,480.00</td>
+                <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">KSh 18,600.00</td>
                 <td className="py-3.5 px-4 text-right">
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold">
-                    <span className="material-symbols-outlined text-[14px]">verified</span> Dual Signed
+                    <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span> Dual Signed
                   </span>
                 </td>
               </tr>
               <tr className="hover:bg-[#faf2ee]/40">
-                <td className="py-3.5 px-4 font-semibold">6:00 PM Youth & Vespers</td>
+                <td className="py-3.5 px-4 font-semibold">Wednesday Midweek Service</td>
                 <td className="py-3.5 px-4 font-mono text-[#59413a]">112 attendees</td>
-                <td className="py-3.5 px-4 font-mono">$1,250.00</td>
-                <td className="py-3.5 px-4 font-mono">$2,800.00</td>
-                <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">$4,050.00</td>
+                <td className="py-3.5 px-4 font-mono">KSh 1,250.00</td>
+                <td className="py-3.5 px-4 font-mono">KSh 2,800.00</td>
+                <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">KSh 4,050.00</td>
                 <td className="py-3.5 px-4 text-right">
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold">
-                    <span className="material-symbols-outlined text-[14px]">verified</span> Dual Signed
+                    <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span> Dual Signed
                   </span>
                 </td>
               </tr>
               <tr className="hover:bg-[#faf2ee]/40 bg-[#faf2ee]/20">
                 <td className="py-3.5 px-4 font-semibold">Midweek Prayer & Study</td>
                 <td className="py-3.5 px-4 font-mono text-[#59413a]">68 attendees</td>
-                <td className="py-3.5 px-4 font-mono">$450.00</td>
-                <td className="py-3.5 px-4 font-mono">$850.00</td>
-                <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">$1,300.00</td>
+                <td className="py-3.5 px-4 font-mono">KSh 450.00</td>
+                <td className="py-3.5 px-4 font-mono">KSh 850.00</td>
+                <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">KSh 1,300.00</td>
                 <td className="py-3.5 px-4 text-right">
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold">
-                    <span className="material-symbols-outlined text-[14px]">verified</span> Dual Signed
+                    <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span> Dual Signed
                   </span>
                 </td>
               </tr>
@@ -254,28 +254,28 @@ export const FinancesOfferingsPanel: React.FC = () => {
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-xs">
               <div className="p-2.5 bg-white rounded-xl border border-[#EAE1D7]">
-                <span className="text-[#59413a] block text-[10px]">$100 Bills (54 pcs)</span>
-                <span className="font-headline font-bold text-[#1e1b19]">$5,400.00</span>
+                <span className="text-[#59413a] block text-[10px]">KSh 100 Bills (54 pcs)</span>
+                <span className="font-headline font-bold text-[#1e1b19]">KSh 5,400.00</span>
               </div>
               <div className="p-2.5 bg-white rounded-xl border border-[#EAE1D7]">
-                <span className="text-[#59413a] block text-[10px]">$50 Bills (48 pcs)</span>
-                <span className="font-headline font-bold text-[#1e1b19]">$2,400.00</span>
+                <span className="text-[#59413a] block text-[10px]">KSh 50 Bills (48 pcs)</span>
+                <span className="font-headline font-bold text-[#1e1b19]">KSh 2,400.00</span>
               </div>
               <div className="p-2.5 bg-white rounded-xl border border-[#EAE1D7]">
-                <span className="text-[#59413a] block text-[10px]">$20 Bills (192 pcs)</span>
-                <span className="font-headline font-bold text-[#1e1b19]">$3,840.00</span>
+                <span className="text-[#59413a] block text-[10px]">KSh 20 Bills (192 pcs)</span>
+                <span className="font-headline font-bold text-[#1e1b19]">KSh 3,840.00</span>
               </div>
               <div className="p-2.5 bg-white rounded-xl border border-[#EAE1D7]">
-                <span className="text-[#59413a] block text-[10px]">$10 Bills (62 pcs)</span>
-                <span className="font-headline font-bold text-[#1e1b19]">$620.00</span>
+                <span className="text-[#59413a] block text-[10px]">KSh 10 Bills (62 pcs)</span>
+                <span className="font-headline font-bold text-[#1e1b19]">KSh 620.00</span>
               </div>
               <div className="p-2.5 bg-white rounded-xl border border-[#EAE1D7]">
-                <span className="text-[#59413a] block text-[10px]">$5 & $1 Bills (310 pcs)</span>
-                <span className="font-headline font-bold text-[#1e1b19]">$410.00</span>
+                <span className="text-[#59413a] block text-[10px]">KSh 5 & KSh 1 Bills (310 pcs)</span>
+                <span className="font-headline font-bold text-[#1e1b19]">KSh 410.00</span>
               </div>
               <div className="p-2.5 bg-white rounded-xl border border-[#EAE1D7]">
                 <span className="text-[#59413a] block text-[10px]">Total Plate Cash</span>
-                <span className="font-headline font-bold text-[#9b2f00]">$12,670.00</span>
+                <span className="font-headline font-bold text-[#9b2f00]">KSh 12,670.00</span>
               </div>
             </div>
           </div>
@@ -286,10 +286,10 @@ export const FinancesOfferingsPanel: React.FC = () => {
       <div className="p-4 rounded-2xl bg-[#faf2ee] border border-[#EAE1D7] flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-[#006243] text-white flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-[18px]">lock</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">lock</span>
           </div>
           <p className="text-xs text-[#59413a]">
-            <strong>Cash Count Dual-Custody Verification:</strong> Safe Deposit Bag <strong className="text-[#1e1b19]">#B-902</strong> sealed with tamper-evident strip #TX-7814 at 1:45 PM by Elder Marcus Jenkins and Deaconess Clara Oswald.
+            <strong>Cash Count Dual-Custody Verification:</strong> Safe Deposit Bag <strong className="text-[#1e1b19]">#B-902</strong> sealed with tamper-evident strip #TX-7814 at 1:45 PM by Elder Marcus Kamau and Clara Wambui.
           </p>
         </div>
         <button className="h-8 px-3 rounded-lg bg-white border border-[#EAE1D7] text-xs font-bold text-[#1e1b19] hover:bg-[#f4ece8] shrink-0">
@@ -301,7 +301,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="p-4 bg-white rounded-2xl border border-[#EAE1D7] shadow-xs">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="material-symbols-outlined text-[#904d00] text-[18px]">mail</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[#904d00] text-[18px]">mail</span>
             <h4 className="font-headline text-xs font-bold text-[#1e1b19]">Envelopes Distribution</h4>
           </div>
           <p className="text-xs text-[#59413a] leading-relaxed">
@@ -311,7 +311,7 @@ export const FinancesOfferingsPanel: React.FC = () => {
 
         <div className="p-4 bg-white rounded-2xl border border-[#EAE1D7] shadow-xs">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="material-symbols-outlined text-[#006243] text-[18px]">local_shipping</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[18px]">local_shipping</span>
             <h4 className="font-headline text-xs font-bold text-[#1e1b19]">Armored Courier Pickup</h4>
           </div>
           <p className="text-xs text-[#59413a] leading-relaxed">
@@ -321,11 +321,11 @@ export const FinancesOfferingsPanel: React.FC = () => {
 
         <div className="p-4 bg-white rounded-2xl border border-[#EAE1D7] shadow-xs">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="material-symbols-outlined text-[#9b2f00] text-[18px]">public</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[#9b2f00] text-[18px]">public</span>
             <h4 className="font-headline text-xs font-bold text-[#1e1b19]">Special Second Offering</h4>
           </div>
           <p className="text-xs text-[#59413a] leading-relaxed">
-            Missionary Aviation Fellowship fund reached $3,840 from the special love offering basket.
+            Missionary Aviation Fellowship fund reached KSh 3,840 from the special love offering basket.
           </p>
         </div>
       </div>
