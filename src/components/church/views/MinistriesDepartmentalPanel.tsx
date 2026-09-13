@@ -1,26 +1,7 @@
 import React, { useState } from 'react';
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain'
 ;
-import { 
-  Building2, 
-  Users, 
-  Wallet, 
-  ShieldCheck, 
-  Search, 
-  Plus, 
-  MoreVertical, 
-  Calendar, 
-  Mail, 
-  Phone, 
-  ArrowRight, 
-  CheckCircle, 
-  X,
-  ArrowUpDown,
-  Filter,
-  Grid,
-  List
-} from 'lucide-react';
 
 interface Department {
   id: string;
@@ -225,6 +206,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
   const [sortMode, setSortMode] = useState('Headcount (High to Low)');
   const [viewFormat, setViewFormat] = useState<'grid' | 'list'>('grid');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const drawerOpenDialog = useDialog(() => setIsDrawerOpen(false), "New Department Charter");
 
   // Form State
   const [newDeptName, setNewDeptName] = useState('');
@@ -559,7 +541,7 @@ export const MinistriesDepartmentalPanel: React.FC = () => {
 
       {/* Quick Department Creation Drawer / Modal (Warm Ember overlay) */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs" {...dialogProps(() => setIsDrawerOpen(false), "New Department Charter")}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs" {...drawerOpenDialog}>
           <div className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col justify-between p-6 overflow-y-auto animate-in slide-in-from-right duration-200">
             <div>
               {/* Header */}

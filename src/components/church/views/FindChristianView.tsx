@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ParishMember } from '../../../types';
 import { LOCATIONS } from '../../../data/churchDomain';
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import { interactiveCard } from '../interactiveCard'
 ;
 
@@ -25,6 +25,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
   const [density, setDensity] = useState<'compact' | 'comfortable'>('compact');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeCareModalMember, setActiveCareModalMember] = useState<ParishMember | null>(null);
+  const activeCareModalMemberDialog = useDialog(() => setActiveCareModalMember(null), "Member Care Record");
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
@@ -626,7 +627,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
 
       {/* Quick Care Log View Modal */}
       {activeCareModalMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs" {...dialogProps(() => setActiveCareModalMember(null), "Member Care Record")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs" {...activeCareModalMemberDialog}>
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-150">
             <button
               type="button"

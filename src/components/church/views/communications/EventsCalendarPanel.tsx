@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChurchEventItem } from '../../../../types';
 import { INITIAL_CHURCH_EVENTS } from '../../../../data/churchMockData';
-import { dialogProps } from '../../dialog';
+import { useDialog } from '../../dialog';
 import { DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain'
 ;
 
@@ -22,6 +22,7 @@ export const EventsCalendarPanel: React.FC = () => {
   const [events, setEvents] = useState<ChurchEventItem[]>(INITIAL_CHURCH_EVENTS);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isCreatingEvent, setIsCreatingEvent] = useState<boolean>(false);
+  const creatingEventDialog = useDialog(() => setIsCreatingEvent(false), "Schedule New Church Event");
   const [rsvpSuccessId, setRsvpSuccessId] = useState<string | null>(null);
 
   // New Event Form State
@@ -277,7 +278,7 @@ export const EventsCalendarPanel: React.FC = () => {
 
       {/* MODAL: Schedule Event */}
       {isCreatingEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreatingEvent(false), "Schedule New Church Event")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...creatingEventDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Schedule New Church Event</h3>

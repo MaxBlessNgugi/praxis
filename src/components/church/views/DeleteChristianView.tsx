@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SoftDeleteRecord } from '../../../types';
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import { INITIAL_SOFT_DELETE_RECORDS } from '../../../data/churchMockData'
 ;
 
@@ -19,6 +19,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
   );
   const [filterDisposition, setFilterDisposition] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const modalOpenDialog = useDialog(() => setIsModalOpen(false), "Confirm Soft-Delete to Trash: Elena Mwangi (#MBR-1082)");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [records, setRecords] = useState<SoftDeleteRecord[]>(INITIAL_SOFT_DELETE_RECORDS);
 
@@ -623,7 +624,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
 
       {/* Confirmation Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs" {...dialogProps(() => setIsModalOpen(false), "Confirm Soft-Delete to Trash: Elena Mwangi (#MBR-1082)")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs" {...modalOpenDialog}>
           <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-200">
             <button
               type="button"

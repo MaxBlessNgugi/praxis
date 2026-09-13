@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AnnouncementItem, AnnouncementAudience } from '../../../../types';
-import { dialogProps } from '../../dialog';
+import { useDialog } from '../../dialog';
 import { INITIAL_ANNOUNCEMENTS } from '../../../../data/churchMockData'
 ;
 
@@ -8,6 +8,7 @@ export const AnnouncementsPanel: React.FC = () => {
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(INITIAL_ANNOUNCEMENTS);
   const [selectedAudience, setSelectedAudience] = useState<string>('all');
   const [isCreating, setIsCreating] = useState<boolean>(false);
+  const creatingDialog = useDialog(() => setIsCreating(false), "Publish Announcement");
 
   // Form State
   const [title, setTitle] = useState('');
@@ -247,7 +248,7 @@ export const AnnouncementsPanel: React.FC = () => {
 
       {/* MODAL: Publish Announcement */}
       {isCreating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreating(false), "Publish Announcement")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...creatingDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Publish Announcement</h3>

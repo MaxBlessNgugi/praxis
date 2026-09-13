@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ServiceReportItem, WorshipService } from '../../../../types';
 import { INITIAL_SERVICE_REPORTS, INITIAL_SERVICES } from '../../../../data/churchMockData';
-import { dialogProps } from '../../dialog';
+import { useDialog } from '../../dialog';
 import { interactiveCard } from '../../interactiveCard'
 ;
 
@@ -9,7 +9,9 @@ export const ServiceReportsPanel: React.FC = () => {
   const [reports, setReports] = useState<ServiceReportItem[]>(INITIAL_SERVICE_REPORTS);
   const [selectedReportId, setSelectedReportId] = useState<string>(INITIAL_SERVICE_REPORTS[0].id);
   const [isFilingReport, setIsFilingReport] = useState<boolean>(false);
+  const filingReportDialog = useDialog(() => setIsFilingReport(false), "File Post-Service Summary Report");
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const printModalOpenDialog = useDialog(() => setIsPrintModalOpen(false), "Lord’s Day Service Dossier");
 
   // Form State for New Service Report
   const [targetServiceId, setTargetServiceId] = useState<string>(INITIAL_SERVICES[0].id);
@@ -312,7 +314,7 @@ export const ServiceReportsPanel: React.FC = () => {
 
       {/* MODAL: File New Post-Service Report */}
       {isFilingReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsFilingReport(false), "File Post-Service Summary Report")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...filingReportDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-xl w-full p-6 shadow-2xl border border-[#E7E5E4] max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <div className="flex items-center gap-2">
@@ -476,7 +478,7 @@ export const ServiceReportsPanel: React.FC = () => {
 
       {/* MODAL: Print Dossier View */}
       {isPrintModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsPrintModalOpen(false), "Lord’s Day Service Dossier")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...printModalOpenDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-2xl w-full p-8 shadow-2xl border border-[#E7E5E4] max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in duration-150 font-serif">
             <div className="flex items-center justify-between pb-4 border-b-2 border-[#1C1917]">
               <div>

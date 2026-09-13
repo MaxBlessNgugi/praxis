@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { HouseholdUnit } from '../../../types';
 import { INITIAL_HOUSEHOLDS } from '../../../data/churchMockData';
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain'
 ;
 
@@ -20,6 +20,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
   const [campusFilter, setCampusFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const createModalOpenDialog = useDialog(() => setIsCreateModalOpen(false), "Create New Household");
   const [newSurname, setNewSurname] = useState('');
   const [newHead, setNewHead] = useState('');
   const [newAddress, setNewAddress] = useState('');
@@ -458,7 +459,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
 
       {/* Create New Household Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreateModalOpen(false), "Create New Household")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs" {...createModalOpenDialog}>
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-150">
             <button
               type="button"

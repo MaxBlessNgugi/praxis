@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BroadcastItem, BroadcastTemplate } from '../../../../types';
-import { dialogProps } from '../../dialog';
+import { useDialog } from '../../dialog';
 import { INITIAL_BROADCAST_HISTORY, INITIAL_BROADCAST_TEMPLATES } from '../../../../data/churchMockData'
 ;
 
@@ -8,6 +8,7 @@ export const BroadcastsPanel: React.FC = () => {
   const [broadcasts, setBroadcasts] = useState<BroadcastItem[]>(INITIAL_BROADCAST_HISTORY);
   const [templates, setTemplates] = useState<BroadcastTemplate[]>(INITIAL_BROADCAST_TEMPLATES);
   const [isComposing, setIsComposing] = useState<boolean>(false);
+  const composingDialog = useDialog(() => setIsComposing(false), "Compose Church Broadcast");
   const [selectedChannel, setSelectedChannel] = useState<'all' | 'sms' | 'email'>('all');
 
   // Broadcast Composer State
@@ -282,7 +283,7 @@ export const BroadcastsPanel: React.FC = () => {
 
       {/* MODAL: Compose Broadcast */}
       {isComposing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsComposing(false), "Compose Church Broadcast")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...composingDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-xl w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-import { dialogProps } from '../../dialog';
+import { useDialog } from '../../dialog';
 import React, { useState } from 'react'
 ;
 import {
@@ -22,6 +22,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
   // Assign Volunteer Modal
   const [isAssigningDuty, setIsAssigningDuty] = useState<boolean>(false);
+  const assigningDutyDialog = useDialog(() => setIsAssigningDuty(false), "Assign Volunteer to Service");
   const [targetDept, setTargetDept] = useState<VolunteerRosterDuty['department']>('ushers');
   const [roleTitle, setRoleTitle] = useState<string>('');
   const [selectedMemberId, setSelectedMemberId] = useState<string>(INITIAL_CHURCH_MEMBERS[0].id);
@@ -30,6 +31,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
   // Request Swap Modal
   const [swappingDuty, setSwappingDuty] = useState<VolunteerRosterDuty | null>(null);
+  const swappingDutyDialog = useDialog(() => setSwappingDuty(null), "Request Duty Replacement");
   const [replacementName, setReplacementName] = useState<string>('');
   const [swapReason, setSwapReason] = useState<string>('');
 
@@ -374,7 +376,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
       {/* MODAL: Assign Volunteer Duty */}
       {isAssigningDuty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsAssigningDuty(false), "Assign Volunteer to Service")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...assigningDutyDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Assign Volunteer to Service</h3>
@@ -476,7 +478,7 @@ export const VolunteerRosterPanel: React.FC = () => {
 
       {/* MODAL: Request Swap */}
       {swappingDuty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setSwappingDuty(null), "Request Duty Replacement")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...swappingDutyDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Request Duty Replacement</h3>

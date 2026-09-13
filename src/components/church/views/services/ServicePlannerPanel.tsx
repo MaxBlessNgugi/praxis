@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { WorshipService, LiturgyItem, ServiceRoleAssignment, ServiceType } from '../../../../types';
 import { INITIAL_SERVICES } from '../../../../data/churchMockData';
 import { DEFAULT_LOCATION, LOCATIONS, SUNDAY_WINDOW, sundayLiturgy } from '../../../../data/churchDomain';
-import { dialogProps } from '../../dialog';
+import { useDialog } from '../../dialog';
 import { interactiveCard } from '../../interactiveCard'
 ;
 
@@ -11,8 +11,11 @@ export const ServicePlannerPanel: React.FC = () => {
   const [selectedServiceId, setSelectedServiceId] = useState<string>(INITIAL_SERVICES[0].id);
   const [filterType, setFilterType] = useState<'all' | 'upcoming' | 'completed'>('all');
   const [isCreatingService, setIsCreatingService] = useState<boolean>(false);
+  const creatingServiceDialog = useDialog(() => setIsCreatingService(false), "Schedule New Worship Service");
   const [isAddingLiturgyItem, setIsAddingLiturgyItem] = useState<boolean>(false);
+  const addingLiturgyItemDialog = useDialog(() => setIsAddingLiturgyItem(false), "Add Service Element");
   const [previewBulletinModal, setPreviewBulletinModal] = useState<boolean>(false);
+  const previewBulletinModalDialog = useDialog(() => setPreviewBulletinModal(false), "Order of Divine Service");
 
   // New Service Form State
   const [newServiceTitle, setNewServiceTitle] = useState('');
@@ -505,7 +508,7 @@ export const ServicePlannerPanel: React.FC = () => {
 
       {/* MODAL: Create New Service */}
       {isCreatingService && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreatingService(false), "Schedule New Worship Service")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...creatingServiceDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <div className="flex items-center gap-2">
@@ -662,7 +665,7 @@ export const ServicePlannerPanel: React.FC = () => {
 
       {/* MODAL: Add Service Item */}
       {isAddingLiturgyItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsAddingLiturgyItem(false), "Add Service Element")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...addingLiturgyItemDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Add Service Element</h3>
@@ -776,7 +779,7 @@ export const ServicePlannerPanel: React.FC = () => {
 
       {/* MODAL: Printable Service Bulletin Preview */}
       {previewBulletinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setPreviewBulletinModal(false), "Order of Divine Service")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...previewBulletinModalDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-2xl w-full p-8 shadow-2xl border border-[#E7E5E4] max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in duration-150 font-serif">
             <div className="flex items-center justify-between pb-4 border-b-2 border-[#1C1917]">
               <div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PrayerRequestItem, PrayerPrivacyLevel } from '../../../../types';
-import { dialogProps } from '../../dialog';
+import { useDialog } from '../../dialog';
 import { INITIAL_PRAYER_REQUESTS } from '../../../../data/churchMockData'
 ;
 
@@ -8,7 +8,9 @@ export const PrayerRequestsPanel: React.FC = () => {
   const [prayers, setPrayers] = useState<PrayerRequestItem[]>(INITIAL_PRAYER_REQUESTS);
   const [selectedPrivacy, setSelectedPrivacy] = useState<string>('all');
   const [isSubmittingPrayer, setIsSubmittingPrayer] = useState<boolean>(false);
+  const submittingPrayerDialog = useDialog(() => setIsSubmittingPrayer(false), "Submit Prayer Petition");
   const [answeringPrayer, setAnsweringPrayer] = useState<PrayerRequestItem | null>(null);
+  const answeringPrayerDialog = useDialog(() => setAnsweringPrayer(null), "Record Answered Prayer");
   const [praiseText, setPraiseText] = useState<string>('');
 
   // New Prayer Form State
@@ -280,7 +282,7 @@ export const PrayerRequestsPanel: React.FC = () => {
 
       {/* MODAL: Submit Prayer Petition */}
       {isSubmittingPrayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsSubmittingPrayer(false), "Submit Prayer Petition")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...submittingPrayerDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Submit Prayer Petition</h3>
@@ -395,7 +397,7 @@ export const PrayerRequestsPanel: React.FC = () => {
 
       {/* MODAL: Record Praise / Answered Prayer */}
       {answeringPrayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setAnsweringPrayer(null), "Record Answered Prayer")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...answeringPrayerDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Record Answered Prayer</h3>

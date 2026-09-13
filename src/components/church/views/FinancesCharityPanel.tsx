@@ -1,4 +1,4 @@
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import React, { useState } from 'react'
 ;
 
@@ -58,6 +58,7 @@ const EXPENSES: CharityExp[] = [
 
 export const FinancesCharityPanel: React.FC = () => {
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const expenseModalOpenDialog = useDialog(() => setIsExpenseModalOpen(false), "Record Charity Disbursement");
 
   return (
     <div className="flex flex-col w-full space-y-6">
@@ -398,7 +399,7 @@ export const FinancesCharityPanel: React.FC = () => {
 
       {/* Record Expense Modal */}
       {isExpenseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...dialogProps(() => setIsExpenseModalOpen(false), "Record Charity Disbursement")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...expenseModalOpenDialog}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[#EAE1D7] pb-3">
               <h3 className="font-headline text-base font-bold text-[#1e1b19]">Record Charity Disbursement</h3>

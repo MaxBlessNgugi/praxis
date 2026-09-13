@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { dialogProps } from '../../dialog';
+import { useDialog } from '../../dialog';
 import {
   AttendanceRecord,
   FirstTimeVisitorLink,
@@ -40,6 +40,7 @@ export const AttendancePanel: React.FC = () => {
 
   // Visitor Intake Form / Link to Member modal
   const [isAddingVisitor, setIsAddingVisitor] = useState<boolean>(false);
+  const addingVisitorDialog = useDialog(() => setIsAddingVisitor(false), "Register New Guest / Visitor");
   const [visitorName, setVisitorName] = useState<string>('');
   const [visitorPhone, setVisitorPhone] = useState<string>('');
   const [visitorEmail, setVisitorEmail] = useState<string>('');
@@ -48,6 +49,7 @@ export const AttendancePanel: React.FC = () => {
 
   // Link to Existing Member Modal
   const [linkingVisitor, setLinkingVisitor] = useState<FirstTimeVisitorLink | null>(null);
+  const linkingVisitorDialog = useDialog(() => setLinkingVisitor(null), "Link Guest to Members Register");
   const [selectedMemberId, setSelectedMemberId] = useState<string>(INITIAL_CHURCH_MEMBERS[0].id);
 
   const selectedService = INITIAL_SERVICES.find((s) => s.id === selectedServiceId) || INITIAL_SERVICES[0];
@@ -357,7 +359,7 @@ export const AttendancePanel: React.FC = () => {
               <div className="relative w-full h-48">
                 <svg
                   role="img"
-                  aria-label="Attendance across the past five Lord's Days, 5 January to 2 February 2025. Total attendance rose from 345 to a high of 387, averaging 374 a week; sanctuary in-person attendance averaged 270, with online viewers holding steady below it."
+                  aria-label="Attendance across the past five Lord's Days, 5 January to 2 February 2025. Total attendance rose from 345 to a high of 387, averaging 374 a week; sanctuary in-person attendance averaged 270."
                   className="w-full h-full overflow-visible"
                   viewBox="0 0 500 160"
                   preserveAspectRatio="none"
@@ -570,7 +572,7 @@ export const AttendancePanel: React.FC = () => {
 
       {/* MODAL: Intake New Visitor */}
       {isAddingVisitor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsAddingVisitor(false), "Register New Guest / Visitor")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...addingVisitorDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Register New Guest / Visitor</h3>
@@ -669,7 +671,7 @@ export const AttendancePanel: React.FC = () => {
 
       {/* MODAL: Link Visitor to Member / Household */}
       {linkingVisitor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setLinkingVisitor(null), "Link Guest to Members Register")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...linkingVisitorDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">

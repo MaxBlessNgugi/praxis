@@ -1,9 +1,10 @@
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import React, { useState } from 'react'
 ;
 
 export const FinancesProjectFundingPanel: React.FC = () => {
   const [isPledgeModalOpen, setIsPledgeModalOpen] = useState(false);
+  const pledgeModalOpenDialog = useDialog(() => setIsPledgeModalOpen(false), "New Capital Campaign Pledge");
 
   return (
     <div className="flex flex-col w-full space-y-6">
@@ -234,7 +235,7 @@ export const FinancesProjectFundingPanel: React.FC = () => {
 
       {/* Pledge Modal */}
       {isPledgeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...dialogProps(() => setIsPledgeModalOpen(false), "New Capital Campaign Pledge")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...pledgeModalOpenDialog}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[#EAE1D7] pb-3">
               <h3 className="font-headline text-base font-bold text-[#1e1b19]">New Capital Campaign Pledge</h3>
