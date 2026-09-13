@@ -1,4 +1,4 @@
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import React, { useState } from 'react'
 ;
 
@@ -95,6 +95,7 @@ export const FinancesTithesPanel: React.FC = () => {
   const [paymentFilter, setPaymentFilter] = useState('All Payment Methods');
   const [dateRange, setDateRange] = useState('February 2025 (MTD)');
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
+  const offlineModalOpenDialog = useDialog(() => setIsOfflineModalOpen(false), "Record Offline Envelope / Cheque");
 
   const filteredTx = TRANSACTIONS.filter(t => {
     const matchesSearch = [t.donor, t.txCode, t.envelopeNo].some((field) =>
@@ -225,7 +226,7 @@ export const FinancesTithesPanel: React.FC = () => {
           <div className="h-44 w-full relative pt-2">
             <svg
               role="img"
-              aria-label="February tithe flow by week. Recurring tithes climb steadily through the month while one-time envelope giving stays lower and peaks mid-month; at the marked Week 2 peak (Feb 8–14), recurring tithes were KSh 36,200 against KSh 14,100 one-time."
+              aria-label="February tithe flow by week. Recurring tithes climb steadily through the month while one-time envelope giving stays lower and peaks mid-month; at the marked Week 2 peak, recurring tithes were KSh 36,200 against KSh 14,100 one-time."
               className="w-full h-full overflow-visible"
               viewBox="0 0 600 120"
               preserveAspectRatio="none"
@@ -453,7 +454,7 @@ export const FinancesTithesPanel: React.FC = () => {
 
       {/* Offline Tithe Modal */}
       {isOfflineModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...dialogProps(() => setIsOfflineModalOpen(false), "Record Offline Envelope / Cheque")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...offlineModalOpenDialog}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[#EAE1D7] pb-3">
               <h3 className="font-headline text-base font-bold text-[#1e1b19]">Record Offline Envelope / Cheque</h3>

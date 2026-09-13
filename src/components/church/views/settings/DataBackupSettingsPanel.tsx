@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { DataBackupSnapshot } from '../../../../types';
-import { dialogProps } from '../../dialog';
+import { useDialog } from '../../dialog';
 import { INITIAL_BACKUP_SNAPSHOTS } from '../../../../data/churchMockData'
 ;
 
 export const DataBackupSettingsPanel: React.FC = () => {
   const [backups, setBackups] = useState<DataBackupSnapshot[]>(INITIAL_BACKUP_SNAPSHOTS);
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState<boolean>(false);
+  const creatingSnapshotDialog = useDialog(() => setIsCreatingSnapshot(false), "Create Instant Data Snapshot");
   const [backupLabel, setBackupLabel] = useState<string>('Pre-Council Audit Snapshot');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState<DataBackupSnapshot | null>(null);
+  const restoringDialog = useDialog(() => setIsRestoring(null), "Confirm Snapshot Restoration");
 
   const handleCreateBackup = (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,7 +154,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
 
       {/* MODAL: Create Snapshot */}
       {isCreatingSnapshot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsCreatingSnapshot(false), "Create Instant Data Snapshot")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...creatingSnapshotDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">Create Instant Data Snapshot</h3>
@@ -203,7 +205,7 @@ export const DataBackupSettingsPanel: React.FC = () => {
 
       {/* MODAL: Restore Snapshot Confirm */}
       {isRestoring && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setIsRestoring(null), "Confirm Snapshot Restoration")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...restoringDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#DC2626]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center gap-2 pb-3 border-b border-[#E7E5E4] text-[#DC2626]">
               <span aria-hidden="true" className="material-symbols-outlined text-[22px]">warning</span>

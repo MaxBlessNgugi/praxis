@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ParishNavTab, MembersSubTab, ParishMember } from '../../../types';
 import { DEFAULT_LOCATION } from '../../../data/churchDomain';
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import { interactiveCard } from '../interactiveCard'
 ;
 
@@ -143,11 +143,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [activityFilter, setActivityFilter] = useState<string>('all');
   const [activitySearch, setActivitySearch] = useState<string>('');
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null);
+  const selectedActivityDialog = useDialog(() => setSelectedActivity(null), "Activity Detail");
 
   // Modals for sticky bottom quick action pills
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const addMemberOpenDialog = useDialog(() => setIsAddMemberOpen(false), "Quick Member Intake");
   const [isRecordTitheOpen, setIsRecordTitheOpen] = useState(false);
+  const recordTitheOpenDialog = useDialog(() => setIsRecordTitheOpen(false), "Record Tithe & Offering");
   const [isScheduleMeetingOpen, setIsScheduleMeetingOpen] = useState(false);
+  const scheduleMeetingOpenDialog = useDialog(() => setIsScheduleMeetingOpen(false), "Schedule Council / Committee Meeting");
 
   // Form states for quick actions
   const [newMemberName, setNewMemberName] = useState('');
@@ -719,7 +723,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       {/* MODAL 1: QUICK ADD MEMBER */}
       {/* ========================================================================= */}
       {isAddMemberOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...dialogProps(() => setIsAddMemberOpen(false), "Quick Member Intake")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...addMemberOpenDialog}>
           <div className="w-full max-w-lg bg-[#FFFFFF] rounded-[14px] p-6 shadow-2xl border border-[#E7E5E4] animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-[#E7E5E4] mb-4">
               <div className="flex items-center gap-2.5">
@@ -826,7 +830,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       {/* MODAL 2: QUICK RECORD TITHE */}
       {/* ========================================================================= */}
       {isRecordTitheOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...dialogProps(() => setIsRecordTitheOpen(false), "Record Tithe & Offering")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...recordTitheOpenDialog}>
           <div className="w-full max-w-lg bg-[#FFFFFF] rounded-[14px] p-6 shadow-2xl border border-[#E7E5E4] animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-[#E7E5E4] mb-4">
               <div className="flex items-center gap-2.5">
@@ -933,7 +937,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       {/* MODAL 3: QUICK SCHEDULE MEETING */}
       {/* ========================================================================= */}
       {isScheduleMeetingOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...dialogProps(() => setIsScheduleMeetingOpen(false), "Schedule Council / Committee Meeting")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...scheduleMeetingOpenDialog}>
           <div className="w-full max-w-lg bg-[#FFFFFF] rounded-[14px] p-6 shadow-2xl border border-[#E7E5E4] animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-[#E7E5E4] mb-4">
               <div className="flex items-center gap-2.5">
@@ -1028,7 +1032,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       {/* ACTIVITY DETAIL MODAL */}
       {/* ========================================================================= */}
       {selectedActivity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...dialogProps(() => setSelectedActivity(null), "Activity Detail")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...selectedActivityDialog}>
           <div className="w-full max-w-md bg-[#FFFFFF] rounded-[14px] p-6 shadow-2xl border border-[#E7E5E4] animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4] mb-3">
               <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import React, { useState } from 'react'
 ;
 
@@ -86,7 +86,9 @@ const CASES: WelfareCase[] = [
 
 export const FinancesWelfarePanel: React.FC = () => {
   const [selectedCase, setSelectedCase] = useState<WelfareCase | null>(null);
+  const selectedCaseDialog = useDialog(() => setSelectedCase(null), "Welfare Case Detail");
   const [isDisbursementModalOpen, setIsDisbursementModalOpen] = useState(false);
+  const disbursementModalOpenDialog = useDialog(() => setIsDisbursementModalOpen(false), "New Welfare Relief Disbursement");
 
   return (
     <div className="flex flex-col w-full space-y-6">
@@ -293,7 +295,7 @@ export const FinancesWelfarePanel: React.FC = () => {
 
       {/* Confidential Notes Slide-Out Drawer */}
       {selectedCase && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs" {...dialogProps(() => setSelectedCase(null), "Welfare Case Detail")}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs" {...selectedCaseDialog}>
           <div className="w-full max-w-md bg-white h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200">
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-[#EAE1D7]">
@@ -362,7 +364,7 @@ export const FinancesWelfarePanel: React.FC = () => {
 
       {/* New Disbursement Modal */}
       {isDisbursementModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...dialogProps(() => setIsDisbursementModalOpen(false), "New Welfare Relief Disbursement")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...disbursementModalOpenDialog}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[#EAE1D7] pb-3">
               <h3 className="font-headline text-base font-bold text-[#1e1b19]">New Welfare Relief Disbursement</h3>

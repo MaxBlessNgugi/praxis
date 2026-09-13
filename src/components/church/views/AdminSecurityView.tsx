@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import { AdminSubTab } from '../../../types'
 ;
 
@@ -197,12 +197,15 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
   const [searchTrash, setSearchTrash] = useState('');
   const [demoEmptyTrash, setDemoEmptyTrash] = useState(false);
   const [purgeModalItem, setPurgeModalItem] = useState<TrashItem | null>(null);
+  const purgeModalItemDialog = useDialog(() => setPurgeModalItem(null), "Permanently Purge Record?");
   const [purgePasscode, setPurgePasscode] = useState('');
   const [trashPoliciesDrawer, setTrashPoliciesDrawer] = useState(false);
+  const trashPoliciesDrawerDialog = useDialog(() => setTrashPoliciesDrawer(false), "Canonic Trash Policies");
 
   // Finance Audit states
   const [searchAudit, setSearchAudit] = useState('');
   const [selectedAuditBlock, setSelectedAuditBlock] = useState<AuditBlock | null>(null);
+  const selectedAuditBlockDialog = useDialog(() => setSelectedAuditBlock(null), "Audit Event Detail");
   const [auditFilterType, setAuditFilterType] = useState(ALL_EVENT_TYPES);
   const [fiscalPeriod, setFiscalPeriod] = useState<FiscalPeriod>('Fiscal Q1 2025');
   const [isVerifyingChain, setIsVerifyingChain] = useState(false);
@@ -1200,7 +1203,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
       {/* Cryptographic Proof Receipt Modal */}
       {selectedAuditBlock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs" {...dialogProps(() => setSelectedAuditBlock(null), "Audit Event Detail")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs" {...selectedAuditBlockDialog}>
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#e1bfb5]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#f4ece8]">
               <div className="flex items-center gap-2">
@@ -1272,7 +1275,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
       {/* Dual-Key Purge Passcode Modal */}
       {purgeModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs" {...dialogProps(() => setPurgeModalItem(null), "Permanently Purge Record?")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs" {...purgeModalItemDialog}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#e1bfb5]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#f4ece8]">
               <div className="flex items-center gap-2">
@@ -1338,7 +1341,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
       {/* Trash Policies Drawer */}
       {trashPoliciesDrawer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-[#33302d]/60 backdrop-blur-xs" {...dialogProps(() => setTrashPoliciesDrawer(false), "Canonic Trash Policies")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-[#33302d]/60 backdrop-blur-xs" {...trashPoliciesDrawerDialog}>
           <div className="bg-white h-full max-w-md w-full p-6 shadow-2xl border-l border-[#e1bfb5]/40 flex flex-col justify-between animate-in slide-in-from-right duration-200">
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-[#f4ece8]">

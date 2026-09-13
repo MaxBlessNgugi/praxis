@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BirthdayAnniversaryItem } from '../../../../types';
-import { dialogProps } from '../../dialog';
+import { useDialog } from '../../dialog';
 import { INITIAL_MILESTONES } from '../../../../data/churchMockData'
 ;
 
@@ -33,6 +33,7 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<'all' | 'birthday' | 'anniversary'>('all');
   const [timeFilter, setTimeFilter] = useState<TimeRange>('this-month');
   const [sendingBlessing, setSendingBlessing] = useState<BirthdayAnniversaryItem | null>(null);
+  const sendingBlessingDialog = useDialog(() => setSendingBlessing(null), "Send Pastoral Blessing Card");
   const [blessingMessage, setBlessingMessage] = useState<string>('');
   const [sentAlert, setSentAlert] = useState<string | null>(null);
 
@@ -257,7 +258,7 @@ export const BirthdaysAnniversariesPanel: React.FC = () => {
 
       {/* MODAL: Send Pastoral Blessing */}
       {sendingBlessing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...dialogProps(() => setSendingBlessing(null), "Send Pastoral Blessing Card")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...sendingBlessingDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-base font-bold text-[#1C1917]">

@@ -1,4 +1,4 @@
-import { dialogProps } from '../dialog';
+import { useDialog } from '../dialog';
 import React, { useState } from 'react'
 ;
 
@@ -131,6 +131,7 @@ export const GovernanceView: React.FC = () => {
 
   // Modals
   const [newResolutionModal, setNewResolutionModal] = useState(false);
+  const newResolutionModalDialog = useDialog(() => setNewResolutionModal(false), "Submit New Legislative Bill");
   const [resolutionTitle, setResolutionTitle] = useState('');
   const [resolutionSponsor, setResolutionSponsor] = useState('Trustee Board');
   const [resolutionSummary, setResolutionSummary] = useState('');
@@ -1405,7 +1406,7 @@ export const GovernanceView: React.FC = () => {
 
       {/* New Resolution Submission Modal */}
       {newResolutionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs" {...dialogProps(() => setNewResolutionModal(false), "Submit New Legislative Bill")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/60 backdrop-blur-xs" {...newResolutionModalDialog}>
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#e1bfb5]/40 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#f4ece8]">
               <div className="flex items-center gap-2">

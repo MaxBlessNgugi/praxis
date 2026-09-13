@@ -29,7 +29,7 @@ import { GovernanceView } from './views/GovernanceView';
 import { AdminSecurityView } from './views/AdminSecurityView';
 import { ServicesWorshipView } from './views/ServicesWorshipView';
 import { CommunicationsView } from './views/CommunicationsView';
-import { dialogProps } from './dialog';
+import { useDialog } from './dialog';
 import { SettingsView } from './views/SettingsView'
 ;
 
@@ -67,6 +67,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
   const [members, setMembers] = useState<ParishMember[]>(INITIAL_CHURCH_MEMBERS);
   const [searchTerm, setSearchTerm] = useState('');
   const [quickActionModal, setQuickActionModal] = useState(false);
+  const quickActionModalDialog = useDialog(() => setQuickActionModal(false), "Quick Actions");
 
   const handleAddMember = (newPartial: Partial<ParishMember>) => {
     const fullMember: ParishMember = {
@@ -390,7 +391,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
 
       {/* Quick Action Modal */}
       {quickActionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...dialogProps(() => setQuickActionModal(false), "Quick Actions")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...quickActionModalDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-sm w-full p-5 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
               <h3 className="font-headline text-sm font-bold text-[#1C1917]">Quick Actions</h3>
