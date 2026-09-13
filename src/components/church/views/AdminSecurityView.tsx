@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useDialog } from '../dialog';
-import { AdminSubTab } from '../../../types'
-;
+import { AdminSubTab } from '../../../types';
 
 interface TrashItem {
   id: string;

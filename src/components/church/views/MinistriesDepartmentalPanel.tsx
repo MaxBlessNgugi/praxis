@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useDialog } from '../dialog';
-import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain'
-;
+import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
 
 interface Department {
   id: string;

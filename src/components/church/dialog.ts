@@ -23,14 +23,12 @@ import { useCallback, useEffect, useRef, type KeyboardEvent as ReactKeyboardEven
  * The `onClose` argument is the same state setter the overlay's own close button already calls —
  * it is not a second source of truth.
  */
-export function useDialog(onClose: () => void, label: string | DialogOptions) {
-  const name = typeof label === 'string' ? label : label.label;
-  const autoFocus = typeof label === 'string' ? true : label.noAutoFocus !== true;
-  // Both handlers stay stable, so they read the current arguments through a ref rather than closing
-  // over them.
-  const latest = useRef({ onClose, autoFocus });
+export function useDialog(onClose: () => void, label: string) {
+  // The handler stays stable, so it reads the current callback through a ref rather than closing
+  // over it.
+  const latest = useRef(onClose);
   useEffect(() => {
-    latest.current = { onClose, autoFocus };
+    latest.current = onClose;
   });
 
   /** What the open dialog took from the page, so unmount can hand it back. */
@@ -46,16 +44,14 @@ export function useDialog(onClose: () => void, label: string | DialogOptions) {
       return;
     }
     open.current = { restoreTarget: (document.activeElement as HTMLElement) ?? null, marked: inertOutside(dialog) };
-    if (latest.current.autoFocus) {
-      firstFocusable(dialog).focus({ preventScroll: true });
-    }
+    (focusableIn(dialog)[0] ?? dialog).focus({ preventScroll: true });
   }, []);
 
   const onKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape') {
       // A dialog opened from a dialog would otherwise close both.
       event.stopPropagation();
-      latest.current.onClose();
+      latest.current();
       return;
     }
     if (event.key !== 'Tab') return;
@@ -77,14 +73,7 @@ export function useDialog(onClose: () => void, label: string | DialogOptions) {
     }
   }, []);
 
-  return { role: 'dialog' as const, 'aria-modal': true as const, 'aria-label': name, tabIndex: -1, ref, onKeyDown };
-}
-
-export interface DialogOptions {
-  /** Name announced for the dialog — usually the visible heading. */
-  label: string;
-  /** Skip moving focus in; for an overlay that has nothing focusable to land on. */
-  noAutoFocus?: boolean;
+  return { role: 'dialog' as const, 'aria-modal': true as const, 'aria-label': label, tabIndex: -1, ref, onKeyDown };
 }
 
 /** Marked while a dialog is open, with a count so overlapping dialogs release in the right order. */
@@ -136,8 +125,4 @@ function focusableIn(dialog: HTMLElement): HTMLElement[] {
   return Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
     (control) => !control.hasAttribute('disabled') && control.offsetParent !== null,
   );
-}
-
-function firstFocusable(dialog: HTMLElement): HTMLElement {
-  return focusableIn(dialog).find((control) => control.getAttribute('aria-hidden') !== 'true') ?? dialog;
 }

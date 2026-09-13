@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { ParishNavTab, MembersSubTab, ParishMember } from '../../../types';
 import { DEFAULT_LOCATION } from '../../../data/churchDomain';
 import { useDialog } from '../dialog';
-import { interactiveCard } from '../interactiveCard'
-;
+import { interactiveCard } from '../interactiveCard';
 
 interface ActivityItem {
   id: string;

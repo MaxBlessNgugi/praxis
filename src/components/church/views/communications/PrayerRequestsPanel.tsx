@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { PrayerRequestItem, PrayerPrivacyLevel } from '../../../../types';
 import { useDialog } from '../../dialog';
-import { INITIAL_PRAYER_REQUESTS } from '../../../../data/churchMockData'
-;
+import { INITIAL_PRAYER_REQUESTS } from '../../../../data/churchMockData';
 
 export const PrayerRequestsPanel: React.FC = () => {
   const [prayers, setPrayers] = useState<PrayerRequestItem[]>(INITIAL_PRAYER_REQUESTS);

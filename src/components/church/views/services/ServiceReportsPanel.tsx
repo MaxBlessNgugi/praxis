@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { ServiceReportItem, WorshipService } from '../../../../types';
 import { INITIAL_SERVICE_REPORTS, INITIAL_SERVICES } from '../../../../data/churchMockData';
 import { useDialog } from '../../dialog';
-import { interactiveCard } from '../../interactiveCard'
-;
+import { interactiveCard } from '../../interactiveCard';
 
 export const ServiceReportsPanel: React.FC = () => {
   const [reports, setReports] = useState<ServiceReportItem[]>(INITIAL_SERVICE_REPORTS);

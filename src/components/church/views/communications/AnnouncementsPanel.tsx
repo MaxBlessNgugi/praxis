@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { AnnouncementItem, AnnouncementAudience } from '../../../../types';
 import { useDialog } from '../../dialog';
-import { INITIAL_ANNOUNCEMENTS } from '../../../../data/churchMockData'
-;
+import { INITIAL_ANNOUNCEMENTS } from '../../../../data/churchMockData';
 
 export const AnnouncementsPanel: React.FC = () => {
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(INITIAL_ANNOUNCEMENTS);

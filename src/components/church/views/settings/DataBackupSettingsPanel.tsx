@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { DataBackupSnapshot } from '../../../../types';
 import { useDialog } from '../../dialog';
-import { INITIAL_BACKUP_SNAPSHOTS } from '../../../../data/churchMockData'
-;
+import { INITIAL_BACKUP_SNAPSHOTS } from '../../../../data/churchMockData';
 
 export const DataBackupSettingsPanel: React.FC = () => {
   const [backups, setBackups] = useState<DataBackupSnapshot[]>(INITIAL_BACKUP_SNAPSHOTS);

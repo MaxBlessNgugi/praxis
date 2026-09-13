@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { ChurchEventItem } from '../../../../types';
 import { INITIAL_CHURCH_EVENTS } from '../../../../data/churchMockData';
 import { useDialog } from '../../dialog';
-import { DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain'
-;
+import { DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain';
 
 /** The published dates, e.g. "April 16 – 19, 2025"; a single-day event reads "November 24, 2025".
  *  `en-US` because that is the month-first order the rest of the mockup and the church's own
