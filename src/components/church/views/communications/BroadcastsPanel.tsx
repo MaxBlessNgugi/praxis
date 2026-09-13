@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { BroadcastItem, BroadcastTemplate } from '../../../../types';
 import { useDialog } from '../../dialog';
-import { INITIAL_BROADCAST_HISTORY, INITIAL_BROADCAST_TEMPLATES } from '../../../../data/churchMockData'
-;
+import { INITIAL_BROADCAST_HISTORY, INITIAL_BROADCAST_TEMPLATES } from '../../../../data/churchMockData';
 
 export const BroadcastsPanel: React.FC = () => {
   const [broadcasts, setBroadcasts] = useState<BroadcastItem[]>(INITIAL_BROADCAST_HISTORY);

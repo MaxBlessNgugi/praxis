@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { BirthdayAnniversaryItem } from '../../../../types';
 import { useDialog } from '../../dialog';
-import { INITIAL_MILESTONES } from '../../../../data/churchMockData'
-;
+import { INITIAL_MILESTONES } from '../../../../data/churchMockData';
 
 type TimeRange = 'this-week' | 'this-month' | 'quarter';
 

@@ -1,6 +1,5 @@
 import { useDialog } from '../../dialog';
-import React, { useState } from 'react'
-;
+import React, { useState } from 'react';
 import {
   VolunteerRosterDuty,
   SwapRequest,

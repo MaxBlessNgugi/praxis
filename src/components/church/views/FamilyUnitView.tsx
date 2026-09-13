@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { HouseholdUnit } from '../../../types';
 import { INITIAL_HOUSEHOLDS } from '../../../data/churchMockData';
 import { useDialog } from '../dialog';
-import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain'
-;
+import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
 
 /** The statuses the mock households actually carry, so the filter cannot go dead. */
 const HOUSEHOLD_STATUSES = [...new Set(INITIAL_HOUSEHOLDS.map((household) => household.statusBadge))];

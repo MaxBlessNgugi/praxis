@@ -30,8 +30,7 @@ import { AdminSecurityView } from './views/AdminSecurityView';
 import { ServicesWorshipView } from './views/ServicesWorshipView';
 import { CommunicationsView } from './views/CommunicationsView';
 import { useDialog } from './dialog';
-import { SettingsView } from './views/SettingsView'
-;
+import { SettingsView } from './views/SettingsView';
 
 interface ChurchSystemAppProps {
   initialTab?: ParishNavTab;

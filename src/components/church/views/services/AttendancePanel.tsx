@@ -12,8 +12,7 @@ import {
   INITIAL_SERVICES,
   INITIAL_CHURCH_MEMBERS,
 } from '../../../../data/churchMockData';
-import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain'
-;
+import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain';
 
 /** The ministries a first-time visitor can ask about; the form defaults to the first. */
 const INTERESTED_MINISTRIES = [

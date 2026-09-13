@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { SoftDeleteRecord } from '../../../types';
 import { useDialog } from '../dialog';
-import { INITIAL_SOFT_DELETE_RECORDS } from '../../../data/churchMockData'
-;
+import { INITIAL_SOFT_DELETE_RECORDS } from '../../../data/churchMockData';
 
 interface DeleteChristianViewProps {
   onRestoreMember?: (record: SoftDeleteRecord) => void;

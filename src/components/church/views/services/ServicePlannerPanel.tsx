@@ -3,8 +3,7 @@ import { WorshipService, LiturgyItem, ServiceRoleAssignment, ServiceType } from 
 import { INITIAL_SERVICES } from '../../../../data/churchMockData';
 import { DEFAULT_LOCATION, LOCATIONS, SUNDAY_WINDOW, sundayLiturgy } from '../../../../data/churchDomain';
 import { useDialog } from '../../dialog';
-import { interactiveCard } from '../../interactiveCard'
-;
+import { interactiveCard } from '../../interactiveCard';
 
 export const ServicePlannerPanel: React.FC = () => {
   const [services, setServices] = useState<WorshipService[]>(INITIAL_SERVICES);
