@@ -2,25 +2,6 @@ import React, { useState } from 'react';
 import { useDialog } from '../dialog';
 import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain'
 ;
-import { 
-  Building2, 
-  Users, 
-  Wallet, 
-  ShieldCheck, 
-  Search, 
-  Plus, 
-  MoreVertical, 
-  Calendar, 
-  Mail, 
-  Phone, 
-  ArrowRight, 
-  CheckCircle, 
-  X,
-  ArrowUpDown,
-  Filter,
-  Grid,
-  List
-} from 'lucide-react';
 
 interface Department {
   id: string;
