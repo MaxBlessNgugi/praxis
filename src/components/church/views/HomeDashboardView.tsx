@@ -772,7 +772,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <select id="home-member-tier" aria-label="Membership Tier"
                     value={newMemberTier}
                     onChange={(e) => setNewMemberTier(e.target.value)}
-                    className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] cursor-pointer transition-all"
+                    className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/20 cursor-pointer transition-all"
                   >
                     <option value="member">Member (Full Voting)</option>
                     <option value="first-timer">First Timer / Candidate</option>
@@ -882,7 +882,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <select id="home-tithe-fund" aria-label="Fund Allocation"
                     value={titheFund}
                     onChange={(e) => setTitheFund(e.target.value)}
-                    className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] cursor-pointer transition-all"
+                    className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/20 cursor-pointer transition-all"
                   >
                     <option value="General Operating #101">General Operating #101</option>
                     <option value="Building Expansion #610">Building Expansion #610</option>
@@ -976,7 +976,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <select id="home-meeting-committee" aria-label="Governing Body / Committee"
                     value={meetingCommittee}
                     onChange={(e) => setMeetingCommittee(e.target.value)}
-                    className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] cursor-pointer transition-all"
+                    className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/20 cursor-pointer transition-all"
                   >
                     <option value="Church Council">Church Council</option>
                     <option value="Missions, Mercy & Church Planting">Missions, Mercy & Church Planting</option>
@@ -991,7 +991,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     type="datetime-local"
                     value={meetingDate}
                     onChange={(e) => setMeetingDate(e.target.value)}
-                    className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] cursor-pointer transition-all"
+                    className="w-full h-9 px-2.5 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] focus:outline-none focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/20 cursor-pointer transition-all"
                   />
                 </div>
               </div>
