@@ -6,6 +6,8 @@ import { useDialog } from './dialog';
 
 interface ChurchHeaderProps {
   onQuickAction?: () => void;
+  /** Opens the command palette; the same shortcut (Ctrl/Cmd + K) lives in the shell. */
+  onOpenCommandPalette?: () => void;
   searchTerm: string;
   onSearchChange: (val: string) => void;
   activeTabTitle?: string;
@@ -13,6 +15,7 @@ interface ChurchHeaderProps {
 
 export const ChurchHeader: React.FC<ChurchHeaderProps> = ({
   onQuickAction,
+  onOpenCommandPalette,
   searchTerm,
   onSearchChange,
   activeTabTitle = 'Home Cloud Dashboard',
@@ -108,6 +111,17 @@ export const ChurchHeader: React.FC<ChurchHeaderProps> = ({
         >
           <span aria-hidden="true" className="material-symbols-outlined text-[20px]">notifications</span>
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#C2410C]"></span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenCommandPalette}
+          aria-label="Command palette"
+          title="Command palette (Ctrl+K)"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] bg-[#FDF8F3] hover:bg-[#F5EDE4] text-[#57534E] hover:text-[#1C1917] border border-[#E7E5E4] font-headline text-xs font-bold transition-all cursor-pointer"
+        >
+          <span aria-hidden="true" className="material-symbols-outlined text-[17px]">keyboard_command_key</span>
+          <span className="hidden xl:inline">Command palette</span>
         </button>
 
         <button
