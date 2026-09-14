@@ -10,10 +10,9 @@ Ministries, Governance, Reports, Settings and Admin.
 ```bash
 cd backend
 cp .env.example .env          # then set DATABASE_URL and a real JWT_SECRET
-npm install
-npx prisma generate
-npx prisma migrate dev --name init
-npm run seed
+npm install                   # also generates the Prisma client
+npx prisma migrate deploy     # builds the schema from the checked-in prisma/migrations/
+npm run seed                  # Destiny Sanctuary's departments, register, ledgers and sittings
 npm run dev                   # http://localhost:4000/health
 ```
 
@@ -38,27 +37,55 @@ Nothing the *application* writes depends on that, deliberately: every stored sum
 trash label uses plain ASCII punctuation, so a mis-encoded database cannot turn a payment into a 500
 partway through its transaction.
 
+**A database that already exists** — one this service was pointed at with `prisma db push` before the
+migration was checked in — has the tables but no record of how it got them, so `migrate deploy` would
+try to create tables that are already there. Check that it really is at the migration, then baseline
+it once:
+
+```bash
+npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+                                              # 0 = it matches the schema, 2 = print what differs
+npx prisma migrate resolve --applied 20260914151632_init
+```
+
 ## Verify it
 
 ```bash
 npm run typecheck                             # tsc --noEmit, strict
 npx prisma validate                           # the schema parses and every relation resolves
-npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
-                                              # the schema materialises as real DDL, no database needed
-npx prisma migrate dev --name init            # …and it applies to Postgres
+npx prisma migrate deploy                     # applies prisma/migrations/ to an empty database
 npm run seed                                  # and the seed actually writes
+npx prisma migrate diff --from-migrations prisma/migrations \
+  --to-schema-datamodel prisma/schema.prisma \
+  --shadow-database-url "$SHADOW_DATABASE_URL" --exit-code
+                                              # 0 = migrations and schema agree, 2 = they have drifted
 curl -s localhost:4000/health                 # {"status":"ok","database":"reachable",...}
 curl -s localhost:4000/api/services           # 401 — the route exists and is guarded
 ```
 
-The last pass was verified against a throwaway Postgres rather than by reading the code: 36 end-to-end
-checks, each asserting the HTTP status as well as the body — a retirement on each shape of entity, a
-reason outside the shared list, a reason a module does not offer, a second restore, the wrong door, a
-household with people in it, a ministry with a roll, an account retiring and being restored,
-`?headsOnly=false`, `?isActive=false`, a report answering for its window, and the ledger still
-verifying after both a void and a restore. Those checks live in the commit history, not in the
-repository: the harness needs the throwaway database to run, so turning it into a checked-in suite is
-the next piece of work this needs.
+`$SHADOW_DATABASE_URL` is an empty database Prisma replays the migrations into to compare them with
+the schema. It has to exist first; `npx prisma db execute --url "$ADMIN_DATABASE_URL" --stdin` can
+create it without a Postgres client installed, which is how CI does it.
+
+Those four steps are what CI runs on every pull request: `.github/workflows/check.yml` starts a
+Postgres service container, applies `prisma/migrations/` to an empty database, seeds it, asserts the
+seed wrote rows, and fails the pull request if the migrations and `schema.prisma` have drifted apart.
+A fresh environment is therefore reproducible from this repository alone, and a schema change that
+forgets its migration cannot merge.
+
+The module sweep is a separate, hand-run thing — 26 end-to-end checks this pass, against a database
+built by nothing but `migrate deploy` and `npm run seed`, each asserting the status and the body
+rather than a bare `200`: an announcement written and found again, the celebrations window answering
+for a full year (the seeded wedding anniversaries fall outside the default thirty days), the seven
+departments, the leadership roster, the two sittings, a resolution drafted, filtered by stage and
+voted through, the reports overview's five keys, the profile read then changed, the three preference
+documents plus a write to one, and the Trash — retire, list, restore, and an audit trail holding
+create, delete and restore. It needs a live seeded database, so it is evidence for a revision rather
+than a gate; what CI re-proves every time is the provisioning above.
+
+**Nothing calls this API yet.** The console reads its own demo data: there is no HTTP client in
+`src/`, no `VITE_API_*` variable and no wiring, so every request in this document is a `curl` until
+that changes.
 
 ## Endpoints
 

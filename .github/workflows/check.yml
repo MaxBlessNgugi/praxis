@@ -75,3 +75,68 @@ jobs:
 
       - name: typecheck
         run: npm run typecheck
+
+  # Nothing above proves a database can be built from this repository — the typecheck job reads types
+  # and the checks below it read nothing. This job builds one: a Postgres service container, the
+  # checked-in migration applied to an empty database, the seed, and a parity check that
+  # `prisma/migrations/` still describes `schema.prisma`. A migration that no longer matches the
+  # schema fails the pull request instead of surfacing as a runtime error in a parish office.
+  provision:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: praxis
+          POSTGRES_PASSWORD: praxis
+          POSTGRES_DB: praxis
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U praxis" --health-interval 5s --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://praxis:praxis@localhost:5432/praxis?schema=public
+      JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
+      PORT: 4000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: install
+        run: npm ci
+
+      - name: build the schema from the migration alone
+        run: npx prisma migrate deploy
+
+      # The seed is what proves the schema is not merely present but usable: it writes through the
+      # generated client, and the counts are asserted so an empty database cannot pass as provisioned.
+      - name: seed it, and assert the seed wrote rows
+        run: |
+          npm run seed
+          node -e 'const {PrismaClient}=require("@prisma/client");const p=new PrismaClient();p.member.count().then(async (members)=>{const ministries=await p.ministry.count();await p.$disconnect();console.log(`seed wrote ${members} members and ${ministries} ministries`);if(members===0||ministries!==7)process.exit(1);})'
+
+      # `migrate diff` needs an empty shadow database to replay the migrations into; `db execute`
+      # creates it so this job needs no Postgres client of its own. `--exit-code` returns 2 on any
+      # difference, which fails the step.
+      - name: the migrations still describe the schema
+        env:
+          ADMIN_DATABASE_URL: postgresql://praxis:praxis@localhost:5432/postgres
+          SHADOW_DATABASE_URL: postgresql://praxis:praxis@localhost:5432/praxis_shadow
+        run: |
+          npx prisma db execute --url "$ADMIN_DATABASE_URL" --stdin <<'SQL'
+          CREATE DATABASE praxis_shadow;
+          SQL
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --exit-code
