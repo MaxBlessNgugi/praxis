@@ -5,6 +5,7 @@ import { assertMemberOnRegister } from './member.service';
 import { page } from '../lib/respond';
 import { between } from '../schemas/common';
 import { retireRecord } from '../lib/archive';
+import { findLive, live } from '../lib/live';
 import type { RetireReason } from '../schemas/common';
 import type {
   AnswerPrayerRequestInput,
@@ -37,7 +38,7 @@ import type {
 
 export async function listAnnouncements(query: ListAnnouncementsQuery) {
   const where: Prisma.AnnouncementWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.audience ? { audience: query.audience } : {}),
     ...(query.isPinned === undefined ? {} : { isPinned: query.isPinned }),
     ...between('publishedAt', query),
@@ -73,13 +74,12 @@ export async function listAnnouncements(query: ListAnnouncementsQuery) {
   return { data, meta: page(total, query) };
 }
 
-export async function getAnnouncement(id: string) {
-  const announcement = await prisma.announcement.findFirst({
-    where: { id, deletedAt: null },
-    include: { author: { select: { id: true, name: true } } },
-  });
-  if (!announcement) throw new AppError(404, 'That announcement does not exist', 'not_found');
-  return announcement;
+export function getAnnouncement(id: string) {
+  return findLive(
+    { where: { id }, include: { author: { select: { id: true, name: true } } } },
+    prisma.announcement,
+    'That announcement does not exist',
+  );
 }
 
 export async function createAnnouncement(input: CreateAnnouncementInput, actorId: string) {
@@ -109,8 +109,7 @@ export async function createAnnouncement(input: CreateAnnouncementInput, actorId
 }
 
 export async function updateAnnouncement(id: string, input: UpdateAnnouncementInput, actorId: string) {
-  const before = await prisma.announcement.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That announcement does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.announcement, 'That announcement does not exist');
 
   return prisma.$transaction(async (tx) => {
     const announcement = await tx.announcement.update({
@@ -154,7 +153,7 @@ export function retireAnnouncement(id: string, input: RetireReason, actorId: str
 
 export async function listBroadcasts(query: ListBroadcastsQuery) {
   const where: Prisma.BroadcastWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.channel ? { channel: query.channel } : {}),
     ...(query.status ? { status: query.status } : {}),
     ...between('createdAt', query),
@@ -183,13 +182,12 @@ export async function listBroadcasts(query: ListBroadcastsQuery) {
   return { data, meta: page(total, query) };
 }
 
-export async function getBroadcast(id: string) {
-  const broadcast = await prisma.broadcast.findFirst({
-    where: { id, deletedAt: null },
-    include: { createdBy: { select: { id: true, name: true } } },
-  });
-  if (!broadcast) throw new AppError(404, 'That broadcast does not exist', 'not_found');
-  return broadcast;
+export function getBroadcast(id: string) {
+  return findLive(
+    { where: { id }, include: { createdBy: { select: { id: true, name: true } } } },
+    prisma.broadcast,
+    'That broadcast does not exist',
+  );
 }
 
 export async function createBroadcast(input: CreateBroadcastInput, actorId: string) {
@@ -219,8 +217,7 @@ export async function createBroadcast(input: CreateBroadcastInput, actorId: stri
 }
 
 export async function updateBroadcast(id: string, input: UpdateBroadcastInput, actorId: string) {
-  const before = await prisma.broadcast.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That broadcast does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.broadcast, 'That broadcast does not exist');
   // A campaign that has already gone out is a record of what was said, not a draft.
   if (before.status === 'sent') throw new AppError(409, 'That broadcast has already been sent', 'already_sent');
 
@@ -243,8 +240,7 @@ export async function updateBroadcast(id: string, input: UpdateBroadcastInput, a
 }
 
 export async function sendBroadcast(id: string, input: SendBroadcastInput, actorId: string) {
-  const existing = await prisma.broadcast.findFirst({ where: { id, deletedAt: null } });
-  if (!existing) throw new AppError(404, 'That broadcast does not exist', 'not_found');
+  const existing = await findLive({ where: { id } }, prisma.broadcast, 'That broadcast does not exist');
   if (existing.status === 'sent') throw new AppError(409, 'That broadcast has already been marked sent', 'already_sent');
 
   const sentAt = input.sentAt ?? new Date();
@@ -284,7 +280,7 @@ export function retireBroadcast(id: string, input: RetireReason, actorId: string
 
 export async function listEvents(query: ListEventsQuery) {
   const where: Prisma.EventWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.kind ? { kind: query.kind } : {}),
     ...between('startsAt', query),
     // "Upcoming" means not yet over, so an event running today still shows.
@@ -313,10 +309,8 @@ export async function listEvents(query: ListEventsQuery) {
   return { data, meta: page(total, query) };
 }
 
-export async function getEvent(id: string) {
-  const event = await prisma.event.findFirst({ where: { id, deletedAt: null } });
-  if (!event) throw new AppError(404, 'That event does not exist', 'not_found');
-  return event;
+export function getEvent(id: string) {
+  return findLive({ where: { id } }, prisma.event, 'That event does not exist');
 }
 
 export async function createEvent(input: CreateEventInput, actorId: string) {
@@ -330,8 +324,7 @@ export async function createEvent(input: CreateEventInput, actorId: string) {
 }
 
 export async function updateEvent(id: string, input: UpdateEventInput, actorId: string) {
-  const before = await prisma.event.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That event does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.event, 'That event does not exist');
 
   return prisma.$transaction(async (tx) => {
     const event = await tx.event.update({ where: { id }, data: input });
@@ -365,7 +358,7 @@ export function retireEvent(id: string, input: RetireReason, actorId: string) {
 
 export async function listPrayerRequests(query: ListPrayerRequestsQuery) {
   const where: Prisma.PrayerRequestWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.status ? { status: query.status } : {}),
     ...(query.memberId ? { memberId: query.memberId } : {}),
     ...between('submittedAt', query),
@@ -388,7 +381,7 @@ export async function listPrayerRequests(query: ListPrayerRequestsQuery) {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),
-    prisma.prayerRequest.groupBy({ by: ['status'], where: { deletedAt: null }, _count: true }),
+    prisma.prayerRequest.groupBy({ by: ['status'], where: live, _count: true }),
   ]);
 
   return {
@@ -398,13 +391,12 @@ export async function listPrayerRequests(query: ListPrayerRequestsQuery) {
   };
 }
 
-export async function getPrayerRequest(id: string) {
-  const request = await prisma.prayerRequest.findFirst({
-    where: { id, deletedAt: null },
-    include: { member: { select: { id: true, firstName: true, lastName: true } } },
-  });
-  if (!request) throw new AppError(404, 'That prayer request does not exist', 'not_found');
-  return request;
+export function getPrayerRequest(id: string) {
+  return findLive(
+    { where: { id }, include: { member: { select: { id: true, firstName: true, lastName: true } } } },
+    prisma.prayerRequest,
+    'That prayer request does not exist',
+  );
 }
 
 export async function createPrayerRequest(input: CreatePrayerRequestInput, actorId: string) {
@@ -435,8 +427,7 @@ export async function createPrayerRequest(input: CreatePrayerRequestInput, actor
 }
 
 export async function updatePrayerRequest(id: string, input: UpdatePrayerRequestInput, actorId: string) {
-  const before = await prisma.prayerRequest.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That prayer request does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.prayerRequest, 'That prayer request does not exist');
 
   return prisma.$transaction(async (tx) => {
     const request = await tx.prayerRequest.update({
@@ -465,8 +456,7 @@ export async function updatePrayerRequest(id: string, input: UpdatePrayerRequest
 }
 
 export async function answerPrayerRequest(id: string, input: AnswerPrayerRequestInput, actorId: string) {
-  const before = await prisma.prayerRequest.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That prayer request does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.prayerRequest, 'That prayer request does not exist');
   if (before.status === 'answered') throw new AppError(409, 'That request has already been marked answered', 'already_answered');
 
   const answeredAt = input.answeredAt ?? new Date();
@@ -520,7 +510,7 @@ export interface Celebration {
  */
 export async function celebrations(query: CelebrationsQuery) {
   const members = await prisma.member.findMany({
-    where: { deletedAt: null, status: 'active', OR: [{ dateOfBirth: { not: null } }, { weddingAnniversary: { not: null } }] },
+    where: { ...live, status: 'active', OR: [{ dateOfBirth: { not: null } }, { weddingAnniversary: { not: null } }] },
     select: { id: true, firstName: true, lastName: true, initials: true, phone: true, dateOfBirth: true, weddingAnniversary: true },
   });
 

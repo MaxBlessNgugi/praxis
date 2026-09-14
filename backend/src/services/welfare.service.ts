@@ -4,6 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import { appendFinanceEntry } from '../lib/financeAudit';
 import { assertMemberOnRegister } from './member.service';
 import { page } from '../lib/respond';
+import { findLive, live } from '../lib/live';
 import type {
   DecideWelfareInput,
   DisburseWelfareInput,
@@ -32,7 +33,7 @@ const toPublicCase = (row: WelfareRow) => ({ ...row, amount: money(row.amount) }
 
 export async function listCases(query: ListWelfareQuery) {
   const where: Prisma.WelfareDisbursementWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.status ? { status: query.status } : {}),
     ...(query.category ? { category: query.category } : {}),
     ...(query.memberId ? { memberId: query.memberId } : {}),
@@ -82,8 +83,7 @@ export async function listCases(query: ListWelfareQuery) {
 }
 
 export async function getCase(id: string) {
-  const welfareCase = await prisma.welfareDisbursement.findFirst({ where: { id, deletedAt: null }, include: caseInclude });
-  if (!welfareCase) throw new AppError(404, 'That welfare case does not exist', 'not_found');
+  const welfareCase = await findLive({ where: { id }, include: caseInclude }, prisma.welfareDisbursement, 'That welfare case does not exist');
   return toPublicCase(welfareCase);
 }
 
@@ -132,8 +132,7 @@ export async function openCase(input: OpenWelfareCaseInput, actorId: string) {
 }
 
 export async function decideCase(id: string, input: DecideWelfareInput, actorId: string) {
-  const existing = await prisma.welfareDisbursement.findFirst({ where: { id, deletedAt: null } });
-  if (!existing) throw new AppError(404, 'That welfare case does not exist', 'not_found');
+  const existing = await findLive({ where: { id } }, prisma.welfareDisbursement, 'That welfare case does not exist');
   if (existing.status !== 'requested') {
     throw new AppError(409, `That case was already ${existing.status}`, 'already_decided');
   }
@@ -166,8 +165,7 @@ export async function decideCase(id: string, input: DecideWelfareInput, actorId:
 
 /** The moment money actually leaves. Recorded separately from approval, with its own date. */
 export async function disburseCase(id: string, input: DisburseWelfareInput, actorId: string) {
-  const existing = await prisma.welfareDisbursement.findFirst({ where: { id, deletedAt: null } });
-  if (!existing) throw new AppError(404, 'That welfare case does not exist', 'not_found');
+  const existing = await findLive({ where: { id } }, prisma.welfareDisbursement, 'That welfare case does not exist');
   if (existing.status !== 'approved') {
     throw new AppError(
       409,

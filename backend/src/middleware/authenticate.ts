@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
+import { live } from '../lib/live';
 import { verifyAccessToken } from '../lib/auth';
 import { AppError, forbiddenError, unauthorizedError } from './errorHandler';
 
@@ -40,7 +41,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
     const { sub } = verifyAccessToken(token);
 
     const user = await prisma.user.findFirst({
-      where: { id: sub, deletedAt: null },
+      where: { id: sub, ...live },
       include: { role: true },
     });
     if (!user) throw unauthorizedError('That account no longer exists');

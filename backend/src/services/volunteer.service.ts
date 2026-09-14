@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { page } from '../lib/respond';
+import { findLive, live } from '../lib/live';
 import type { CreateDutyInput, ListRosterQuery, RequestSwapInput, UpdateDutyInput } from '../schemas/service.schema';
 
 const dutyInclude = {
@@ -11,7 +12,7 @@ const dutyInclude = {
 
 export async function listRoster(query: ListRosterQuery) {
   const where: Prisma.RosterDutyWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.serviceId ? { serviceId: query.serviceId } : {}),
     ...(query.memberId ? { memberId: query.memberId } : {}),
     ...(query.ministryId ? { ministryId: query.ministryId } : {}),
@@ -37,8 +38,8 @@ export async function listRoster(query: ListRosterQuery) {
 
 export async function createDuty(serviceId: string, input: CreateDutyInput, actorId: string) {
   const [service, member] = await Promise.all([
-    prisma.service.findFirst({ where: { id: serviceId, deletedAt: null } }),
-    prisma.member.findFirst({ where: { id: input.memberId, deletedAt: null } }),
+    prisma.service.findFirst({ where: { id: serviceId, ...live } }),
+    prisma.member.findFirst({ where: { id: input.memberId, ...live } }),
   ]);
   if (!service) throw new AppError(404, 'That service does not exist', 'not_found');
   if (!member) throw new AppError(400, 'That volunteer is not on the register', 'unknown_member');
@@ -59,8 +60,7 @@ export async function createDuty(serviceId: string, input: CreateDutyInput, acto
 }
 
 export async function updateDuty(id: string, input: UpdateDutyInput, actorId: string) {
-  const before = await prisma.rosterDuty.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That duty is not on the roster', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.rosterDuty, 'That duty is not on the roster');
 
   return prisma.$transaction(async (tx) => {
     const duty = await tx.rosterDuty.update({ where: { id }, data: input, include: dutyInclude });
@@ -80,8 +80,7 @@ export async function updateDuty(id: string, input: UpdateDutyInput, actorId: st
 }
 
 export async function removeDuty(id: string, actorId: string) {
-  const duty = await prisma.rosterDuty.findFirst({ where: { id, deletedAt: null } });
-  if (!duty) throw new AppError(404, 'That duty is not on the roster', 'not_found');
+  const duty = await findLive({ where: { id } }, prisma.rosterDuty, 'That duty is not on the roster');
 
   return prisma.$transaction(async (tx) => {
     await tx.rosterDuty.update({ where: { id }, data: { deletedAt: new Date(), status: 'cancelled' } });
@@ -99,8 +98,7 @@ export async function removeDuty(id: string, actorId: string) {
  * roster never holds two competing claims on the same slot.
  */
 export async function requestSwap(dutyId: string, input: RequestSwapInput, actorId: string, requesterMemberId: string) {
-  const duty = await prisma.rosterDuty.findFirst({ where: { id: dutyId, deletedAt: null }, include: { swapRequests: true } });
-  if (!duty) throw new AppError(404, 'That duty is not on the roster', 'not_found');
+  const duty = await findLive({ where: { id: dutyId }, include: { swapRequests: true } }, prisma.rosterDuty, 'That duty is not on the roster');
   if (duty.memberId !== requesterMemberId) throw new AppError(403, 'Only the volunteer holding this duty can ask for cover', 'not_duty_holder');
   if (duty.status === 'completed' || duty.status === 'missed') throw new AppError(409, 'That duty has already happened', 'duty_closed');
   if (duty.swapRequests.some((request) => request.status === 'requested')) {
@@ -108,7 +106,7 @@ export async function requestSwap(dutyId: string, input: RequestSwapInput, actor
   }
 
   if (input.replacementId) {
-    const replacement = await prisma.member.findFirst({ where: { id: input.replacementId, deletedAt: null } });
+    const replacement = await prisma.member.findFirst({ where: { id: input.replacementId, ...live } });
     if (!replacement) throw new AppError(400, 'That replacement is not on the register', 'unknown_member');
   }
 

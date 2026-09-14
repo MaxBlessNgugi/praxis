@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { money, prisma } from '../lib/prisma';
 import { appendFinanceEntry } from '../lib/financeAudit';
 import { FINANCE_ENTITY_NAMES, restoreArchived, retireRecord } from '../lib/archive';
+import { live } from '../lib/live';
 import { page } from '../lib/respond';
 import type {
   FinanceSummaryQuery,
@@ -178,7 +179,6 @@ export async function listAudit(query: ListFinanceAuditQuery) {
  */
 export async function summary(query: FinanceSummaryQuery) {
   const window = query.from || query.to ? { gte: query.from, lte: query.to } : undefined;
-  const live = { deletedAt: null };
 
   const [tithes, offerings, contributions, welfare, charity, givenByMethod, givenByCategory] = await Promise.all([
     prisma.tithe.aggregate({ where: { ...live, ...(window ? { receivedAt: window } : {}) }, _sum: { amount: true }, _count: true }),

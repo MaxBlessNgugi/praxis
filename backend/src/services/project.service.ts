@@ -5,6 +5,7 @@ import { appendFinanceEntry, lockFinanceLedger } from '../lib/financeAudit';
 import { assertMemberOnRegister } from './member.service';
 import { nextInSeries } from './giving.service';
 import { page } from '../lib/respond';
+import { findLive, includingRetired, live } from '../lib/live';
 import type {
   CreateProjectInput,
   ListContributionsQuery,
@@ -46,10 +47,12 @@ async function totalsFor(projectIds: string[]): Promise<Map<string, FundingTotal
   if (projectIds.length === 0) return new Map();
 
   const [projects, grouped] = await Promise.all([
-    prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, targetAmount: true } }),
+    // Retired rows too: the caller is looking up ids it already holds, and a project retired
+    // mid-report still owes its target amount.
+    prisma.project.findMany({ where: { id: { in: projectIds }, ...includingRetired }, select: { id: true, targetAmount: true } }),
     prisma.projectContribution.groupBy({
       by: ['projectId', 'kind'],
-      where: { projectId: { in: projectIds }, deletedAt: null },
+      where: { projectId: { in: projectIds }, ...live },
       _sum: { amount: true },
     }),
   ]);
@@ -83,7 +86,7 @@ const withProgress = (project: { id: string } & Record<string, unknown>, totals:
 
 export async function listProjects(query: ListProjectsQuery) {
   const where: Prisma.ProjectWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.status ? { status: query.status } : {}),
     ...(query.q ? { name: { contains: query.q, mode: 'insensitive' as const } } : {}),
   };
@@ -106,11 +109,10 @@ export async function listProjects(query: ListProjectsQuery) {
 }
 
 export async function getProject(id: string) {
-  const project = await prisma.project.findFirst({ where: { id, deletedAt: null } });
-  if (!project) throw new AppError(404, 'That project does not exist', 'not_found');
+  const project = await findLive({ where: { id } }, prisma.project, 'That project does not exist');
 
   const totals = await totalsFor([project.id]);
-  const contributorCount = await prisma.projectContribution.count({ where: { projectId: id, deletedAt: null } });
+  const contributorCount = await prisma.projectContribution.count({ where: { projectId: id, ...live } });
   return { ...withProgress(project as { id: string } & Record<string, unknown>, totals), contributorCount };
 }
 
@@ -149,8 +151,7 @@ export async function createProject(input: CreateProjectInput, actorId: string) 
  * edited, only voided.
  */
 export async function updateProject(id: string, input: UpdateProjectInput, actorId: string) {
-  const before = await prisma.project.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That project does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.project, 'That project does not exist');
 
   return prisma.$transaction(async (tx) => {
     const project = await tx.project.update({
@@ -181,12 +182,11 @@ export async function updateProject(id: string, input: UpdateProjectInput, actor
 }
 
 export async function listContributions(projectId: string, query: ListContributionsQuery) {
-  const project = await prisma.project.findFirst({ where: { id: projectId, deletedAt: null }, select: { id: true } });
-  if (!project) throw new AppError(404, 'That project does not exist', 'not_found');
+  await findLive({ where: { id: projectId }, select: { id: true } }, prisma.project, 'That project does not exist');
 
   const where: Prisma.ProjectContributionWhereInput = {
     projectId,
-    deletedAt: null,
+    ...live,
     ...(query.kind ? { kind: query.kind } : {}),
   };
 
@@ -208,8 +208,7 @@ export async function listContributions(projectId: string, query: ListContributi
 }
 
 export async function recordContribution(projectId: string, input: RecordContributionInput, actorId: string) {
-  const project = await prisma.project.findFirst({ where: { id: projectId, deletedAt: null } });
-  if (!project) throw new AppError(404, 'That project does not exist', 'not_found');
+  const project = await findLive({ where: { id: projectId } }, prisma.project, 'That project does not exist');
   if (project.status === 'completed') {
     throw new AppError(409, 'That project is closed; reopen it before recording against it', 'project_closed');
   }

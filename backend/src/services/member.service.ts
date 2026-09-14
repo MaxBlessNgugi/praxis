@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { page } from '../lib/respond';
 import { retireRecord, restoreArchived } from '../lib/archive';
+import { findLive, includingRetired, live } from '../lib/live';
 import type { CreateMemberInput, ListMembersQuery, RetireMemberInput, UpdateMemberInput } from '../schemas/member.schema';
 
 /** What every member response carries: the household it belongs to, and nothing it does not need. */
@@ -24,7 +25,7 @@ function initialsOf(firstName: string, lastName: string): string {
  */
 async function nextMemberId(): Promise<string> {
   const latest = await prisma.member.findFirst({
-    where: { memberId: { startsWith: 'MBR-' } },
+    where: { memberId: { startsWith: 'MBR-' }, ...includingRetired },
     orderBy: { memberId: 'desc' },
     select: { memberId: true },
   });
@@ -34,7 +35,7 @@ async function nextMemberId(): Promise<string> {
 
 export async function listMembers(query: ListMembersQuery) {
   const where: Prisma.MemberWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.status ? { status: query.status } : {}),
     ...(query.baptismType ? { baptismType: query.baptismType } : {}),
     ...(query.location ? { location: query.location } : {}),
@@ -78,18 +79,17 @@ export async function listMembers(query: ListMembersQuery) {
   return { data, meta: page(total, query) };
 }
 
-export async function getMember(id: string) {
-  const member = await prisma.member.findFirst({
-    where: { id, deletedAt: null },
-    include: { ...memberInclude, ministries: { include: { ministry: { select: { id: true, name: true } } } } },
-  });
-  if (!member) throw new AppError(404, 'That member is not on the register', 'not_found');
-  return member;
+export function getMember(id: string) {
+  return findLive(
+    { where: { id }, include: { ...memberInclude, ministries: { include: { ministry: { select: { id: true, name: true } } } } } },
+    prisma.member,
+    'That member is not on the register',
+  );
 }
 
 export async function createMember(input: CreateMemberInput, actorId: string) {
   if (input.householdId) {
-    const household = await prisma.household.findFirst({ where: { id: input.householdId, deletedAt: null } });
+    const household = await prisma.household.findFirst({ where: { id: input.householdId, ...live } });
     if (!household) throw new AppError(400, 'That household does not exist', 'unknown_household');
   }
 
@@ -128,16 +128,15 @@ export async function createMember(input: CreateMemberInput, actorId: string) {
  * where the register lives, rather than answered four times by foreign-key errors.
  */
 export async function assertMemberOnRegister(memberId: string, what = 'That member'): Promise<void> {
-  const member = await prisma.member.findFirst({ where: { id: memberId, deletedAt: null }, select: { id: true } });
+  const member = await prisma.member.findFirst({ where: { id: memberId, ...live }, select: { id: true } });
   if (!member) throw new AppError(400, `${what} is not on the register`, 'unknown_member');
 }
 
 export async function updateMember(id: string, input: UpdateMemberInput, actorId: string) {
-  const before = await prisma.member.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That member is not on the register', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.member, 'That member is not on the register');
 
   if (input.householdId) {
-    const household = await prisma.household.findFirst({ where: { id: input.householdId, deletedAt: null } });
+    const household = await prisma.household.findFirst({ where: { id: input.householdId, ...live } });
     if (!household) throw new AppError(400, 'That household does not exist', 'unknown_household');
   }
 

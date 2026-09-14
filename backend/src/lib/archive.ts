@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { AppError } from '../middleware/errorHandler';
 import { appendFinanceEntry } from './financeAudit';
+import { live } from './live';
 
 /**
  * Retirement and restoration, for every module.
@@ -76,7 +77,7 @@ type ArchiveReason = (typeof ARCHIVE_REASONS)[number];
 
 /** Prisma types each delegate separately and this module treats them alike. */
 interface ArchiveDelegate {
-  findFirst(args: { where: { id: string; deletedAt: null } }): Promise<Record<string, unknown> | null>;
+  findFirst(args: { where: { id: string } & typeof live }): Promise<Record<string, unknown> | null>;
   update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<Record<string, unknown>>;
 }
 
@@ -120,7 +121,7 @@ export async function retireRecord(entity: ArchivedEntityName, id: string, optio
   return prisma.$transaction(async (tx) => {
     // Read inside the transaction, not before it: two retirements of the same row arriving together
     // would otherwise both pass an outside check and leave two archive entries for one record.
-    const row = await delegateFor(tx, table).findFirst({ where: { id, deletedAt: null } });
+    const row = await delegateFor(tx, table).findFirst({ where: { id, ...live } });
     if (!row) throw new AppError(404, options.missing, 'not_found');
 
     const label = options.label(row);

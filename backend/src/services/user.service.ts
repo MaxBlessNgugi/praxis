@@ -4,11 +4,12 @@ import { AppError } from '../middleware/errorHandler';
 import { toPublicUser } from './auth.service';
 import { page } from '../lib/respond';
 import { retireRecord } from '../lib/archive';
+import { findLive, live } from '../lib/live';
 import type { RetireReason } from '../schemas/common';
 import type { CreateUserInput, ListUsersQuery, RoleKey, UpdateUserInput } from '../schemas/user.schema';
 
 async function roleIdFor(roleKey: RoleKey): Promise<string> {
-  const role = await prisma.role.findFirst({ where: { key: roleKey, deletedAt: null } });
+  const role = await prisma.role.findFirst({ where: { key: roleKey, ...live } });
   if (!role) throw new AppError(400, `The role "${roleKey}" is not configured on this installation`, 'unknown_role');
   return role.id;
 }
@@ -21,7 +22,7 @@ async function audit(actorId: string, action: 'create' | 'update' | 'delete', us
 
 export async function listUsers(query: ListUsersQuery) {
   const where = {
-    deletedAt: null,
+    ...live,
     ...(query.roleKey ? { role: { key: query.roleKey } } : {}),
     ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
     ...(query.q
@@ -69,8 +70,7 @@ export async function createUser(input: CreateUserInput, actorId: string) {
 }
 
 export async function updateUser(id: string, input: UpdateUserInput, actorId: string) {
-  const existing = await prisma.user.findFirst({ where: { id, deletedAt: null } });
-  if (!existing) throw new AppError(404, 'That account does not exist', 'not_found');
+  await findLive({ where: { id } }, prisma.user, 'That account does not exist');
 
   // Deactivating the last active administrator would leave the installation with nobody able to
   // administer it, and no way back in through the UI.
@@ -92,8 +92,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actorId: st
 }
 
 export async function assignRole(id: string, roleKey: RoleKey, actorId: string) {
-  const existing = await prisma.user.findFirst({ where: { id, deletedAt: null }, include: { role: true } });
-  if (!existing) throw new AppError(404, 'That account does not exist', 'not_found');
+  const existing = await findLive({ where: { id }, include: { role: true } }, prisma.user, 'That account does not exist');
   if (existing.role?.key === 'super_admin' && roleKey !== 'super_admin') await assertNotLastAdministrator(id);
 
   const updated = await prisma.user.update({
@@ -112,8 +111,7 @@ export async function assignRole(id: string, roleKey: RoleKey, actorId: string) 
  * and the snapshot makes the restore possible months later.
  */
 export async function removeUser(id: string, input: RetireReason, actorId: string) {
-  const existing = await prisma.user.findFirst({ where: { id, deletedAt: null }, include: { role: true } });
-  if (!existing) throw new AppError(404, 'That account does not exist', 'not_found');
+  const existing = await findLive({ where: { id }, include: { role: true } }, prisma.user, 'That account does not exist');
   if (id === actorId) throw new AppError(400, 'You cannot retire your own account', 'self_delete');
   await assertNotLastAdministrator(id);
 
@@ -130,17 +128,17 @@ export async function removeUser(id: string, input: RetireReason, actorId: strin
 
 /** A link to a register record has to point at somebody real, or the FK failure arrives as a 409. */
 async function assertMemberExists(memberId: string): Promise<void> {
-  const member = await prisma.member.findFirst({ where: { id: memberId, deletedAt: null } });
+  const member = await prisma.member.findFirst({ where: { id: memberId, ...live } });
   if (!member) throw new AppError(400, 'That member is not on the register', 'unknown_member');
 }
 
 /** Refuses an operation that would leave the installation with no active super_admin. */
 async function assertNotLastAdministrator(id: string): Promise<void> {
   const others = await prisma.user.count({
-    where: { id: { not: id }, deletedAt: null, isActive: true, role: { key: 'super_admin' } },
+    where: { id: { not: id }, ...live, isActive: true, role: { key: 'super_admin' } },
   });
   const target = await prisma.user.findFirst({
-    where: { id, deletedAt: null, isActive: true, role: { key: 'super_admin' } },
+    where: { id, ...live, isActive: true, role: { key: 'super_admin' } },
   });
   if (target && others === 0) {
     throw new AppError(409, 'This is the last active super administrator — promote someone else first', 'last_administrator');

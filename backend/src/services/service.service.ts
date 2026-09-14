@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { money } from '../lib/prisma';
 import { page } from '../lib/respond';
 import { retireRecord } from '../lib/archive';
+import { findLive, live } from '../lib/live';
 import { AppError } from '../middleware/errorHandler';
 import type {
   CreateServiceInput,
@@ -17,12 +18,12 @@ import type {
 
 const serviceInclude = {
   officiant: { select: { id: true, firstName: true, lastName: true, initials: true } },
-  liturgy: { where: { deletedAt: null }, orderBy: { position: 'asc' } },
+  liturgy: { where: live, orderBy: { position: 'asc' } },
 } satisfies Prisma.ServiceInclude;
 
 export async function listServices(query: ListServicesQuery) {
   const where: Prisma.ServiceWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.venue ? { venue: query.venue } : {}),
     ...(query.isTemplate === undefined ? {} : { isTemplate: query.isTemplate }),
     ...(query.from || query.to
@@ -45,14 +46,13 @@ export async function listServices(query: ListServicesQuery) {
 }
 
 export async function getService(id: string) {
-  const service = await prisma.service.findFirst({ where: { id, deletedAt: null }, include: serviceInclude });
-  if (!service) throw new AppError(404, 'That service does not exist', 'not_found');
+  const service = await findLive({ where: { id }, include: serviceInclude }, prisma.service, 'That service does not exist');
   return service;
 }
 
 export async function createService(input: CreateServiceInput, actorId: string) {
   if (input.officiantId) {
-    const officiant = await prisma.member.findFirst({ where: { id: input.officiantId, deletedAt: null } });
+    const officiant = await prisma.member.findFirst({ where: { id: input.officiantId, ...live } });
     if (!officiant) throw new AppError(400, 'That officiant is not on the register', 'unknown_member');
   }
 
@@ -66,8 +66,7 @@ export async function createService(input: CreateServiceInput, actorId: string) 
 }
 
 export async function updateService(id: string, input: UpdateServiceInput, actorId: string) {
-  const before = await prisma.service.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That service does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.service, 'That service does not exist');
 
   return prisma.$transaction(async (tx) => {
     const service = await tx.service.update({ where: { id }, data: input, include: serviceInclude });
@@ -105,8 +104,7 @@ export async function retireService(id: string, input: RetireServiceInput, actor
  * same transaction, so the new arrangement can be written without a collision.
  */
 export async function replaceLiturgy(serviceId: string, items: LiturgyItemInput[], actorId: string) {
-  const service = await prisma.service.findFirst({ where: { id: serviceId, deletedAt: null } });
-  if (!service) throw new AppError(404, 'That service does not exist', 'not_found');
+  const service = await findLive({ where: { id: serviceId } }, prisma.service, 'That service does not exist');
 
   return prisma.$transaction(async (tx) => {
     await tx.orderOfServiceItem.deleteMany({ where: { serviceId } });
@@ -130,7 +128,7 @@ export async function replaceLiturgy(serviceId: string, items: LiturgyItemInput[
 export async function recordAttendance(serviceId: string | null, rows: RecordAttendanceInput[], actorId: string) {
   for (const row of rows) {
     if (row.memberId) {
-      const member = await prisma.member.findFirst({ where: { id: row.memberId, deletedAt: null } });
+      const member = await prisma.member.findFirst({ where: { id: row.memberId, ...live } });
       if (!member) throw new AppError(400, `Member ${row.memberId} is not on the register`, 'unknown_member');
     }
   }
@@ -164,7 +162,7 @@ export async function recordAttendance(serviceId: string | null, rows: RecordAtt
 
 export async function listAttendance(query: ListAttendanceQuery) {
   const where: Prisma.AttendanceWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.serviceId ? { serviceId: query.serviceId } : {}),
     ...(query.memberId ? { memberId: query.memberId } : {}),
     ...(query.kind ? { kind: query.kind } : {}),
@@ -194,10 +192,9 @@ export async function listAttendance(query: ListAttendanceQuery) {
  * "23 visitors" typed into a note is not a number the system can trust; naming them is.
  */
 export async function attendanceSummary(serviceId: string) {
-  const service = await prisma.service.findFirst({ where: { id: serviceId, deletedAt: null } });
-  if (!service) throw new AppError(404, 'That service does not exist', 'not_found');
+  await findLive({ where: { id: serviceId } }, prisma.service, 'That service does not exist');
 
-  const rows = await prisma.attendance.findMany({ where: { serviceId, deletedAt: null } });
+  const rows = await prisma.attendance.findMany({ where: { serviceId, ...live } });
   const byKind: Record<string, number> = {};
   let total = 0;
   for (const row of rows) {
@@ -222,8 +219,7 @@ export async function attendanceSummary(serviceId: string) {
  * later which of three drafts is true.
  */
 export async function upsertReport(serviceId: string, input: UpsertServiceReportInput, actorId: string) {
-  const service = await prisma.service.findFirst({ where: { id: serviceId, deletedAt: null } });
-  if (!service) throw new AppError(404, 'That service does not exist', 'not_found');
+  const service = await findLive({ where: { id: serviceId } }, prisma.service, 'That service does not exist');
 
   const { offeringsTotal, ...rest } = input;
   const data = {
@@ -253,7 +249,7 @@ export async function upsertReport(serviceId: string, input: UpsertServiceReport
 
 export async function getReport(serviceId: string) {
   const report = await prisma.serviceReport.findFirst({
-    where: { serviceId, deletedAt: null },
+    where: { serviceId, ...live },
     include: { preparedBy: { select: { id: true, name: true } } },
   });
   if (!report) throw new AppError(404, 'That service has no report yet', 'not_found');

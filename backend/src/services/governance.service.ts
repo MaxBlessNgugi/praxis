@@ -6,6 +6,7 @@ import { page } from '../lib/respond';
 import { between } from '../schemas/common';
 import type { RetireReason } from '../schemas/common';
 import { retireRecord } from '../lib/archive';
+import { findLive, live } from '../lib/live';
 import type {
   CreateDocumentInput,
   CreateMeetingInput,
@@ -33,12 +34,12 @@ import type {
 const meetingInclude = {
   chair: { select: { id: true, firstName: true, lastName: true } },
   secretary: { select: { id: true, firstName: true, lastName: true } },
-  _count: { select: { resolutions: { where: { deletedAt: null } } } },
+  _count: { select: { resolutions: { where: live } } },
 } satisfies Prisma.MeetingInclude;
 
 export async function listMeetings(query: ListMeetingsQuery) {
   const where: Prisma.MeetingWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.kind ? { kind: query.kind } : {}),
     ...(query.status ? { status: query.status } : {}),
     ...between('heldAt', query),
@@ -67,13 +68,12 @@ export async function listMeetings(query: ListMeetingsQuery) {
   return { data, meta: page(total, query) };
 }
 
-export async function getMeeting(id: string) {
-  const meeting = await prisma.meeting.findFirst({
-    where: { id, deletedAt: null },
-    include: { ...meetingInclude, resolutions: { where: { deletedAt: null }, orderBy: { councilDate: 'asc' } } },
-  });
-  if (!meeting) throw new AppError(404, 'That meeting does not exist', 'not_found');
-  return meeting;
+export function getMeeting(id: string) {
+  return findLive(
+    { where: { id }, include: { ...meetingInclude, resolutions: { where: live, orderBy: { councilDate: 'asc' } } } },
+    prisma.meeting,
+    'That meeting does not exist',
+  );
 }
 
 export async function createMeeting(input: CreateMeetingInput, actorId: string) {
@@ -105,8 +105,7 @@ export async function createMeeting(input: CreateMeetingInput, actorId: string) 
 }
 
 export async function updateMeeting(id: string, input: UpdateMeetingInput, actorId: string) {
-  const before = await prisma.meeting.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That meeting does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.meeting, 'That meeting does not exist');
   if (input.chairId) await assertMemberOnRegister(input.chairId, 'That chair');
   if (input.secretaryId) await assertMemberOnRegister(input.secretaryId, 'That secretary');
 
@@ -160,7 +159,7 @@ const resolutionInclude = { meeting: { select: { id: true, title: true, heldAt: 
 
 export async function listResolutions(query: ListResolutionsQuery) {
   const where: Prisma.ResolutionWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.stage ? { stage: query.stage } : {}),
     ...(query.sponsor ? { sponsor: query.sponsor } : {}),
     ...(query.meetingId ? { meetingId: query.meetingId } : {}),
@@ -187,21 +186,19 @@ export async function listResolutions(query: ListResolutionsQuery) {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),
-    prisma.resolution.groupBy({ by: ['stage'], where: { deletedAt: null }, _count: true }),
+    prisma.resolution.groupBy({ by: ['stage'], where: live, _count: true }),
   ]);
 
   return { data, meta: page(total, query), counts: Object.fromEntries(byStage.map((row) => [row.stage, row._count])) };
 }
 
-export async function getResolution(id: string) {
-  const resolution = await prisma.resolution.findFirst({ where: { id, deletedAt: null }, include: resolutionInclude });
-  if (!resolution) throw new AppError(404, 'That resolution does not exist', 'not_found');
-  return resolution;
+export function getResolution(id: string) {
+  return findLive({ where: { id }, include: resolutionInclude }, prisma.resolution, 'That resolution does not exist');
 }
 
 export async function createResolution(input: CreateResolutionInput, actorId: string) {
   if (input.meetingId) {
-    const meeting = await prisma.meeting.findFirst({ where: { id: input.meetingId, deletedAt: null }, select: { id: true } });
+    const meeting = await prisma.meeting.findFirst({ where: { id: input.meetingId, ...live }, select: { id: true } });
     if (!meeting) throw new AppError(400, 'That meeting does not exist', 'unknown_meeting');
   }
 
@@ -244,8 +241,7 @@ export async function createResolution(input: CreateResolutionInput, actorId: st
 }
 
 export async function updateResolution(id: string, input: UpdateResolutionInput, actorId: string) {
-  const before = await prisma.resolution.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That resolution does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.resolution, 'That resolution does not exist');
 
   return prisma.$transaction(async (tx) => {
     const resolution = await tx.resolution.update({
@@ -280,8 +276,7 @@ export async function updateResolution(id: string, input: UpdateResolutionInput,
 }
 
 export async function decideResolution(id: string, input: DecideResolutionInput, actorId: string) {
-  const before = await prisma.resolution.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That resolution does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.resolution, 'That resolution does not exist');
   if (before.stage === input.decision) {
     throw new AppError(409, `That resolution is already ${input.decision.replace('_', ' ')}`, 'already_decided');
   }
@@ -332,7 +327,7 @@ export function retireResolution(id: string, input: RetireReason, actorId: strin
 
 export async function listDocuments(query: ListDocumentsQuery) {
   const where: Prisma.GovernanceDocumentWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.kind ? { kind: query.kind } : {}),
     ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
     ...between('adoptedAt', query),
@@ -355,16 +350,14 @@ export async function listDocuments(query: ListDocumentsQuery) {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),
-    prisma.governanceDocument.groupBy({ by: ['kind'], where: { deletedAt: null, isActive: true }, _count: true }),
+    prisma.governanceDocument.groupBy({ by: ['kind'], where: { ...live, isActive: true }, _count: true }),
   ]);
 
   return { data, meta: page(total, query), counts: Object.fromEntries(byKind.map((row) => [row.kind, row._count])) };
 }
 
-export async function getDocument(id: string) {
-  const document = await prisma.governanceDocument.findFirst({ where: { id, deletedAt: null } });
-  if (!document) throw new AppError(404, 'That document does not exist', 'not_found');
-  return document;
+export function getDocument(id: string) {
+  return findLive({ where: { id } }, prisma.governanceDocument, 'That document does not exist');
 }
 
 export async function createDocument(input: CreateDocumentInput, actorId: string) {
@@ -395,8 +388,7 @@ export async function createDocument(input: CreateDocumentInput, actorId: string
 }
 
 export async function updateDocument(id: string, input: UpdateDocumentInput, actorId: string) {
-  const before = await prisma.governanceDocument.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That document does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.governanceDocument, 'That document does not exist');
 
   return prisma.$transaction(async (tx) => {
     const document = await tx.governanceDocument.update({

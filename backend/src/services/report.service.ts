@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { money, prisma } from '../lib/prisma';
+import { live, liveSql } from '../lib/live';
 
 /**
  * Reports: the aggregate questions a council asks.
@@ -32,11 +33,11 @@ async function givingByMonth(range: Range) {
   const [tithes, offerings] = await Promise.all([
     prisma.$queryRaw<Array<{ month: Date; total: Prisma.Decimal }>>`
       SELECT date_trunc('month', "receivedAt") AS month, SUM("amount") AS total
-      FROM "Tithe" WHERE "deletedAt" IS NULL ${since('"receivedAt"', range)}
+      FROM "Tithe" WHERE ${liveSql} ${since('"receivedAt"', range)}
       GROUP BY 1 ORDER BY 1`,
     prisma.$queryRaw<Array<{ month: Date; total: Prisma.Decimal }>>`
       SELECT date_trunc('month', "receivedAt") AS month, SUM("amount") AS total
-      FROM "Offering" WHERE "deletedAt" IS NULL ${since('"receivedAt"', range)}
+      FROM "Offering" WHERE ${liveSql} ${since('"receivedAt"', range)}
       GROUP BY 1 ORDER BY 1`,
   ]);
 
@@ -58,7 +59,6 @@ async function givingByMonth(range: Range) {
 /** Everything the home screen's cards and the reports panel's header need, in one round trip. */
 export async function overview(range: Range) {
   const window = range.from || range.to ? { gte: range.from, lte: range.to } : undefined;
-  const live = { deletedAt: null };
 
   const [
     membersActive,
@@ -122,15 +122,15 @@ export async function overview(range: Range) {
 
 export async function memberReport() {
   const [byStatus, byLocation, households, householdsWithSizes, recent] = await Promise.all([
-    prisma.member.groupBy({ by: ['status'], where: { deletedAt: null }, _count: true }),
-    prisma.member.groupBy({ by: ['location'], where: { deletedAt: null }, _count: true }),
-    prisma.household.count({ where: { deletedAt: null } }),
+    prisma.member.groupBy({ by: ['status'], where: live, _count: true }),
+    prisma.member.groupBy({ by: ['location'], where: live, _count: true }),
+    prisma.household.count({ where: live }),
     prisma.household.findMany({
-      where: { deletedAt: null },
-      select: { id: true, name: true, unitNumber: true, _count: { select: { members: { where: { deletedAt: null } } } } },
+      where: live,
+      select: { id: true, name: true, unitNumber: true, _count: { select: { members: { where: live } } } },
     }),
     prisma.member.findMany({
-      where: { deletedAt: null },
+      where: live,
       select: { joinedAt: true },
       orderBy: { joinedAt: 'asc' },
     }),
@@ -161,7 +161,6 @@ export async function memberReport() {
 
 export async function givingReport(range: Range) {
   const window = range.from || range.to ? { gte: range.from, lte: range.to } : undefined;
-  const live = { deletedAt: null };
 
   const [byMethod, byCategory, byMonth, tithes, offerings, contributions] = await Promise.all([
     prisma.tithe.groupBy({ by: ['method'], where: { ...live, ...(window ? { receivedAt: window } : {}) }, _sum: { amount: true }, _count: true }),
@@ -198,7 +197,7 @@ export async function givingReport(range: Range) {
 
 export async function attendanceReport(range: Range) {
   const where: Prisma.AttendanceWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(range.from || range.to ? { recordedAt: { gte: range.from, lte: range.to } } : {}),
   };
 
@@ -208,7 +207,7 @@ export async function attendanceReport(range: Range) {
       where: { ...where, serviceId: { not: null } },
       select: { serviceId: true, count: true, service: { select: { id: true, title: true, heldAt: true, venue: true } } },
     }),
-    prisma.service.count({ where: { deletedAt: null, ...(range.from || range.to ? { heldAt: { gte: range.from, lte: range.to } } : {}) } }),
+    prisma.service.count({ where: { ...live, ...(range.from || range.to ? { heldAt: { gte: range.from, lte: range.to } } : {}) } }),
   ]);
 
   const perService = new Map<string, { serviceId: string; title: string; heldAt: Date; venue: string; counted: number }>();
@@ -242,18 +241,18 @@ export async function attendanceReport(range: Range) {
 export async function ministryReport() {
   const [ministries, unassigned] = await Promise.all([
     prisma.ministry.findMany({
-      where: { deletedAt: null },
+      where: live,
       select: {
         id: true,
         name: true,
         isActive: true,
         meetingDay: true,
         leader: { select: { id: true, firstName: true, lastName: true } },
-        _count: { select: { members: { where: { deletedAt: null } } } },
+        _count: { select: { members: { where: live } } },
       },
       orderBy: { name: 'asc' },
     }),
-    prisma.member.count({ where: { deletedAt: null, status: 'active', ministries: { none: { deletedAt: null } } } }),
+    prisma.member.count({ where: { ...live, status: 'active', ministries: { none: live } } }),
   ]);
 
   const serving = ministries.reduce((sum, row) => sum + row._count.members, 0);
@@ -281,18 +280,18 @@ export async function governanceReport(range: Range) {
   const window = range.from || range.to ? { gte: range.from, lte: range.to } : undefined;
 
   const [meetingsByKind, meetingsByStatus, resolutionsByStage, documentsByKind, recentMeetings, recentResolutions] = await Promise.all([
-    prisma.meeting.groupBy({ by: ['kind'], where: { deletedAt: null }, _count: true }),
-    prisma.meeting.groupBy({ by: ['status'], where: { deletedAt: null }, _count: true }),
-    prisma.resolution.groupBy({ by: ['stage'], where: { deletedAt: null }, _count: true }),
-    prisma.governanceDocument.groupBy({ by: ['kind'], where: { deletedAt: null, isActive: true }, _count: true }),
+    prisma.meeting.groupBy({ by: ['kind'], where: live, _count: true }),
+    prisma.meeting.groupBy({ by: ['status'], where: live, _count: true }),
+    prisma.resolution.groupBy({ by: ['stage'], where: live, _count: true }),
+    prisma.governanceDocument.groupBy({ by: ['kind'], where: { ...live, isActive: true }, _count: true }),
     prisma.meeting.findMany({
-      where: { deletedAt: null, ...(window ? { heldAt: window } : {}) },
+      where: { ...live, ...(window ? { heldAt: window } : {}) },
       orderBy: { heldAt: 'desc' },
       take: 10,
       select: { id: true, title: true, kind: true, status: true, heldAt: true, attendees: true, quorumMet: true },
     }),
     prisma.resolution.findMany({
-      where: { deletedAt: null, ...(window ? { councilDate: window } : {}) },
+      where: { ...live, ...(window ? { councilDate: window } : {}) },
       orderBy: { councilDate: 'desc' },
       take: 10,
       select: { id: true, code: true, title: true, stage: true, sponsor: true, councilDate: true },

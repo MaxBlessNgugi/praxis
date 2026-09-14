@@ -230,6 +230,26 @@ members module re-implemented the restore that the archive module already perfor
 supplies only what is its own: the checks that read like rules about *it* (a household with people in
 it, a ministry with a roll, the last administrator) and the words the screen would use.
 
+**A retired record is invisible everywhere except the Trash, and that rule has one owner.**
+`lib/live.ts`. Retiring keeps the row — the ledger, the archive entry and the audit trail all still
+resolve it — so every read that is not the Trash has to exclude it, and that is the part that leaks:
+silently, with a live screen showing a deleted record and nothing failing. The rule was written out at
+155 call sites. Now `live` is the one filter every query is built from (152 of them), and `findLive`
+is the lookup that goes with it: one live row by id, or a 404 carrying the words of the screen that
+asked. `liveSql` is the same filter for the two reports that group in SQL rather than through Prisma.
+Four reads deliberately see retired rows, and each says so with `includingRetired` — the next register
+number, a role key, a ministry membership re-rolled under its unique key, and a project's target
+amount looked up by an id the caller already has. Without it the key would be reissued (two living
+members sharing a register number) or the insert would collide with a row nobody can see.
+
+**Two consequences of that rule are unenforced, and are recorded rather than fixed.** A ministry's
+roll is filtered on the *membership* row, not on the member it points at, so retiring a member leaves
+their live membership visible on `/api/ministries/roster` and counted by `/api/reports/ministries`.
+Retiring a member does not take them off a roll; whether it should is a parish's decision. And `Role`
+and `SoftDeletedRecord` carry a `deletedAt` that nothing ever writes: neither can be retired through
+the API, so the column is inert rather than wrong. Both are visible from a single place now, which is
+the point of having one.
+
 **Each module narrows the reason list; none invents its own.** `ARCHIVE_REASONS` in `lib/archive.ts` is
 the storage vocabulary, and a module whose truth is narrower takes a subset with `archiveReasonSchema.extract([...])`:
 a service is cancelled, postponed or duplicated, never transferred to another parish; a payment can be
