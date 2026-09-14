@@ -1,8 +1,0 @@
-{
-  "name": "Remix Praxis Church OS - Figma Mockup \u0026 Frontend",
-  "description": "High-fidelity React \u0026 Tailwind CSS church management system featuring the Home Cloud Dashboard, Members Registry, Ministries \u0026 Groups, Giving \u0026 Stewardship, Reports \u0026 Certificates, Governance, and interactive Figma artboards.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}

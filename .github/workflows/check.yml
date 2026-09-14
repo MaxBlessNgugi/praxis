@@ -1,0 +1,45 @@
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: install
+        run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: build
+        run: npm run build
+
+      # The audits drive a real browser, so they need the app actually serving.
+      - name: start the app
+        run: |
+          npm run dev > /tmp/dev.log 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:3000/ > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "the app never answered on :3000"
+          cat /tmp/dev.log
+          exit 1
+
+      # Both audits exit non-zero when their report holds a failure, so a green check means clean.
+      - name: accessibility audit
+        run: node tools/audit-a11y.mjs
+
+      - name: dialog audit
+        run: node tools/audit-dialogs.mjs
