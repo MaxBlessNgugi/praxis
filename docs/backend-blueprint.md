@@ -9,6 +9,13 @@ one is right and why.
 
 Read it as: *what Praxis has to grow into, and the exact shape of the thing it grows into.*
 
+**Decision: Praxis's backend ports this system rather than being re-derived from a proposal.** A
+separately drafted backend blueprint describing the same Express/Prisma/Postgres stack, a fresh
+24-model schema and a `{ success, data, message, meta }` envelope was reconciled against this document
+in `docs/frontend-blueprint.md` §4 — the envelope in particular contradicts the live `API.md` contract
+that `src/services/api.ts` matches 1:1, and the schema would be the third derivation of ECCLESIA's 28
+real models.
+
 ---
 
 ## 1. The stack, as actually deployed
