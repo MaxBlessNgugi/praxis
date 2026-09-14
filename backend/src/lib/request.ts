@@ -1,6 +1,10 @@
 import type { Request } from 'express';
 import { unauthorizedError } from '../middleware/errorHandler';
 
+// Throwaway probe on a branch that is never merged: proves the `backend` CI job fails on a real type
+// error rather than merely installing and reporting green.
+const vacuityProbe: number = 'not a number';
+
 /**
  * The signed-in account's id.
  *
