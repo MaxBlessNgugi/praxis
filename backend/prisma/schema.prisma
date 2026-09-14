@@ -151,6 +151,11 @@ model Household {
   @@index([deletedAt])
 }
 
+model VacuityProbe {
+  id   String @id @default(uuid())
+  note String
+}
+
 model Member {
   id           String       @id @default(uuid())
   memberId     String       @unique
