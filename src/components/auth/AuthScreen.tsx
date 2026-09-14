@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import logoMark from '../../assets/brand/praxis-icon.webp';
+import logoWordmark from '../../assets/brand/praxis-wordmark.webp';
 
 /**
  * Praxis sign-in screen — the app's entry gate (`App.tsx` renders it until it
@@ -15,7 +17,7 @@ interface AuthScreenProps {
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
   const [email, setEmail] = useState<string>('bishop@destinysanctuary.co.ke');
-  const [password, setPassword] = useState<string>('praxis-demo-2024');
+  const [password, setPassword] = useState<string>('praxis-demo-2025');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -42,9 +44,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
   };
 
   return (
-    <div className="w-full h-full flex bg-[#FDF8F3] text-[#1C1917] font-['Inter',sans-serif] overflow-hidden">
-      {/* LEFT PANEL — Brand & Composition (42%) */}
-      <aside className="relative w-[42%] h-full bg-[#F8F1E9] flex flex-col items-center justify-center overflow-hidden px-12">
+    <div className="w-full h-full flex flex-col md:flex-row bg-[#FDF8F3] text-[#1C1917] font-['Inter',sans-serif] overflow-hidden">
+      {/* LEFT PANEL — Brand & Composition (42%). On a phone it stacks above the card
+          (branding on top, form below) rather than disappearing. */}
+      <aside className="relative w-full md:w-[42%] shrink-0 bg-[#F8F1E9] flex flex-col items-center justify-center overflow-hidden px-8 py-10 md:h-full md:px-12 md:py-0">
         {/* Soft warm depth: gentle light gradient with abstract shapes */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#FFF8F5] via-[#F8F1E9] to-[#F5EDE4]" />
         <div className="pointer-events-none absolute -top-24 -left-24 w-[440px] h-[440px] rounded-full bg-[#C2410C]/10 blur-3xl" />
@@ -53,12 +56,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
         <div className="pointer-events-none absolute bottom-24 left-6 w-40 h-40 rounded-full border border-[#904D00]/15" />
 
         <div className="relative z-10 flex flex-col items-center text-center">
-          <div className="w-14 h-14 rounded-[16px] bg-[#C2410C] flex items-center justify-center text-white shadow-[0_4px_16px_rgba(194,65,12,0.35)] mb-6">
-            <span className="material-symbols-outlined text-[32px]">church</span>
-          </div>
+          <img src={logoMark} alt="" aria-hidden="true" className="h-20 w-auto mb-6" />
 
-          <h1 className="font-headline text-[52px] leading-[58px] font-black tracking-tight text-[#C2410C]">
-            Praxis
+          {/* The heading is the wordmark itself, so the name keeps the uploaded lockup's own
+              letterforms while staying a real h1 whose accessible name is "Praxis Church OS". */}
+          <h1 className="flex justify-center">
+            <img src={logoWordmark} alt="Praxis Church OS" className="w-[240px] max-w-full h-auto" />
           </h1>
 
           <p className="font-headline text-[14px] font-semibold tracking-[0.18em] uppercase text-[#57534E] mt-3">
@@ -66,15 +69,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
           </p>
         </div>
 
-        <div className="absolute bottom-10 inset-x-12 z-10 flex items-center justify-center gap-2 text-[11px] font-medium text-[#57534E]">
-          <span className="material-symbols-outlined text-[16px] text-[#C2410C]">encrypted</span>
+        <div className="absolute bottom-10 inset-x-12 z-10 hidden md:flex items-center justify-center gap-2 text-[11px] font-medium text-[#57534E]">
+          <span className="material-symbols-outlined text-[16px] text-[#C2410C]" aria-hidden="true">encrypted</span>
           Church records secured under church confidentiality
         </div>
       </aside>
 
       {/* RIGHT PANEL — Authentication Card (58%) */}
-      <main className="relative w-[58%] h-full bg-[#FDF8F3] flex items-center justify-center px-12">
-        <div className="w-full max-w-[420px] bg-[#FFFFFF] rounded-[14px] border border-[#E7E5E4] shadow-warm-card p-8">
+      <main className="relative w-full md:w-[58%] flex-1 min-h-0 bg-[#FDF8F3] flex overflow-y-auto px-6 py-8 md:px-12 md:py-0">
+        <div className="m-auto w-full max-w-[420px] bg-[#FFFFFF] rounded-[14px] border border-[#E7E5E4] shadow-warm-card p-8">
           <div className="mb-7">
             <h2 className="font-headline text-[20px] font-bold text-[#1C1917] tracking-tight">
               Welcome back
@@ -157,7 +160,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
               disabled={isSubmitting}
               className="w-full px-5 py-3 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] disabled:opacity-85 disabled:cursor-wait text-white text-sm font-bold shadow-[0_2px_8px_rgba(194,65,12,0.25)] hover:shadow-[0_4px_14px_rgba(194,65,12,0.32)] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span className={`material-symbols-outlined text-[19px] ${isSubmitting ? 'animate-spin' : ''}`}>
+              <span aria-hidden="true" className={`material-symbols-outlined text-[19px] ${isSubmitting ? 'animate-spin' : ''}`}>
                 {isSubmitting ? 'progress_activity' : 'login'}
               </span>
               {isSubmitting ? 'Signing in…' : 'Sign In to Praxis'}

@@ -1,5 +1,8 @@
 import React from 'react';
 import { ParishNavTab, MembersSubTab } from '../../types';
+import { CHURCH, initialsOf } from '../../data/churchDomain';
+import logoMark from '../../assets/brand/praxis-icon.webp';
+import logoWordmark from '../../assets/brand/praxis-wordmark.webp';
 
 interface ChurchSidebarProps {
   activeTab: ParishNavTab;
@@ -28,15 +31,13 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
     }`}>
       <div className="flex flex-col flex-1 min-h-0">
         {/* Brand / Church Mark */}
-        <div className="h-20 px-4 flex items-center gap-3 border-b border-[#E7E5E4]">
-          <div className="w-9 h-9 rounded-[9px] bg-[#C2410C] flex items-center justify-center text-white shrink-0 shadow-[0_2px_8px_rgba(194,65,12,0.25)]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[22px]">church</span>
-          </div>
+        <div className="h-20 px-4 flex items-center gap-2.5 border-b border-[#E7E5E4]">
+          <img src={logoMark} alt="" aria-hidden="true" className="h-9 w-auto shrink-0" />
           {!collapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="font-headline text-[15px] font-bold text-[#1C1917] tracking-tight truncate">
-                Praxis Church OS
-              </span>
+            <div className="flex flex-col gap-0.5 min-w-0">
+              {/* The wordmark carries the name in the brand's own letterforms; the alt text keeps
+                  the full product name available to a screen reader. */}
+              <img src={logoWordmark} alt="Praxis Church OS" className="h-5 w-auto self-start" />
               <span className="font-headline text-[11px] font-semibold text-[#57534E] truncate">
                 Destiny Sanctuary Int'L
               </span>
@@ -202,14 +203,16 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
       {/* Bottom User Profile */}
       <div className="p-3 border-t border-[#E7E5E4] bg-[#F8F1E9]">
         <div className="flex items-center gap-3 p-2.5 rounded-[14px] bg-[#FFFFFF] shadow-[0_2px_8px_rgba(87,83,78,0.06)] border border-[#E7E5E4]">
-          <div className="w-9 h-9 rounded-full bg-[#C2410C] flex items-center justify-center shrink-0 text-white shadow-sm">
-            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person</span>
+          {/* The avatar is the user's initials, and the name beside it is read from the same
+              record, so the two cannot drift apart. */}
+          <div aria-hidden="true" className="w-9 h-9 rounded-full bg-[#C2410C] flex items-center justify-center shrink-0 text-white shadow-sm font-headline text-[12px] font-bold tracking-tight">
+            {initialsOf(CHURCH.visionaryLeader)}
           </div>
           {!collapsed && (
             <>
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="font-headline text-[13px] text-[#1C1917] font-bold truncate">
-                  Bishop Sammy
+                  {CHURCH.visionaryLeader}
                 </span>
                 <span className="font-headline text-[11px] text-[#57534E] truncate">
                   Bishop & Visionary Leader
