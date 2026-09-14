@@ -10,11 +10,8 @@ import {
   ServicesSubTab,
   CommunicationsSubTab,
   SettingsSubTab,
-  ParishMember, 
-  SoftDeleteRecord 
 } from '../../types';
-import { INITIAL_CHURCH_MEMBERS } from '../../data/churchMockData';
-import { DEFAULT_LOCATION } from '../../data/churchDomain';
+import { useDemoData } from '../../data/demoStore';
 import { ChurchSidebar } from './ChurchSidebar';
 import { ChurchHeader } from './ChurchHeader';
 import { HomeDashboardView } from './views/HomeDashboardView';
@@ -63,60 +60,12 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
   const [activeServicesSubTab, setActiveServicesSubTab] = useState<ServicesSubTab>(initialServicesSubTab);
   const [activeCommunicationsSubTab, setActiveCommunicationsSubTab] = useState<CommunicationsSubTab>(initialCommunicationsSubTab);
   const [activeSettingsSubTab, setActiveSettingsSubTab] = useState<SettingsSubTab>(initialSettingsSubTab);
-  const [members, setMembers] = useState<ParishMember[]>(INITIAL_CHURCH_MEMBERS);
+  // The editable demo data lives in the store, so this shell no longer owns a copy of the
+  // register that the screens below it can drift away from.
+  const { addMember } = useDemoData();
   const [searchTerm, setSearchTerm] = useState('');
   const [quickActionModal, setQuickActionModal] = useState(false);
   const quickActionModalDialog = useDialog(() => setQuickActionModal(false), "Quick Actions");
-
-  const handleAddMember = (newPartial: Partial<ParishMember>) => {
-    const fullMember: ParishMember = {
-      id: `mbr-${Date.now()}`,
-      name: newPartial.name || 'New Member',
-      memberId: newPartial.memberId || `#MBR-${Math.floor(1000 + Math.random() * 900)}`,
-      initials: newPartial.initials || 'NM',
-      church: newPartial.church || DEFAULT_LOCATION,
-      roleDescription: newPartial.roleDescription || 'Member',
-      membershipTier: newPartial.membershipTier || 'member',
-      baptismType: newPartial.baptismType || 'baptized',
-      baptismDate: newPartial.baptismDate || 'Jan 12, 2025',
-      baptismOfficiant: newPartial.baptismOfficiant || 'Bishop Sammy',
-      householdName: newPartial.householdName || 'The Household',
-      householdId: newPartial.householdId || '#108',
-      householdRole: newPartial.householdRole || 'Head',
-      email: newPartial.email || 'member@example.com',
-      phone: newPartial.phone || '+254 700 000 000',
-      residentialAddress: newPartial.residentialAddress || 'Nyahururu',
-      pastoralStatus: newPartial.pastoralStatus || 'active-regular',
-      statusLabel: newPartial.statusLabel || 'Active Regular',
-      dateOfBirth: newPartial.dateOfBirth || '1990-01-01',
-      pastoralNotes: newPartial.pastoralNotes || '',
-      tags: newPartial.tags || [],
-      envelopeNumber: newPartial.envelopeNumber || 'ENV-1402',
-    };
-
-    setMembers([fullMember, ...members]);
-  };
-
-  const handleRestoreMember = (record: SoftDeleteRecord) => {
-    const restored: ParishMember = {
-      id: `restored-${record.id}`,
-      name: record.name,
-      memberId: record.memberId,
-      initials: record.initials,
-      church: DEFAULT_LOCATION,
-      membershipTier: 'member',
-      baptismType: 'baptized',
-      householdName: `${record.name.split(' ').slice(-1)[0]} Household`,
-      householdId: '#108',
-      householdRole: 'Member',
-      email: `${record.name.toLowerCase().replace(' ', '.')}@destinysanctuary.co.ke`,
-      phone: '+254 753 008 800',
-      pastoralStatus: 'active-regular',
-      statusLabel: 'Active Restored',
-      pastoralNotes: record.rationale,
-    };
-    setMembers([restored, ...members]);
-  };
 
   const isMembersView = 
     activeTab === 'find-christian' || 
@@ -176,7 +125,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                 setActiveTab(tab);
                 if (subTab) setActiveSubTab(subTab as MembersSubTab);
               }}
-              onAddMember={handleAddMember}
+              onAddMember={addMember}
             />
           )}
 
@@ -304,7 +253,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
               <div className="w-full px-6 sm:px-8 py-6">
                 {activeSubTab === 'add-new-christian' && (
                   <AddNewChristianView
-                    onSaveMember={handleAddMember}
+                    onSaveMember={addMember}
                     onNavigateToFind={() => {
                       setActiveSubTab('find-christian');
                       setActiveTab('find-christian');
@@ -314,7 +263,6 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
 
                 {activeSubTab === 'find-christian' && (
                   <FindChristianView
-                    members={members}
                     onNavigateToAdd={() => {
                       setActiveSubTab('add-new-christian');
                       setActiveTab('add-new-christian');
@@ -331,9 +279,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                 )}
 
                 {activeSubTab === 'delete-christian' && (
-                  <DeleteChristianView
-                    onRestoreMember={handleRestoreMember}
-                  />
+                  <DeleteChristianView />
                 )}
 
                 {activeSubTab === 'family-unit' && (

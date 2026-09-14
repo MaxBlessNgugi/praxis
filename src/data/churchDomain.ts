@@ -62,6 +62,35 @@ export const SERVICE_TIMES: ReadonlyArray<{ name: string; time: string }> = [
   { name: 'Wednesdays (Counseling, Prayers & Midweek Services)', time: '9:00 AM – 5:00 PM' },
 ];
 
+/**
+ * The mockup's clock: the day every screen pretends is now. `label` is what the
+ * header chip shows and `short` is how dated records are written, so a record added
+ * from a dialog lands on the same day the rest of the console is living in.
+ */
+export const DEMO_TODAY = {
+  label: 'Sunday, Feb 09, 2025',
+  short: 'Feb 09, 2025',
+} as const;
+
+/**
+ * The initials an avatar shows for a person's name — "Bishop Sammy" reads as "BS". Derived from
+ * the name itself so an avatar can never disagree with the name printed beside it.
+ */
+export const initialsOf = (name: string) =>
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+
+/**
+ * Money as the console writes it — grouped thousands with the cents kept, so one gift reads alike
+ * on the Home card, the ledger's KPI band and the ledger rows themselves.
+ */
+export const formatKes = (value: number) =>
+  `KSh ${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+
 /** The Sunday window the six elements add up to: 8:00 AM – 2:00 PM. */
 export const SUNDAY_WINDOW = '8:00 AM – 2:00 PM';
 

@@ -450,3 +450,17 @@ export interface SoftDeleteRecord {
   rationale: string;
   isUrgent?: boolean;
 }
+
+/** One row of the tithe ledger the Giving & Stewardship screens read. */
+export interface TitheTransaction {
+  id: string;
+  txCode: string;
+  donor: string;
+  envelopeNo: string;
+  method: string;
+  methodIcon: string;
+  category: string;
+  amount: number;
+  date: string;
+  status: 'Completed' | 'Cleared' | 'Pending';
+}

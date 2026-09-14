@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
 import { SoftDeleteRecord } from '../../../types';
 import { useDialog } from '../dialog';
-import { INITIAL_SOFT_DELETE_RECORDS } from '../../../data/churchMockData';
+import { useDemoData } from '../../../data/demoStore';
 
-interface DeleteChristianViewProps {
-  onRestoreMember?: (record: SoftDeleteRecord) => void;
-}
+/** How each disposition reason is written onto the archived record. */
+const REASON_LABELS: Record<SoftDeleteRecord['reason'], string> = {
+  transfer: 'Church Transfer',
+  memorial: 'Memorial Book of Life',
+  inactive: 'Pastoral Inactivity',
+  admin: 'Registry Cleanse',
+};
 
-export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
-  onRestoreMember,
-}) => {
+/**
+ * The archive screen acts on ONE named member, chosen from the roll — it used to act on
+ * a hardcoded name, so "deleting" her left her on the register and put a copy in the
+ * vault. Both lists now come from the demo store, so archiving moves her between them.
+ */
+export const DeleteChristianView: React.FC = () => {
+  const { members, trash, archiveMember, restoreMember } = useDemoData();
+  const [targetId, setTargetId] = useState('');
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const pickerDialog = useDialog(() => setIsPickerOpen(false), 'Choose a member to archive');
   const [selectedReason, setSelectedReason] = useState<'transfer' | 'memorial' | 'inactive' | 'admin'>('transfer');
   const [destParish, setDestParish] = useState('Deliverance Church Nyahururu');
   const [destPastor, setDestPastor] = useState('Rev. Peter Kariuki');
@@ -18,48 +29,43 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
   );
   const [filterDisposition, setFilterDisposition] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const modalOpenDialog = useDialog(() => setIsModalOpen(false), "Confirm Soft-Delete to Trash: Elena Mwangi (#MBR-1082)");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [records, setRecords] = useState<SoftDeleteRecord[]>(INITIAL_SOFT_DELETE_RECORDS);
 
-  const handleProceedClick = () => {
-    setIsModalOpen(true);
+  // Whoever the toolbar is pointed at; archiving them leaves the roll, so the target
+  // falls back to the next name rather than pointing at somebody who is gone.
+  const target = members.find((m) => m.id === targetId) ?? members[0];
+  const household = target ? members.filter((m) => m.householdName === target.householdName && m.id !== target.id) : [];
+  const modalOpenDialog = useDialog(
+    () => setIsModalOpen(false),
+    `Confirm Soft-Delete to Trash: ${target ? `${target.name} (${target.memberId})` : 'No member selected'}`,
+  );
+
+  const flashToast = (message: string, ms: number) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), ms);
   };
 
   const handleConfirmSoftDelete = () => {
+    if (!target) return;
     setIsModalOpen(false);
-    const newArchived: SoftDeleteRecord = {
-      id: `sd-${Date.now()}`,
-      name: 'Elena Mwangi',
-      memberId: '#MBR-1082',
-      initials: 'EM',
-      dismissalDate: 'Today',
-      daysLeft: 30,
+    archiveMember(target, {
       reason: selectedReason,
-      reasonLabel: selectedReason === 'transfer' ? 'Church Transfer' : selectedReason === 'memorial' ? 'Memorial Book of Life' : selectedReason === 'inactive' ? 'Pastoral Inactivity' : 'Registry Cleanse',
-      authorizedBy: 'Bishop Sammy',
-      destinationParish: destParish,
+      reasonLabel: REASON_LABELS[selectedReason],
+      destinationParish: selectedReason === 'transfer' ? destParish : undefined,
+      destinationPastor: selectedReason === 'transfer' ? destPastor : undefined,
       rationale,
-    };
-    setRecords([newArchived, ...records]);
-    setToastMessage('Elena Mwangi moved to Trash. Record retained in 30-day grace vault.');
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 5000);
+      authorizedBy: 'Bishop Sammy',
+    });
+    setTargetId('');
+    flashToast(`${target.name} moved to Trash. Record retained in the 30-day grace vault.`, 5000);
   };
 
   const handleRestore = (rec: SoftDeleteRecord) => {
-    setRecords(records.filter((r) => r.id !== rec.id));
-    if (onRestoreMember) {
-      onRestoreMember(rec);
-    }
-    setToastMessage(`${rec.name} restored from Trash back to active Members Register.`);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
+    restoreMember(rec.id);
+    flashToast(`${rec.name} restored from Trash back to the active Members Register.`, 4000);
   };
 
-  const filteredQueue = records.filter((r) => {
+  const filteredQueue = trash.filter((r) => {
     if (filterDisposition === 'all') return true;
     if (filterDisposition === 'transfer') return r.reason === 'transfer';
     if (filterDisposition === 'memorial') return r.reason === 'memorial';
@@ -126,7 +132,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
             <input aria-label="Member on file"
               type="text"
               readOnly
-              value="Elena Mwangi (#MBR-1082)"
+              value={target ? `${target.name} (${target.memberId})` : 'No members on the roll'}
               className="w-full h-11 pl-11 pr-16 rounded-lg bg-[#faf2ee] text-[#1e1b19] font-body text-sm placeholder:text-[#59413a]/60 focus:outline-none shadow-inner"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded bg-[#eee7e3] text-[#59413a] text-xs font-headline font-bold">
@@ -181,23 +187,32 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
                 </div>
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-headline text-xl font-bold text-[#1e1b19]">Elena Mwangi</h3>
+                    <h3 className="font-headline text-xl font-bold text-[#1e1b19]">{target?.name ?? 'No member selected'}</h3>
                     <span className="px-2 py-0.5 rounded bg-[#eee7e3] text-[#1e1b19] font-mono text-xs font-bold">
-                      #MBR-1082
+                      {target?.memberId ?? '—'}
                     </span>
                   </div>
                   <span className="font-body text-xs text-[#59413a]">
-                    Member • Mwangi Household • Enrolled Aug 14, 2018
+                    {target
+                      ? `${target.roleDescription ?? 'Member'} • ${target.householdName} • ${target.church}`
+                      : 'The register is empty — add a member before archiving one.'}
                   </span>
                   <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs font-headline font-semibold">
-                    <span className="inline-flex items-center gap-1 text-[#006243]">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">water_drop</span> Baptism Confirmed
+                    <span
+                      className={`inline-flex items-center gap-1 ${
+                        target?.baptismType === 'awaiting' ? 'text-[#904d00]' : 'text-[#006243]'
+                      }`}
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">water_drop</span>
+                      {target?.baptismType === 'awaiting' ? 'Baptism Pending' : 'Baptism Confirmed'}
                     </span>
                     <span className="inline-flex items-center gap-1 text-[#59413a]">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">home</span> Primary Resident
+                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">home</span>
+                      {target?.householdRole ?? 'Member'}
                     </span>
                     <span className="inline-flex items-center gap-1 text-[#904d00]">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">savings</span> Envelope #0482
+                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">savings</span>
+                      Envelope {target?.envelopeNumber ?? '—'}
                     </span>
                   </div>
                 </div>
@@ -205,7 +220,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
 
               <button
                 type="button"
-                onClick={() => alert('Search and select another member from the roll')}
+                onClick={() => setIsPickerOpen(true)}
                 className="px-3 py-1 rounded-lg bg-[#f4ece8] text-[#59413a] hover:text-[#1e1b19] font-headline text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span> Change Member
@@ -218,10 +233,12 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#fe932c]">family_restroom</span>
                 <div className="flex flex-col">
                   <span className="font-headline text-xs font-bold text-[#1e1b19]">
-                    Household Association: Mwangi Family Unit (3 Active)
+                    Household Association: {target?.householdName ?? '—'} ({household.length + 1} on the roll)
                   </span>
                   <span className="font-body text-xs text-[#59413a]">
-                    Michael Mwangi (Spouse/Head), David Mwangi (Son). Elena's removal will disassociate her giving records.
+                    {household.length > 0
+                      ? `${household.map((m) => `${m.name} (${m.householdRole})`).join(', ')}. Archiving ${target?.name ?? 'this member'} will disassociate her giving records.`
+                      : 'No other members of this household are on the roll.'}
                   </span>
                 </div>
               </div>
@@ -469,8 +486,9 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={handleProceedClick}
-                  className="px-5 py-2.5 rounded-lg bg-[#ba1a1a] hover:bg-red-700 text-white font-headline text-xs font-bold transition-colors shadow-md flex items-center gap-2 cursor-pointer"
+                  onClick={() => setIsModalOpen(true)}
+                  disabled={!target}
+                  className="px-5 py-2.5 rounded-lg bg-[#ba1a1a] hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-headline text-xs font-bold transition-colors shadow-md flex items-center gap-2 cursor-pointer"
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete_sweep</span>
                   <span>Proceed to Soft-Delete</span>
@@ -492,7 +510,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
                 </h3>
               </div>
               <span className="px-2.5 py-1 rounded-full bg-[#ffdad6] text-[#93000a] font-headline text-xs font-bold">
-                {records.length} Records In Grace Period
+                {trash.length} Records In Grace Period
               </span>
             </div>
             <p className="font-body text-xs text-[#59413a] mb-4 leading-relaxed">
@@ -502,10 +520,10 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
             <div className="p-4 rounded-xl bg-[#faf2ee] flex flex-col gap-2 border border-[#e1bfb5]/40">
               <div className="flex justify-between items-center font-headline text-xs">
                 <span className="text-[#1e1b19] font-bold">Vault Capacity & Grace Status</span>
-                <span className="text-[#59413a]">{records.length} of 500 max cached</span>
+                <span className="text-[#59413a]">{trash.length} of 500 max cached</span>
               </div>
               <div className="w-full h-2 rounded-full bg-[#eee7e3] overflow-hidden">
-                <div className="bg-[#9b2f00] h-full rounded-full" style={{ width: `${Math.min(100, (records.length / 50) * 100)}%` }}></div>
+                <div className="bg-[#9b2f00] h-full rounded-full" style={{ width: `${Math.min(100, (trash.length / 50) * 100)}%` }}></div>
               </div>
               <div className="flex items-center justify-between text-[#59413a] font-mono text-[11px] pt-1">
                 <span>Next Automated Purge: Sunday, 23:59 EAT</span>
@@ -622,6 +640,55 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
       </div>
 
       {/* Confirmation Modal */}
+      {/* Member picker — the archive acts on whoever is chosen here, not on a literal. */}
+      {isPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs" {...pickerDialog}>
+          <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] flex flex-col shadow-2xl border border-[#EAE1D7] animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between gap-4 border-b border-[#EAE1D7] p-4">
+              <div className="flex flex-col">
+                <h3 className="font-headline text-base font-bold text-[#1e1b19]">Choose a member to archive</h3>
+                <span className="font-body text-xs text-[#59413a]">
+                  {members.length} on the roll — the archive will target whoever you pick
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPickerOpen(false)}
+                className="p-1 rounded-lg text-[#59413a] hover:bg-[#f4ece8] cursor-pointer"
+                aria-label="Close"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <div className="flex flex-col gap-2 p-4 overflow-y-auto">
+              {members.map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => {
+                    setTargetId(member.id);
+                    setIsPickerOpen(false);
+                  }}
+                  className={`flex items-center justify-between gap-3 p-3 rounded-xl border text-left transition-colors cursor-pointer ${
+                    member.id === target?.id
+                      ? 'bg-[#fdefe6] border-[#e1bfb5]'
+                      : 'bg-[#faf2ee] border-transparent hover:bg-[#f4ece8]'
+                  }`}
+                >
+                  <span className="flex flex-col">
+                    <span className="font-headline text-sm font-bold text-[#1e1b19]">{member.name}</span>
+                    <span className="font-body text-xs text-[#59413a]">
+                      {member.roleDescription ?? 'Member'} • {member.householdName}
+                    </span>
+                  </span>
+                  <span className="font-mono text-xs font-bold text-[#59413a]">{member.memberId}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#33302d]/50 backdrop-blur-xs" {...modalOpenDialog}>
           <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-200">
@@ -639,7 +706,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
               </div>
               <div className="flex flex-col">
                 <h3 className="font-headline text-base font-bold text-[#1e1b19] leading-snug">
-                  Confirm Soft-Delete to Trash: Elena Mwangi (#MBR-1082)
+                  Confirm Soft-Delete to Trash: {target?.name} ({target?.memberId})
                 </h3>
                 <span className="font-headline text-xs text-[#ba1a1a] font-bold mt-1">
                   Council Action Required • 30-Day Safe Grace Active
@@ -649,7 +716,7 @@ export const DeleteChristianView: React.FC<DeleteChristianViewProps> = ({
 
             <div className="p-4 rounded-xl bg-[#faf2ee] mb-4 flex flex-col gap-1.5 border border-[#e1bfb5]/40 text-xs">
               <p className="font-body text-[#1e1b19] leading-relaxed">
-                Executing this action will immediately remove <strong>Elena Mwangi</strong> from active ministry volunteer rosters, pastoral prayer cohorts, small group directories, and automatic envelope batch numbering.
+                Executing this action will immediately remove <strong>{target?.name}</strong> from active ministry volunteer rosters, pastoral prayer cohorts, small group directories, and automatic envelope batch numbering.
               </p>
               <div className="flex items-center gap-2 text-[#59413a] pt-1">
                 <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#006243]">check_circle</span>

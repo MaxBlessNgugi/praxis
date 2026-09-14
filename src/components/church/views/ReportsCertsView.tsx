@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
+import { useDemoData } from '../../../data/demoStore';
 
 type CertificateType = 'baptism' | 'dedication' | 'matrimony' | 'confirmation';
 
 export const ReportsCertsView: React.FC = () => {
+  // The census dossier reports the register, so it says how many records it will sync.
+  const { memberStats } = useDemoData();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeCertTab, setActiveCertTab] = useState<CertificateType>('baptism');
 
@@ -757,7 +760,7 @@ export const ReportsCertsView: React.FC = () => {
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#006243]">check_circle</span>
               </div>
               <div className="flex items-center justify-between text-xs text-[#59413a] pt-1 border-t border-[#e1bfb5]/20">
-                <span>1,248 Members Synced</span>
+                <span>{memberStats.total} Members Synced</span>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-[#007d57]/15 text-[#006243] font-bold">Ready</span>
               </div>
             </div>

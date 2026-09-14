@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { useDemoData } from '../../../data/demoStore';
 import { ParishNavTab, MembersSubTab, ParishMember } from '../../../types';
-import { DEFAULT_LOCATION } from '../../../data/churchDomain';
+import { DEFAULT_LOCATION, formatKes } from '../../../data/churchDomain';
 import { useDialog } from '../dialog';
 import { interactiveCard } from '../interactiveCard';
 
@@ -131,8 +132,11 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Operational metrics
-  const [activeMembersCount, setActiveMembersCount] = useState(1248);
-  const [monthlyTithesCurrent, setMonthlyTithesCurrent] = useState(68450);
+  // Read from the demo store, never held here: the register and the ledger are the
+  // town squares for these two numbers, and this card used to disagree with both.
+  const { memberStats, titheStats, enrolledIds, recordTithe } = useDemoData();
+  const activeMembersCount = memberStats.total - memberStats.inquirers;
+  const monthlyTithesCurrent = titheStats.total;
   const monthlyTithesTarget = 80000;
   const [activeMinistriesCount] = useState(24);
   const [pendingActionsCount, setPendingActionsCount] = useState(3);
@@ -202,7 +206,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     };
 
     onAddMember?.(newMbr);
-    setActiveMembersCount((prev) => prev + 1);
 
     // Add to activity feed
     const newAct: ActivityItem = {
@@ -235,13 +238,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     const val = parseFloat(titheAmount);
     if (isNaN(val) || val <= 0) return;
 
-    setMonthlyTithesCurrent((prev) => prev + val);
+    // Posted to the same ledger the Giving & Stewardship screens read, so the row turns
+    // up there and both totals move together.
+    recordTithe({ donor: titheDonorName, amount: val, method: titheMethod, category: titheFund });
 
     const newAct: ActivityItem = {
       id: `act-${Date.now()}`,
       category: 'giving',
       categoryLabel: 'Tithe Ingestion',
-      title: `Offering Recorded: ${titheDonorName} (+KSh {val.toLocaleString()})`,
+      title: `Offering Recorded: ${titheDonorName} (+KSh ${val.toLocaleString()})`,
       description: `Stewardship receipt confirmed for ${titheFund} via ${titheMethod}. Auto-receipted with signature seal.`,
       timeAgo: 'Just now',
       timestamp: 'Just now',
@@ -250,12 +255,12 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       avatarText: 'SW',
       badgeColor: '#059669',
       badgeBg: '#059669/10',
-      amount: `+KSh {val.toLocaleString()}`,
+      amount: `+KSh ${val.toLocaleString()}`,
       icon: 'attach_money',
     };
     setActivities([newAct, ...activities]);
 
-    showToast(`Tithe of KSh {val.toLocaleString()} posted to ${titheFund}!`);
+    showToast(`Tithe of KSh ${val.toLocaleString()} posted to ${titheFund}!`);
     setIsRecordTitheOpen(false);
     setTitheAmount('500');
   };
@@ -297,10 +302,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     return matchesFilter && matchesSearch;
   });
 
-  const progressPercent = Math.min(
-    100,
-    Math.round((monthlyTithesCurrent / monthlyTithesTarget) * 100)
-  );
+  const progressPercent = Math.min(100, Math.round((monthlyTithesCurrent / monthlyTithesTarget) * 100));
 
   return (
     <div className="flex flex-col w-full min-h-full pb-28 text-[#1C1917] font-['Inter',sans-serif] bg-[#FDF8F3]">
@@ -332,7 +334,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               </span>
             </div>
             <p className="text-xs text-[#57534E]">
-              Nyahururu Main Church • 1,248 active church souls enrolled across 482 member households.
+              Nyahururu Main Church • {memberStats.total} souls on the roll across {memberStats.households} households.
             </p>
           </div>
 
@@ -401,10 +403,12 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <span className="text-3xl font-bold tracking-tight text-[#1C1917]">
                     {activeMembersCount.toLocaleString()}
                   </span>
-                  <span className="inline-flex items-center text-[11px] font-bold text-[#059669] bg-[#059669]/10 px-2 py-0.5 rounded-[9px]">
-                    <span aria-hidden="true" className="material-symbols-outlined text-[13px] mr-0.5">trending_up</span>
-                    +18 this mo
-                  </span>
+                  {enrolledIds.length > 0 && (
+                    <span className="inline-flex items-center text-[11px] font-bold text-[#059669] bg-[#059669]/10 px-2 py-0.5 rounded-[9px]">
+                      <span aria-hidden="true" className="material-symbols-outlined text-[13px] mr-0.5">trending_up</span>
+                      +{enrolledIds.length} enrolled by you
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="w-11 h-11 rounded-[9px] bg-[#F5EDE4] flex items-center justify-center text-[#C2410C] group-hover:scale-105 transition-transform shrink-0">
@@ -433,12 +437,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   Monthly Tithes & Offerings
                 </span>
                 <div className="flex items-baseline gap-1.5 mt-1">
-                  <span className="text-3xl font-bold tracking-tight text-[#1C1917]">
-                    KSh {monthlyTithesCurrent.toLocaleString()}
-                  </span>
-                  <span className="text-xs text-[#57534E] font-medium">
-                    / KSh {monthlyTithesTarget.toLocaleString()}
-                  </span>
+                  <span className="text-3xl font-bold tracking-tight text-[#1C1917]">{formatKes(monthlyTithesCurrent)}</span>
+                  <span className="text-xs text-[#57534E] font-medium">/ {formatKes(monthlyTithesTarget)}</span>
                 </div>
               </div>
               <div className="w-11 h-11 rounded-[9px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#D97706] group-hover:scale-105 transition-transform shrink-0">
@@ -451,7 +451,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               <div className="flex items-center justify-between text-[11px] mb-1.5">
                 <span className="font-bold text-[#C2410C]">{progressPercent}% of target</span>
                 <span className="text-[#57534E] font-medium">
-                  KSh {(monthlyTithesTarget - monthlyTithesCurrent).toLocaleString()} to goal
+                  {formatKes(Math.max(0, monthlyTithesTarget - monthlyTithesCurrent))} to goal
                 </span>
               </div>
               <div className="w-full h-2.5 rounded-full bg-[#E7E5E4] overflow-hidden">

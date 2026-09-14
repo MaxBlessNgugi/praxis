@@ -3,6 +3,7 @@ import {
   ParishMember, 
   HouseholdUnit, 
   SoftDeleteRecord, 
+  TitheTransaction, 
   WorshipService,
   AttendanceRecord,
   FirstTimeVisitorLink,
@@ -1611,5 +1612,85 @@ export const INITIAL_CUSTOMIZATION_SETTINGS: CustomizationSettings = {
   dateFormat: 'MMM D, YYYY',
   compactMode: false,
 };
+
+/**
+ * The tithe ledger's opening rows — the ONLY tithe list, now that the Giving &
+ * Stewardship KPI band and the Home dashboard derive their totals from it instead of
+ * carrying their own copies. A visitor's entries append here (see `demoStore`).
+ */
+export const INITIAL_TITHES: TitheTransaction[] = [
+  {
+    id: 'tx-1',
+    txCode: '#TX-98421',
+    donor: 'Elder Marcus Kamau',
+    envelopeNo: '#ENV-104',
+    method: 'Bank Standing Order',
+    methodIcon: 'account_balance',
+    category: 'General Tithe',
+    amount: 1250.0,
+    date: 'Feb 07, 2025 · 08:30 AM',
+    status: 'Completed',
+  },
+  {
+    id: 'tx-2',
+    txCode: '#TX-98420',
+    donor: 'Sarah Kimani',
+    envelopeNo: '#ENV-202',
+    method: 'Debit / Credit Card (Stripe)',
+    methodIcon: 'credit_card',
+    category: 'Pastoral Tithe',
+    amount: 850.0,
+    date: 'Feb 06, 2025 · 04:15 PM',
+    status: 'Completed',
+  },
+  {
+    id: 'tx-3',
+    txCode: '#TX-98419',
+    donor: 'Arthur Wanjala',
+    envelopeNo: '#ENV-012',
+    method: 'Cheque #4082',
+    methodIcon: 'receipt_long',
+    category: 'Senior Stewardship',
+    amount: 2500.0,
+    date: 'Feb 05, 2025 · 11:00 AM',
+    status: 'Cleared',
+  },
+  {
+    id: 'tx-4',
+    txCode: '#TX-98418',
+    donor: 'Dr. Jonathan Mwaura',
+    envelopeNo: '#ENV-330',
+    method: 'M-PESA Standing Order',
+    methodIcon: 'sync',
+    category: 'Faculty & Staff Tithe',
+    amount: 900.0,
+    date: 'Feb 04, 2025 · 09:00 AM',
+    status: 'Completed',
+  },
+  {
+    id: 'tx-5',
+    txCode: '#TX-98417',
+    donor: 'Anonymous Giver',
+    envelopeNo: '#ENV-999',
+    method: 'Cash Offering (Audited Envelope)',
+    methodIcon: 'payments',
+    category: 'Sunday 11am Basket',
+    amount: 350.0,
+    date: 'Feb 03, 2025 · 12:45 PM',
+    status: 'Completed',
+  },
+  {
+    id: 'tx-6',
+    txCode: '#TX-98416',
+    donor: 'Timothy & Chloe Mwangi',
+    envelopeNo: '#ENV-108',
+    method: 'M-PESA Paybill',
+    methodIcon: 'phone_iphone',
+    category: 'Young Family Tithe',
+    amount: 600.0,
+    date: 'Feb 03, 2025 · 11:20 AM',
+    status: 'Completed',
+  },
+];
 
 

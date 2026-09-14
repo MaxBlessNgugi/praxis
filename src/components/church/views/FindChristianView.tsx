@@ -3,20 +3,37 @@ import { ParishMember } from '../../../types';
 import { LOCATIONS } from '../../../data/churchDomain';
 import { useDialog } from '../dialog';
 import { interactiveCard } from '../interactiveCard';
+import { useDemoData } from '../../../data/demoStore';
+import { usePermissions } from '../../../lib/permissions';
+import { exportCsv } from '../../../lib/export';
 
 interface FindChristianViewProps {
-  members: ParishMember[];
   onNavigateToAdd: () => void;
   onNavigateToFamilyUnit?: () => void;
   onSelectMemberForArchive?: (member: ParishMember) => void;
 }
 
+/** The columns the register leaves the app as, matching ECCLESIA's export panels. */
+const MEMBER_COLUMNS = [
+  { label: 'Member ID', value: (m: ParishMember) => m.memberId },
+  { label: 'Name', value: (m: ParishMember) => m.name },
+  { label: 'Household', value: (m: ParishMember) => m.householdName },
+  { label: 'Tier', value: (m: ParishMember) => m.membershipTier },
+  { label: 'Status', value: (m: ParishMember) => m.statusLabel },
+  { label: 'Envelope', value: (m: ParishMember) => m.envelopeNumber },
+  { label: 'Phone', value: (m: ParishMember) => m.phone },
+  { label: 'Email', value: (m: ParishMember) => m.email },
+];
+
 export const FindChristianView: React.FC<FindChristianViewProps> = ({
-  members,
   onNavigateToAdd,
   onNavigateToFamilyUnit,
   onSelectMemberForArchive,
 }) => {
+  // The roll and its census both come from the store, so the band below can never
+  // describe a different congregation from the rows underneath it.
+  const { members, memberStats } = useDemoData();
+  const { canEdit } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -75,19 +92,30 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               Members Register Census
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-[#006243]/10 px-2 py-0.5 font-headline text-xs text-[#006243] font-bold">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_upward</span>+12 this mo
+              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">diversity_1</span>
+              {memberStats.households} households
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">1,248</span>
-            <span className="font-body text-xs text-[#59413a]">Active Souls</span>
+            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
+              {memberStats.total.toLocaleString()}
+            </span>
+            <span className="font-body text-xs text-[#59413a]">On the roll</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
             <span>Membership Register Vol. I</span>
-            <span className="text-[#9b2f00] font-bold">99.2% verified</span>
+            <span className="text-[#9b2f00] font-bold">
+              {memberStats.total === 0 ? 0 : Math.round((memberStats.baptized / memberStats.total) * 100)}% with
+              baptism on file
+            </span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
-            <div className="h-1.5 rounded-full bg-[#9b2f00]" style={{ width: '88%' }}></div>
+            <div
+              className="h-1.5 rounded-full bg-[#9b2f00]"
+              style={{
+                width: `${memberStats.total === 0 ? 0 : Math.round((memberStats.baptized / memberStats.total) * 100)}%`,
+              }}
+            ></div>
           </div>
         </div>
 
@@ -99,19 +127,21 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               Members
             </span>
             <span className="inline-flex items-center rounded-md bg-[#f4ece8] px-2 py-0.5 font-mono text-xs text-[#904d00] font-bold">
-              71.6% ratio
+              {memberStats.votingRatio}% ratio
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">894</span>
+            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">{memberStats.voting}</span>
             <span className="font-body text-xs text-[#59413a]">Full Voting Roll</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
-            <span>Communion status current</span>
-            <span className="text-[#006243] font-bold">812 attending</span>
+            <span>Envelope numbers issued</span>
+            <span className="text-[#006243] font-bold">
+              {members.filter((m) => m.envelopeNumber).length} of {memberStats.total}
+            </span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
-            <div className="h-1.5 rounded-full bg-[#fe932c]" style={{ width: '71.6%' }}></div>
+            <div className="h-1.5 rounded-full bg-[#fe932c]" style={{ width: `${memberStats.votingRatio}%` }}></div>
           </div>
         </div>
 
@@ -127,7 +157,9 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">218</span>
+            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
+              {memberStats.inquirers}
+            </span>
             <span className="font-body text-xs text-[#59413a]">Under Instruction</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
@@ -135,7 +167,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             <span className="font-bold text-[#1e1b19]">Feb 13</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
-            <div className="h-1.5 rounded-full bg-[#006243]" style={{ width: '44%' }}></div>
+            <div className="h-1.5 rounded-full bg-[#006243]" style={{ width: `${memberStats.inquirerRatio}%` }}></div>
           </div>
         </div>
 
@@ -151,15 +183,15 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">136</span>
-            <span className="font-body text-xs text-[#59413a]">Baptized Dependents</span>
+            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">{memberStats.youth}</span>
+            <span className="font-body text-xs text-[#59413a]">On the youth roll</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
-            <span>Confirmation Track</span>
-            <span className="text-[#9b2f00] font-bold">24 enrolled</span>
+            <span>Share of the register</span>
+            <span className="text-[#9b2f00] font-bold">{memberStats.youthRatio}% of the roll</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
-            <div className="h-1.5 rounded-full bg-[#8d7168]" style={{ width: '32%' }}></div>
+            <div className="h-1.5 rounded-full bg-[#8d7168]" style={{ width: `${memberStats.youthRatio}%` }}></div>
           </div>
         </div>
       </div>
@@ -294,7 +326,9 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             <div className="inline-flex items-center rounded-lg bg-[#faf2ee] shadow-sm border border-[#e1bfb5]/30">
               <button
                 type="button"
-                onClick={() => alert('Exporting members register census as CSV file...')}
+                onClick={() =>
+                  exportCsv('destiny-sanctuary-roll', MEMBER_COLUMNS, filteredMembers)
+                }
                 className="inline-flex items-center gap-1 px-3 py-1.5 hover:bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] transition-colors rounded-l-lg cursor-pointer"
                 title="Export current roll filtered view"
               >
@@ -311,14 +345,17 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={onNavigateToAdd}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#9b2f00] hover:bg-[#c2410c] text-white font-headline text-xs font-bold shadow-md transition-all cursor-pointer"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person_add</span>
-              <span>+ Add Christian</span>
-            </button>
+            {/* A viewer role may read the roll but not enrol anyone — ECCLESIA's `edit` action. */}
+            {canEdit('members') && (
+              <button
+                type="button"
+                onClick={onNavigateToAdd}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#9b2f00] hover:bg-[#c2410c] text-white font-headline text-xs font-bold shadow-md transition-all cursor-pointer"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person_add</span>
+                <span>+ Add Christian</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -336,7 +373,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                 onClick={() => setSelectedIds(members.map((m) => m.id))}
                 className="text-[#9b2f00] hover:underline font-bold cursor-pointer"
               >
-                Select all 1,248
+                Select all {members.length}
               </button>
             </div>
             <div className="flex items-center gap-2">
@@ -564,8 +601,10 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
         <div className="p-4 bg-[#f8f1e9] flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#EAE1D7]">
           <div className="flex items-center gap-2 text-[#59413a] font-headline text-xs font-semibold">
             <span>
-              Showing <strong className="text-[#1e1b19]">1–{filteredMembers.length}</strong> of{' '}
-              <strong className="text-[#1e1b19]">1,248</strong> congregants
+              Showing <strong className="text-[#1e1b19]">
+                {filteredMembers.length === 0 ? 0 : 1}–{filteredMembers.length}
+              </strong>{' '}
+              of <strong className="text-[#1e1b19]">{members.length}</strong> congregants
             </span>
             <span className="text-[#8d7168]/40">•</span>
             <div className="flex items-center gap-1">

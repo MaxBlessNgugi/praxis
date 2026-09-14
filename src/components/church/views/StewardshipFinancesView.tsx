@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FinancesSubTab } from '../../../types';
-import { CHURCH } from '../../../data/churchDomain';
+import { CHURCH, formatKes } from '../../../data/churchDomain';
+import { useDemoData } from '../../../data/demoStore';
 import { FinancesTithesPanel } from './FinancesTithesPanel';
 import { FinancesOfferingsPanel } from './FinancesOfferingsPanel';
 import { FinancesProjectFundingPanel } from './FinancesProjectFundingPanel';
@@ -17,6 +18,9 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
   onSubTabChange,
 }) => {
   const [activeTab, setActiveTab] = useState<FinancesSubTab>(initialSubTab);
+  // The tab badge headlines the same figure the ledger's KPI band does, so it reads the ledger:
+  // a gift the visitor logs has to move both, not leave one frozen.
+  const { titheStats } = useDemoData();
 
   const handleTabChange = (tab: FinancesSubTab) => {
     setActiveTab(tab);
@@ -71,7 +75,7 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'tithes' ? 'bg-white/20 text-white' : 'bg-[#E7E5E4] text-[#57534E]'
             }`}>
-              KSh 142.8k
+              {formatKes(titheStats.total)}
             </span>
           </button>
 

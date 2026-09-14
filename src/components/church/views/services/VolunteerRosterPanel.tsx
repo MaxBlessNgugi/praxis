@@ -10,8 +10,8 @@ import {
   INITIAL_VOLUNTEER_ROSTER,
   INITIAL_SWAP_REQUESTS,
   INITIAL_SERVICES,
-  INITIAL_CHURCH_MEMBERS,
 } from '../../../../data/churchMockData';
+import { useDemoData } from '../../../../data/demoStore';
 
 export const VolunteerRosterPanel: React.FC = () => {
   const [duties, setDuties] = useState<VolunteerRosterDuty[]>(INITIAL_VOLUNTEER_ROSTER);
@@ -24,7 +24,8 @@ export const VolunteerRosterPanel: React.FC = () => {
   const assigningDutyDialog = useDialog(() => setIsAssigningDuty(false), "Assign Volunteer to Service");
   const [targetDept, setTargetDept] = useState<VolunteerRosterDuty['department']>('ushers');
   const [roleTitle, setRoleTitle] = useState<string>('');
-  const [selectedMemberId, setSelectedMemberId] = useState<string>(INITIAL_CHURCH_MEMBERS[0].id);
+  const { members } = useDemoData();
+  const [selectedMemberId, setSelectedMemberId] = useState<string>(members[0]?.id ?? '');
   const [callTime, setCallTime] = useState<string>('09:45 AM');
   const [dutyNotes, setDutyNotes] = useState<string>('');
 
@@ -49,7 +50,8 @@ export const VolunteerRosterPanel: React.FC = () => {
     e.preventDefault();
     if (!roleTitle.trim()) return;
 
-    const chosenMember = INITIAL_CHURCH_MEMBERS.find((m) => m.id === selectedMemberId) || INITIAL_CHURCH_MEMBERS[0];
+    const chosenMember = members.find((m) => m.id === selectedMemberId) || members[0];
+    if (!chosenMember) return;
 
     const newDuty: VolunteerRosterDuty = {
       id: `vol-${Date.now()}`,
@@ -425,7 +427,7 @@ export const VolunteerRosterPanel: React.FC = () => {
                   onChange={(e) => setSelectedMemberId(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                 >
-                  {INITIAL_CHURCH_MEMBERS.map((mbr) => (
+                  {members.map((mbr) => (
                     <option key={mbr.id} value={mbr.id}>
                       {mbr.name} ({mbr.memberId})
                     </option>

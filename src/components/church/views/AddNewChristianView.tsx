@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ParishMember } from '../../../types';
 import { DEFAULT_LOCATION } from '../../../data/churchDomain';
+import { useDemoData } from '../../../data/demoStore';
 
 interface AddNewChristianViewProps {
   onSaveMember: (member: Partial<ParishMember>) => void;
@@ -22,6 +23,8 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
   const [notes, setNotes] = useState('');
   const [assignHousehold, setAssignHousehold] = useState(true);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+  // The census cards report the roll itself, so enrolling someone moves them.
+  const { memberStats, enrolledIds } = useDemoData();
 
   const handleAddTag = (tagText: string) => {
     setNotes((prev) => {
@@ -95,12 +98,14 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2 relative z-10">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
-              1,248
+              {memberStats.total}
             </span>
-            <span className="font-headline text-xs text-[#006243] font-semibold flex items-center gap-0.5">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_upward</span>
-              +4.2%
-            </span>
+            {enrolledIds.length > 0 && (
+              <span className="font-headline text-xs text-[#006243] font-semibold flex items-center gap-0.5">
+                <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_upward</span>
+                +{enrolledIds.length} you enrolled
+              </span>
+            )}
           </div>
           <p className="mt-1 font-body text-xs text-[#59413a]/80">Active members directory count</p>
         </div>
@@ -160,11 +165,13 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2 relative z-10">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
-              412
+              {memberStats.households}
             </span>
             <span className="font-headline text-xs text-[#006243] font-semibold flex items-center gap-0.5">
               <span aria-hidden="true" className="material-symbols-outlined text-[14px]">family_restroom</span>
-              89% Mapped
+              {memberStats.households === 0
+                ? 'none yet'
+                : `${(memberStats.total / memberStats.households).toFixed(1)} souls per unit`}
             </span>
           </div>
           <p className="mt-1 font-body text-xs text-[#59413a]/80">Family units registered</p>

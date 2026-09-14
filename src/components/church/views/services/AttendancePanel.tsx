@@ -10,8 +10,8 @@ import {
   INITIAL_ATTENDANCE_RECORDS,
   INITIAL_VISITOR_LINKS,
   INITIAL_SERVICES,
-  INITIAL_CHURCH_MEMBERS,
 } from '../../../../data/churchMockData';
+import { useDemoData } from '../../../../data/demoStore';
 import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain';
 
 /** The ministries a first-time visitor can ask about; the form defaults to the first. */
@@ -49,7 +49,9 @@ export const AttendancePanel: React.FC = () => {
   // Link to Existing Member Modal
   const [linkingVisitor, setLinkingVisitor] = useState<FirstTimeVisitorLink | null>(null);
   const linkingVisitorDialog = useDialog(() => setLinkingVisitor(null), "Link Guest to Members Register");
-  const [selectedMemberId, setSelectedMemberId] = useState<string>(INITIAL_CHURCH_MEMBERS[0].id);
+  // The picker offers whoever is on the roll right now, including anyone the visitor added.
+  const { members } = useDemoData();
+  const [selectedMemberId, setSelectedMemberId] = useState<string>(members[0]?.id ?? '');
 
   const selectedService = INITIAL_SERVICES.find((s) => s.id === selectedServiceId) || INITIAL_SERVICES[0];
 
@@ -701,7 +703,7 @@ export const AttendancePanel: React.FC = () => {
                   onChange={(e) => setSelectedMemberId(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                 >
-                  {INITIAL_CHURCH_MEMBERS.map((mbr) => (
+                  {members.map((mbr) => (
                     <option key={mbr.id} value={mbr.id}>
                       {mbr.name} ({mbr.memberId}) — {mbr.householdRole}
                     </option>

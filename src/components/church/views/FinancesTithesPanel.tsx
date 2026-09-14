@@ -1,102 +1,57 @@
 import { useDialog } from '../dialog';
 import React, { useState } from 'react';
+import { useDemoData } from '../../../data/demoStore';
+import { usePermissions } from '../../../lib/permissions';
+import { exportCsv } from '../../../lib/export';
+import type { TitheTransaction } from '../../../types';
 
-interface TitheTx {
-  id: string;
-  txCode: string;
-  donor: string;
-  envelopeNo: string;
-  method: string;
-  methodIcon: string;
-  category: string;
-  amount: number;
-  date: string;
-  status: 'Completed' | 'Cleared' | 'Pending';
-}
-
-const TRANSACTIONS: TitheTx[] = [
-  {
-    id: 'tx-1',
-    txCode: '#TX-98421',
-    donor: 'Elder Marcus Kamau',
-    envelopeNo: '#ENV-104',
-    method: 'Bank Standing Order',
-    methodIcon: 'account_balance',
-    category: 'General Tithe',
-    amount: 1250.00,
-    date: 'Feb 07, 2025 · 08:30 AM',
-    status: 'Completed',
-  },
-  {
-    id: 'tx-2',
-    txCode: '#TX-98420',
-    donor: 'Sarah Kimani',
-    envelopeNo: '#ENV-202',
-    method: 'Debit / Credit Card (Stripe)',
-    methodIcon: 'credit_card',
-    category: 'Pastoral Tithe',
-    amount: 850.00,
-    date: 'Feb 06, 2025 · 04:15 PM',
-    status: 'Completed',
-  },
-  {
-    id: 'tx-3',
-    txCode: '#TX-98419',
-    donor: 'Arthur Wanjala',
-    envelopeNo: '#ENV-012',
-    method: 'Cheque #4082',
-    methodIcon: 'receipt_long',
-    category: 'Senior Stewardship',
-    amount: 2500.00,
-    date: 'Feb 05, 2025 · 11:00 AM',
-    status: 'Cleared',
-  },
-  {
-    id: 'tx-4',
-    txCode: '#TX-98418',
-    donor: 'Dr. Jonathan Mwaura',
-    envelopeNo: '#ENV-330',
-    method: 'M-PESA Standing Order',
-    methodIcon: 'sync',
-    category: 'Faculty & Staff Tithe',
-    amount: 900.00,
-    date: 'Feb 04, 2025 · 09:00 AM',
-    status: 'Completed',
-  },
-  {
-    id: 'tx-5',
-    txCode: '#TX-98417',
-    donor: 'Anonymous Giver',
-    envelopeNo: '#ENV-999',
-    method: 'Cash Offering (Audited Envelope)',
-    methodIcon: 'payments',
-    category: 'Sunday 11am Basket',
-    amount: 350.00,
-    date: 'Feb 03, 2025 · 12:45 PM',
-    status: 'Completed',
-  },
-  {
-    id: 'tx-6',
-    txCode: '#TX-98416',
-    donor: 'Timothy & Chloe Mwangi',
-    envelopeNo: '#ENV-108',
-    method: 'M-PESA Paybill',
-    methodIcon: 'phone_iphone',
-    category: 'Young Family Tithe',
-    amount: 600.00,
-    date: 'Feb 03, 2025 · 11:20 AM',
-    status: 'Completed',
-  },
+/** The columns the ledger leaves the app as, matching ECCLESIA's export panels. */
+const LEDGER_COLUMNS = [
+  { label: 'Transaction', value: (t: TitheTransaction) => t.txCode },
+  { label: 'Date', value: (t: TitheTransaction) => t.date },
+  { label: 'Donor', value: (t: TitheTransaction) => t.donor },
+  { label: 'Envelope', value: (t: TitheTransaction) => t.envelopeNo },
+  { label: 'Designation', value: (t: TitheTransaction) => t.category },
+  { label: 'Method', value: (t: TitheTransaction) => t.method },
+  { label: 'Amount (KES)', value: (t: TitheTransaction) => t.amount },
+  { label: 'Status', value: (t: TitheTransaction) => t.status },
 ];
+import { formatKes } from '../../../data/churchDomain';
 
+/**
+ * Giving & Stewardship — the tithe ledger.
+ *
+ * The rows live in the demo store and every figure on the screen is totaled from them,
+ * so logging an envelope below moves the KPI band, this table and the Home dashboard
+ * together. The band used to be hand-written (KSh 142,850 / 68.2% / KSh 45,420) beside a
+ * module constant, which meant a visitor's gift changed nothing anywhere.
+ */
 export const FinancesTithesPanel: React.FC = () => {
+  const { tithes, titheStats, recordTithe, voidTithe } = useDemoData();
+  const { canEdit, canDelete } = usePermissions();
   const [search, setSearch] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('All Payment Methods');
   const [dateRange, setDateRange] = useState('February 2025 (MTD)');
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
   const offlineModalOpenDialog = useDialog(() => setIsOfflineModalOpen(false), "Record Offline Envelope / Cheque");
+  const [donor, setDonor] = useState('');
+  const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState('Cheque');
+  const [reference, setReference] = useState('');
 
-  const filteredTx = TRANSACTIONS.filter(t => {
+  const amountValue = parseFloat(amount);
+  const canLogTithe = donor.trim().length > 0 && !isNaN(amountValue) && amountValue > 0;
+
+  const handleLogTithe = () => {
+    if (!canLogTithe) return;
+    recordTithe({ donor: donor.trim(), amount: amountValue, method, reference: reference.trim() || undefined });
+    setIsOfflineModalOpen(false);
+    setDonor('');
+    setAmount('');
+    setReference('');
+  };
+
+  const filteredTx = tithes.filter(t => {
     const matchesSearch = [t.donor, t.txCode, t.envelopeNo].some((field) =>
       field.toLowerCase().includes(search.toLowerCase())
     );
@@ -120,14 +75,14 @@ export const FinancesTithesPanel: React.FC = () => {
             </span>
           </div>
           <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19]">KSh 142,850</div>
+            <div className="font-headline text-3xl font-bold text-[#1e1b19]">{formatKes(titheStats.total)}</div>
             <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">trending_up</span>
-              <span>+12.4% vs previous month</span>
+              <span>Largest gift {formatKes(titheStats.largestGift)}</span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
-            284 MTD Contributions Logged
+            {titheStats.count} MTD Contributions Logged
           </div>
         </div>
 
@@ -143,15 +98,15 @@ export const FinancesTithesPanel: React.FC = () => {
           </div>
           <div>
             <div className="flex items-baseline gap-2">
-              <span className="font-headline text-3xl font-bold text-[#006243]">68.2%</span>
+              <span className="font-headline text-3xl font-bold text-[#006243]">{titheStats.recurringShare}%</span>
               <span className="text-xs text-[#59413a]">of volume</span>
             </div>
             <div className="w-full bg-[#f4ece8] rounded-full h-1.5 mt-2 overflow-hidden">
-              <div className="bg-[#006243] h-full rounded-full" style={{ width: '68.2%' }}></div>
+              <div className="bg-[#006243] h-full rounded-full" style={{ width: `${titheStats.recurringShare}%` }}></div>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
-            194 Automated Members
+            {titheStats.recurringCount} Automated Gifts · {formatKes(titheStats.recurringTotal)}
           </div>
         </div>
 
@@ -166,14 +121,14 @@ export const FinancesTithesPanel: React.FC = () => {
             </span>
           </div>
           <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19]">KSh 45,420</div>
+            <div className="font-headline text-3xl font-bold text-[#1e1b19]">{formatKes(titheStats.oneTimeTotal)}</div>
             <div className="flex items-center gap-1 mt-1 text-[#904d00] text-xs font-semibold">
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">pin_drop</span>
-              <span>90 distinct envelope gifts</span>
+              <span>{titheStats.envelopes} distinct envelopes</span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
-            Avg. Gift: KSh 504.66
+            Avg. Gift: {titheStats.oneTimeCount === 0 ? '—' : formatKes(titheStats.averageGift)}
           </div>
         </div>
 
@@ -225,7 +180,7 @@ export const FinancesTithesPanel: React.FC = () => {
           <div className="h-44 w-full relative pt-2">
             <svg
               role="img"
-              aria-label="February tithe flow by week. Recurring tithes climb steadily through the month while one-time envelope giving stays lower and peaks mid-month; at the marked Week 2 peak, recurring tithes were KSh 36,200 against KSh 14,100 one-time."
+              aria-label="Tithe flow by week across the four weeks of February: automated standing-order and paybill giving, with one-time envelope gifts tracked beneath it."
               className="w-full h-full overflow-visible"
               viewBox="0 0 600 120"
               preserveAspectRatio="none"
@@ -378,17 +333,24 @@ export const FinancesTithesPanel: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 self-end md:self-auto">
-            <button className="h-9 px-3 rounded-xl bg-white border border-[#EAE1D7] text-xs font-semibold text-[#1e1b19] hover:bg-[#f4ece8] flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => exportCsv('destiny-sanctuary-tithes', LEDGER_COLUMNS, tithes)}
+              className="h-9 px-3 rounded-xl bg-white border border-[#EAE1D7] text-xs font-semibold text-[#1e1b19] hover:bg-[#f4ece8] flex items-center gap-1.5 cursor-pointer"
+            >
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">file_download</span>
               <span>Export CSV</span>
             </button>
-            <button
-              onClick={() => setIsOfflineModalOpen(true)}
-              className="h-9 px-3.5 rounded-xl bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_card</span>
-              <span>Record Offline Tithe</span>
-            </button>
+            {/* Recording a gift is the ledger's `edit` right, as it is in ECCLESIA. */}
+            {canEdit('giving') && (
+              <button
+                onClick={() => setIsOfflineModalOpen(true)}
+                className="h-9 px-3.5 rounded-xl bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_card</span>
+                <span>Record Offline Tithe</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -440,12 +402,34 @@ export const FinancesTithesPanel: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-3.5 px-4 text-right">
-                    <button className="p-1 rounded text-[#59413a] hover:text-[#9b2f00] hover:bg-[#f4ece8] transition-colors" title="Download Receipt PDF">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">download</span>
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button className="p-1 rounded text-[#59413a] hover:text-[#9b2f00] hover:bg-[#f4ece8] transition-colors" title="Download Receipt PDF">
+                        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">download</span>
+                      </button>
+                      {/* Voiding is the `delete` right: staff may record a gift, only an
+                          administrator may take one off the ledger. */}
+                      {canDelete('giving') && (
+                        <button
+                          type="button"
+                          onClick={() => voidTithe(tx.id)}
+                          aria-label={`Void ${tx.txCode}`}
+                          title="Void this transaction"
+                          className="p-1 rounded text-[#59413a] hover:text-[#ba1a1a] hover:bg-[#f4ece8] transition-colors cursor-pointer"
+                        >
+                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
+              {filteredTx.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-10 px-4 text-center text-[#59413a]">
+                    No tithes match this view yet — log one with “Record Offline Tithe”.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -464,16 +448,43 @@ export const FinancesTithesPanel: React.FC = () => {
             <div className="space-y-3 text-xs">
               <div>
                 <label htmlFor="offline-donor" className="block font-semibold mb-1">Donor Name / Member ID</label>
-                <input id="offline-donor" aria-label="Donor Name / Member ID" type="text" placeholder="e.g. Arthur Wanjala (#ENV-012)" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <input
+                  id="offline-donor"
+                  aria-label="Donor Name / Member ID"
+                  type="text"
+                  value={donor}
+                  onChange={(e) => setDonor(e.target.value)}
+                  placeholder="e.g. Arthur Wanjala (#ENV-012)"
+                  className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"
+                />
+                <span className="block mt-1 text-[10px] text-[#59413a]">
+                  A name on the members roll picks up that member's envelope number.
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="offline-amount" className="block font-semibold mb-1">Amount (KSh)</label>
-                  <input id="offline-amount" aria-label="Amount (KSh)" type="number" placeholder="500.00" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                  <input
+                    id="offline-amount"
+                    aria-label="Amount (KSh)"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="500.00"
+                    className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"
+                  />
                 </div>
                 <div>
                   <label htmlFor="offline-payment-type" className="block font-semibold mb-1">Payment Type</label>
-                  <select id="offline-payment-type" aria-label="Payment Type" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
+                  <select
+                    id="offline-payment-type"
+                    aria-label="Payment Type"
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value)}
+                    className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"
+                  >
                     <option>Cheque</option>
                     <option>Cash Envelope</option>
                     <option>Bank Transfer</option>
@@ -482,12 +493,27 @@ export const FinancesTithesPanel: React.FC = () => {
               </div>
               <div>
                 <label htmlFor="offline-reference" className="block font-semibold mb-1">Cheque / Reference #</label>
-                <input id="offline-reference" aria-label="Cheque / Reference #" type="text" placeholder="e.g. Cheque #4082" className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]" />
+                <input
+                  id="offline-reference"
+                  aria-label="Cheque / Reference #"
+                  type="text"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder="e.g. Cheque #4082"
+                  className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"
+                />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EAE1D7]">
-              <button onClick={() => setIsOfflineModalOpen(false)} className="px-3.5 py-1.5 text-xs text-[#59413a]">Cancel</button>
-              <button onClick={() => setIsOfflineModalOpen(false)} className="px-4 py-2 bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold rounded-xl shadow-xs">
+              <button onClick={() => setIsOfflineModalOpen(false)} className="px-3.5 py-1.5 text-xs text-[#59413a] cursor-pointer">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleLogTithe}
+                disabled={!canLogTithe}
+                className="px-4 py-2 bg-[#c2410c] hover:bg-[#9b2f00] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+              >
                 Log Tithe
               </button>
             </div>
