@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   ParishNavTab, 
   MembersSubTab, 
@@ -29,6 +29,7 @@ import { ServicesWorshipView } from './views/ServicesWorshipView';
 import { CommunicationsView } from './views/CommunicationsView';
 import { useDialog } from './dialog';
 import { SettingsView } from './views/SettingsView';
+import { CommandPalette, type CommandAction } from './CommandPalette';
 
 interface ChurchSystemAppProps {
   initialTab?: ParishNavTab;
@@ -66,6 +67,44 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
   const { addMember } = useDemoData();
   const [searchTerm, setSearchTerm] = useState('');
   const [quickActionModal, setQuickActionModal] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  /** The same navigation the sidebar performs, so a command lands exactly where a click would. */
+  const goTo = (tab: ParishNavTab) => {
+    setActiveTab(tab);
+    if (tab === 'find-christian' || tab === 'add-new-christian' || tab === 'delete-christian' || tab === 'family-unit') {
+      setActiveSubTab(tab);
+    }
+  };
+
+  /** Every section, plus the register actions worth reaching without hunting through a sidebar. */
+  const commandActions: CommandAction[] = [
+    { id: 'find-christian', label: 'Find a member', hint: 'Members', icon: 'person_search', run: () => goTo('find-christian') },
+    { id: 'add-new-christian', label: 'Add a member', hint: 'Members', icon: 'person_add', run: () => goTo('add-new-christian') },
+    { id: 'family-unit', label: 'Household units', hint: 'Members', icon: 'holiday_village', run: () => goTo('family-unit') },
+    { id: 'delete-christian', label: 'Trash & soft delete', hint: 'Members', icon: 'delete', run: () => goTo('delete-christian') },
+    { id: 'services-worship', label: 'Services & Worship', hint: 'Section', icon: 'menu_book', run: () => goTo('services-worship') },
+    { id: 'ministries-groups', label: 'Groups & Fellowships', hint: 'Section', icon: 'groups', run: () => goTo('ministries-groups') },
+    { id: 'giving-stewardship', label: 'Giving & Stewardship', hint: 'Section', icon: 'volunteer_activism', run: () => goTo('giving-stewardship') },
+    { id: 'inventory-assets', label: 'Inventory & Assets', hint: 'Section', icon: 'inventory_2', run: () => goTo('inventory-assets') },
+    { id: 'governance', label: 'Church Council', hint: 'Section', icon: 'account_balance', run: () => goTo('governance') },
+    { id: 'reports-certs', label: 'Reports & Certificates', hint: 'Section', icon: 'description', run: () => goTo('reports-certs') },
+    { id: 'communications', label: 'Communications', hint: 'Section', icon: 'campaign', run: () => goTo('communications') },
+    { id: 'settings-profile', label: 'Settings & Profile', hint: 'Section', icon: 'settings', run: () => goTo('settings-profile') },
+    { id: 'admin-portal', label: 'Admin & Security', hint: 'Section', icon: 'admin_panel_settings', run: () => goTo('admin-portal') },
+  ];
+
+  // Cmd/Ctrl + K from anywhere in the console.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
   const quickActionModalDialog = useDialog(() => setQuickActionModal(false), "Quick Actions");
 
   const isMembersView = 
@@ -115,6 +154,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           onQuickAction={() => setQuickActionModal(true)}
+          onOpenCommandPalette={() => setPaletteOpen(true)}
           activeTabTitle={getHeaderTitle()}
         />
 
@@ -344,6 +384,8 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
       </div>
 
       {/* Quick Action Modal */}
+      {paletteOpen && <CommandPalette actions={commandActions} onClose={() => setPaletteOpen(false)} />}
+
       {quickActionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/40 backdrop-blur-xs" {...quickActionModalDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-sm w-full p-5 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">

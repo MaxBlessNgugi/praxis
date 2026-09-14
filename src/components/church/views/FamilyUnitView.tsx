@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { HouseholdUnit } from '../../../types';
 import { INITIAL_HOUSEHOLDS } from '../../../data/churchMockData';
 import { useDialog } from '../dialog';
+import { EmptyState } from '../../ui';
 import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
 
 /** The statuses the mock households actually carry, so the filter cannot go dead. */
@@ -229,6 +230,15 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
 
       {/* Household Grid: 6 Units */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {filteredHouseholds.length === 0 && (
+          <div className="col-span-full">
+            <EmptyState
+              icon="holiday_village"
+              title="No households match this view"
+              description="Clear the location or status filter to see the whole roll."
+            />
+          </div>
+        )}
         {filteredHouseholds.map((unit) => (
           <div
             key={unit.id}

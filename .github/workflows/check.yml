@@ -43,3 +43,35 @@ jobs:
 
       - name: dialog audit
         run: node tools/audit-dialogs.mjs
+
+  # The job above no longer compiles `backend/`: the root `tsconfig.json` excludes it, because the
+  # service has its own compiler options (commonjs, `strict`, `noUnusedLocals`), its own lockfile and
+  # its own generated Prisma client. Checking it here instead keeps that exclusion from being a hole.
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # `@prisma/client` generates the client from the schema on install, so the typecheck below runs
+      # against the real generated types rather than an empty `@prisma/client` export.
+      - name: install
+        run: npm ci
+
+      # `prisma validate` parses the schema and never opens a connection, so a placeholder URL is
+      # enough here and no database service is needed.
+      - name: validate the schema
+        env:
+          DATABASE_URL: postgresql://praxis:praxis@localhost:5432/praxis?schema=public
+        run: npx prisma validate
+
+      - name: typecheck
+        run: npm run typecheck

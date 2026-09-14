@@ -6,6 +6,7 @@ import { interactiveCard } from '../interactiveCard';
 import { useDemoData } from '../../../data/demoStore';
 import { usePermissions } from '../../../lib/permissions';
 import { exportCsv } from '../../../lib/export';
+import { EmptyState } from '../../ui';
 
 interface FindChristianViewProps {
   onNavigateToAdd: () => void;
@@ -593,6 +594,17 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                   </tr>
                 );
               })}
+              {filteredMembers.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4">
+                    <EmptyState
+                      icon="person_search"
+                      title="No members match this view"
+                      description="Widen the search term, or clear the tier, status and location filters."
+                    />
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
