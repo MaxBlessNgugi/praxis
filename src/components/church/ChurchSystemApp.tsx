@@ -21,6 +21,7 @@ import { DeleteChristianView } from './views/DeleteChristianView';
 import { FamilyUnitView } from './views/FamilyUnitView';
 import { MinistriesView } from './views/MinistriesView';
 import { StewardshipFinancesView } from './views/StewardshipFinancesView';
+import { InventoryAssetsView } from './views/InventoryAssetsView';
 import { ReportsCertsView } from './views/ReportsCertsView';
 import { GovernanceView } from './views/GovernanceView';
 import { AdminSecurityView } from './views/AdminSecurityView';
@@ -79,6 +80,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
     if (activeTab === 'services-worship') return 'Services & Worship Administration';
     if (activeTab === 'ministries-groups') return 'Ministries & Volunteer Rosters';
     if (activeTab === 'giving-stewardship') return 'Giving & Stewardship Treasury';
+    if (activeTab === 'inventory-assets') return 'Inventory & Assets Register';
     if (activeTab === 'governance') return 'Leadership & Church Council';
     if (activeTab === 'reports-certs') return 'Reports & Official Certificates';
     if (activeTab === 'communications') return 'Church Communications & Community';
@@ -156,6 +158,13 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                 initialSubTab={activeFinancesSubTab}
                 onSubTabChange={setActiveFinancesSubTab}
               />
+            </div>
+          )}
+
+          {/* If Inventory & Assets tab is selected */}
+          {activeTab === 'inventory-assets' && (
+            <div className="w-full px-6 sm:px-8 py-6">
+              <InventoryAssetsView />
             </div>
           )}
 

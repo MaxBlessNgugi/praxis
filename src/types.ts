@@ -7,6 +7,7 @@ export type ParishNavTab =
   | 'services-worship' 
   | 'governance' 
   | 'giving-stewardship' 
+  | 'inventory-assets' 
   | 'ministries-groups' 
   | 'reports-certs' 
   | 'communications' 
@@ -452,6 +453,28 @@ export interface SoftDeleteRecord {
 }
 
 /** One row of the tithe ledger the Giving & Stewardship screens read. */
+/**
+ * A tracked asset or stock line — the sanctuary's sound desk, the bookshop's stock, the kitchen's
+ * gas. Field names follow ECCLESIA's `InventoryItem` (sku, cost, price, stock, reorder) so this
+ * maps onto the real API without a translation layer; `location` and `lastCounted` are the
+ * mockup's own, and stand in for ECCLESIA's separate stock-take records.
+ */
+export interface InventoryItem {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  location: string;
+  /** What the books say is on hand — the figure a physical count is checked against. */
+  stock: number;
+  /** At or below this the item is flagged for restocking. */
+  reorder: number;
+  cost: number;
+  price: number;
+  /** When the shelf was last counted by hand, and by whom. */
+  lastCounted: string;
+}
+
 export interface TitheTransaction {
   id: string;
   txCode: string;

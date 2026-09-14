@@ -123,6 +123,19 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
               </button>
 
               <button
+                onClick={() => onSelectTab('inventory-assets')}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-[9px] font-headline text-[13px] transition-all cursor-pointer w-full text-left ${
+                  activeTab === 'inventory-assets'
+                    ? 'bg-[#C2410C]/15 text-[#C2410C] font-bold shadow-[0_0_15px_rgba(194,65,12,0.25)] ring-1 ring-[#C2410C]/40'
+                    : 'text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917]'
+                }`}
+                title="Inventory & Assets"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">inventory_2</span>
+                {!collapsed && <span>Inventory & Assets</span>}
+              </button>
+
+              <button
                 onClick={() => onSelectTab('ministries-groups')}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-[9px] font-headline text-[13px] transition-all cursor-pointer w-full text-left ${
                   activeTab === 'ministries-groups'

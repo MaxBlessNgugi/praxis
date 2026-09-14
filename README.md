@@ -21,7 +21,7 @@ src/
     auth/AuthScreen.tsx       the entry gate (no backend: a demo transition)
     church/
       ChurchSystemApp.tsx     the shell: navigation, section routing, quick actions
-      ChurchSidebar.tsx       ten sections
+      ChurchSidebar.tsx       eleven sections
       ChurchHeader.tsx        search, role, reset, quick action
       views/                  one component per screen, grouped by section
       dialog.ts               the shared dialog hook (focus, Escape, restore)

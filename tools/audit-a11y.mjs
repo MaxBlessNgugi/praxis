@@ -30,6 +30,7 @@ const ALL_SECTIONS = [
   { title: 'Services & Worship', screens: ['Service Planner', 'Attendance & Census', 'Volunteer Roster', 'Service Reports'] },
   { title: 'Church Council', screens: [] },
   { title: 'Giving & Stewardship', screens: ['Tithes', 'Offerings', 'Project Funding', 'Welfare', 'Charity Activities'] },
+  { title: 'Inventory & Assets', screens: [] },
   { title: 'Groups & Fellowships', screens: ['Departmental', 'Leadership Roles', 'Volunteer Roles'] },
   { title: 'Reports & Certs', screens: ['Baptism Certificate', 'Dedication', 'Matrimony', 'Discipleship'] },
   { title: 'Communications', screens: ['Announcements', 'Broadcasts', 'Events & Calendar', 'Prayer Requests', 'Birthdays & Milestones'] },

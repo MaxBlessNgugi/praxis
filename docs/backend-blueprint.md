@@ -112,6 +112,7 @@ Three conventions worth copying outright:
 | Services & Worship | *(no equivalent)* | — |
 | Church Council | *(no equivalent)* | — |
 | Giving & Stewardship | `Contribution`, `BilledItem`, `Deposit` | `/api/contributions`, `/api/billed-items`, `/api/deposits` |
+| Inventory & Assets | `InventoryItem`, `StockTake` | `/api/inventory/items`, `/api/inventory/stock-takes` |
 | Groups & Fellowships | *(no equivalent)* | — |
 | Reports & Certs | report row shapes, `BilledItem` | `/api/reports/{sacraments,contributions,sales,cashiers}` |
 | Communications | `SmsSettings`, `MailSettings` | *(sends only; no campaigns)* |
@@ -122,8 +123,10 @@ Two honest gaps run both ways. ECCLESIA has **no Services/Worship, no Church Cou
 module — its panels are `christian, activities, sacraments, finance, ledgers, inventory, reports, hr,
 administration`. So three of the mockup's sections describe screens that the reference system does not
 have; if Praxis is going to be the blueprint for ECCLESIA, those three are new work on the *backend*
-side, not just the frontend. Conversely ECCLESIA has three areas the mockup has nothing for —
-**Ledgers, Inventory and HR/Payroll** — and those are the largest genuine gaps in Praxis (§7).
+side, not just the frontend. Conversely ECCLESIA has three areas the mockup had nothing for —
+**Ledgers, Inventory and HR/Payroll**. Inventory is now built (the console's Inventory & Assets
+section reads ECCLESIA's own field names, `sku / cost / price / stock / reorder`, and records a
+physical count against the line it counted); Ledgers and HR/Payroll remain the largest gaps (§7).
 
 ---
 
@@ -255,8 +258,9 @@ The gaps that remain true after grounding this document:
 4. **Filtering happens in the browser.** ECCLESIA pushes filters to the server
    (`?status=&q=`); the mockup filters arrays in memory. At 1,200 members with several years of giving
    this stops working, which is why the mockup should not be pointed at real data as-is.
-5. **Three sections have no backend counterpart** (Services & Worship, Church Council, Groups) and
-   **three backend areas have no mockup** (Ledgers, Inventory, HR/Payroll).
+5. **Three sections still have no backend counterpart** (Services & Worship, Church Council, Groups)
+   and **two backend areas still have no mockup** (Ledgers, HR/Payroll) — Inventory's screen now
+   exists, but nothing behind it does.
 6. **Data protection is mechanism-free.** A parish holds national ID numbers, phone numbers,
    sacramental records and children's data. ECCLESIA gives it a login, roles and a backup; it does not
    give it consent records, retention limits or an erasure path. Under Kenya's Data Protection Act

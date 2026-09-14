@@ -1,7 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { ParishMember, SoftDeleteRecord, TitheTransaction } from '../types';
-import { INITIAL_CHURCH_MEMBERS, INITIAL_SOFT_DELETE_RECORDS, INITIAL_TITHES } from './churchMockData';
-import { DEFAULT_LOCATION, DEMO_TODAY } from './churchDomain';
+import type { InventoryItem, ParishMember, SoftDeleteRecord, TitheTransaction } from '../types';
+import {
+  INITIAL_CHURCH_MEMBERS,
+  INITIAL_INVENTORY_ITEMS,
+  INITIAL_SOFT_DELETE_RECORDS,
+  INITIAL_TITHES,
+} from './churchMockData';
+import { CHURCH, DEFAULT_LOCATION, DEMO_TODAY } from './churchDomain';
 import { ROLES, type DemoRole } from '../lib/permissions';
 
 /**
@@ -55,6 +60,7 @@ interface DemoSnapshot {
   members: ParishMember[];
   trash: SoftDeleteRecord[];
   tithes: TitheTransaction[];
+  inventory: InventoryItem[];
   /** The role the console is being viewed as — it decides what the permission gates allow. */
   role: DemoRole;
   /** Members a visitor enrolled in this browser, so the dashboard can say so. */
@@ -67,6 +73,7 @@ const freshSnapshot = (): DemoSnapshot => ({
   members: INITIAL_CHURCH_MEMBERS,
   trash: INITIAL_SOFT_DELETE_RECORDS,
   tithes: INITIAL_TITHES,
+  inventory: INITIAL_INVENTORY_ITEMS,
   role: 'super_admin',
   enrolledIds: [],
   archived: {},
@@ -83,6 +90,7 @@ function loadSnapshot(): DemoSnapshot {
       members: Array.isArray(saved.members) ? saved.members : seed.members,
       trash: Array.isArray(saved.trash) ? saved.trash : seed.trash,
       tithes: Array.isArray(saved.tithes) ? saved.tithes : seed.tithes,
+      inventory: Array.isArray(saved.inventory) ? saved.inventory : seed.inventory,
       role: ROLES.includes(saved.role as DemoRole) ? (saved.role as DemoRole) : seed.role,
       enrolledIds: Array.isArray(saved.enrolledIds) ? saved.enrolledIds : [],
       archived: saved.archived && typeof saved.archived === 'object' ? saved.archived : {},
@@ -138,6 +146,20 @@ export function titheStats(tithes: TitheTransaction[]) {
   };
 }
 
+/** Everything the inventory screen totals, computed from the items themselves. */
+export function inventoryStats(items: InventoryItem[]) {
+  const sum = (pick: (item: InventoryItem) => number) => items.reduce((total, item) => total + pick(item), 0);
+  return {
+    total: items.length,
+    /** At or below its reorder level — the list a storekeeper works from. */
+    lowStock: items.filter((item) => item.stock <= item.reorder).length,
+    /** What the shelves cost, and what the for-sale lines would fetch. */
+    costValue: sum((item) => item.stock * item.cost),
+    retailValue: sum((item) => item.stock * item.price),
+    categories: new Set(items.map((item) => item.category)).size,
+  };
+}
+
 /* -------------------------------------------------------------------- store */
 
 interface DemoData extends DemoSnapshot {
@@ -148,6 +170,8 @@ interface DemoData extends DemoSnapshot {
   restoreMember: (recordId: string) => void;
   recordTithe: (input: TitheInput) => TitheTransaction;
   voidTithe: (id: string) => void;
+  inventoryStats: ReturnType<typeof inventoryStats>;
+  countStock: (id: string, physical: number) => void;
   setRole: (role: DemoRole) => void;
   resetDemo: () => void;
 }
@@ -312,6 +336,19 @@ export const DemoDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setSnapshot((prev) => ({ ...prev, role }));
   }, []);
 
+  /**
+   * A physical count replaces the book figure. That difference is the whole point of a stock take,
+   * which is why the count is recorded against the item rather than adjusted quietly.
+   */
+  const countStock = useCallback((id: string, physical: number) => {
+    setSnapshot((prev) => ({
+      ...prev,
+      inventory: prev.inventory.map((item) =>
+        item.id === id ? { ...item, stock: physical, lastCounted: `${DEMO_TODAY.short} · ${CHURCH.visionaryLeader}` } : item,
+      ),
+    }));
+  }, []);
+
   const resetDemo = useCallback(() => {
     try {
       localStorage.removeItem(STORAGE_KEY);
@@ -331,10 +368,12 @@ export const DemoDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       restoreMember,
       recordTithe,
       voidTithe,
+      inventoryStats: inventoryStats(snapshot.inventory),
+      countStock,
       setRole,
       resetDemo,
     }),
-    [snapshot, addMember, archiveMember, restoreMember, recordTithe, voidTithe, setRole, resetDemo],
+    [snapshot, addMember, archiveMember, restoreMember, recordTithe, voidTithe, countStock, setRole, resetDemo],
   );
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;

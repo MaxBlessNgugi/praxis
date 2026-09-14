@@ -1,13 +1,15 @@
 /**
  * Panel + action permissions, ported from ECCLESIA (`src/permissions.tsx`).
  *
- * The real system does not carry fifty roles. It carries nine panel keys, three actions and four
- * roles, and resolves rights the same way on both sides of the wire:
+ * The real system does not carry fifty roles. It carries a set of panel keys, three actions and
+ * four roles, and resolves rights the same way on both sides of the wire:
  *
- *   1. super_admin                          → full access, always
- *   2. the role preset below                → the baseline for that role
- *   3. a per-user override would merge here → (the real backend stores it on User.panels/actions)
- *   4. a missing field                      → stays as the baseline
+ *   1. the role's rights below              → the baseline for that role
+ *   2. a per-user override would merge here → (the real backend stores it on User.panels/actions)
+ *   3. a missing field                      → stays as the baseline
+ *
+ * super_admin reaches everything because its rights are full, not through a bypass branch — the
+ * mockup has no per-user overrides, which is the only thing the real bypass exists to skip.
  *
  * The backend enforces this with `requireModule(panel)` returning 403; the frontend mirrors it so a
  * control is hidden rather than offered and then refused. A missing provider grants full access, the
@@ -22,54 +24,50 @@ export type PanelKey =
   | 'services'
   | 'council'
   | 'giving'
+  | 'inventory'
   | 'groups'
   | 'reports'
   | 'communications'
   | 'settings'
   | 'admin';
 
-export const PANEL_KEYS: PanelKey[] = [
-  'home',
-  'members',
-  'services',
-  'council',
-  'giving',
-  'groups',
-  'reports',
-  'communications',
-  'settings',
-  'admin',
-];
-
-export type PanelAction = 'view' | 'edit' | 'delete';
-
-export interface PanelPermissions {
-  panels: Record<PanelKey, boolean>;
-  actions: Record<PanelAction, boolean>;
-}
-
 /** The console's own roles, matching ECCLESIA's `UserRole` enum. */
 export type DemoRole = 'super_admin' | 'admin' | 'staff' | 'viewer';
 
 export const ROLES: DemoRole[] = ['super_admin', 'admin', 'staff', 'viewer'];
 
-const allPanels = (value: boolean) =>
-  Object.fromEntries(PANEL_KEYS.map((key) => [key, value])) as Record<PanelKey, boolean>;
+type Panels = Record<PanelKey, boolean>;
 
-/**
- * What each role may do. `viewer` is read-only and `staff` cannot delete, which is the visible
- * difference the console is meant to demonstrate; `admin` runs the office, `super_admin` owns it.
- */
-export const ROLE_PRESETS: Record<DemoRole, PanelPermissions> = {
-  super_admin: { panels: allPanels(true), actions: { view: true, edit: true, delete: true } },
-  admin: { panels: allPanels(true), actions: { view: true, edit: true, delete: true } },
-  staff: { panels: { ...allPanels(true), admin: false }, actions: { view: true, edit: true, delete: false } },
-  viewer: { panels: allPanels(true), actions: { view: true, edit: false, delete: false } },
+interface Rights {
+  panels: Panels;
+  actions: { view: boolean; edit: boolean; delete: boolean };
+}
+
+/** Every panel, so a right has to be taken away rather than granted one key at a time. */
+const FULL: Panels = {
+  home: true,
+  members: true,
+  services: true,
+  council: true,
+  giving: true,
+  inventory: true,
+  groups: true,
+  reports: true,
+  communications: true,
+  settings: true,
+  admin: true,
+};
+
+/** What each role may do. `staff` cannot delete and `viewer` cannot write — the visible difference. */
+const RIGHTS: Record<DemoRole, Rights> = {
+  super_admin: { panels: FULL, actions: { view: true, edit: true, delete: true } },
+  admin: { panels: FULL, actions: { view: true, edit: true, delete: true } },
+  staff: { panels: { ...FULL, admin: false }, actions: { view: true, edit: true, delete: false } },
+  viewer: { panels: FULL, actions: { view: true, edit: false, delete: false } },
 };
 
 export interface PermissionsApi {
   role: DemoRole;
-  permissions: PanelPermissions;
   canView: (panel: PanelKey) => boolean;
   canEdit: (panel: PanelKey) => boolean;
   canDelete: (panel: PanelKey) => boolean;
@@ -77,7 +75,6 @@ export interface PermissionsApi {
 
 const full: PermissionsApi = {
   role: 'super_admin',
-  permissions: ROLE_PRESETS.super_admin,
   canView: () => true,
   canEdit: () => true,
   canDelete: () => true,
@@ -87,16 +84,13 @@ const PermissionsContext = createContext<PermissionsApi>(full);
 
 export const PermissionsProvider: React.FC<{ role: DemoRole; children: React.ReactNode }> = ({ role, children }) => {
   const value = useMemo<PermissionsApi>(() => {
-    const permissions = ROLE_PRESETS[role] ?? ROLE_PRESETS.super_admin;
-    // super_admin bypasses every check, exactly as the backend middleware does.
-    if (role === 'super_admin') return { role, permissions, canView: () => true, canEdit: () => true, canDelete: () => true };
-    const canView = (panel: PanelKey) => permissions.panels[panel] !== false;
+    const rights = RIGHTS[role];
+    const canView = (panel: PanelKey) => rights.panels[panel] !== false;
     return {
       role,
-      permissions,
       canView,
-      canEdit: (panel: PanelKey) => canView(panel) && permissions.actions.edit !== false,
-      canDelete: (panel: PanelKey) => canView(panel) && permissions.actions.delete !== false,
+      canEdit: (panel: PanelKey) => canView(panel) && rights.actions.edit,
+      canDelete: (panel: PanelKey) => canView(panel) && rights.actions.delete,
     };
   }, [role]);
 
