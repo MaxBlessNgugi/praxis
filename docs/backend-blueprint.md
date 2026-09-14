@@ -9,6 +9,14 @@ one is right and why.
 
 Read it as: *what Praxis has to grow into, and the exact shape of the thing it grows into.*
 
+**Decision, revised: Praxis's backend is a new service under `praxis/backend/`, serving its own
+schema.** Phase B1 is built against the model list from the earlier proposal (`Member`, `Household`,
+`Ministry`, `Service`, `Attendance`, `Tithe`, `Offering`, `Project`, `WelfareDisbursement`,
+`Announcement`, `Event`, `PrayerRequest`, `AuditLog`, `SoftDeletedRecord`), so this document is now a
+*reference* for architecture the port would have reused — money as Decimal, soft delete with an audit
+trail, per-account lockout, the panel/action rights shape — rather than the plan of record. Where the
+two disagree, the code in `backend/prisma/schema.prisma` wins. The previous decision read:
+
 **Decision: Praxis's backend ports this system rather than being re-derived from a proposal.** A
 separately drafted backend blueprint describing the same Express/Prisma/Postgres stack, a fresh
 24-model schema and a `{ success, data, message, meta }` envelope was reconciled against this document

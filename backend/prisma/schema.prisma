@@ -1,0 +1,957 @@
+// Praxis Church OS — data model.
+//
+// Three conventions hold across every model here, because each one is expensive to retrofit:
+//
+//   1. Money is Decimal, never Float. A giving ledger that drifts by a shilling is not a ledger of
+//      record. Conversion to a plain number happens at the JSON edge, nowhere else.
+//   2. Deletion is soft. `deletedAt` marks a retired row; `SoftDeletedRecord` keeps the reason, the
+//      actor and a snapshot, which is what the console's Trash screen reads and what makes a
+//      restore possible months later.
+//   3. Closed sets are enums, not free strings. A member's status or a payment method is one of a
+//      known list, and the database should be the thing that says so.
+//
+// AuditLog is deliberately append-only: it has no `updatedAt` and no `deletedAt`. An audit trail
+// that can be edited is not an audit trail.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------------------------
+// Identity and access
+// ---------------------------------------------------------------------------------------------
+
+enum AuditAction {
+  create
+  update
+  delete
+  restore
+  login
+}
+
+/// A panel key plus the three actions, as JSON — the same shape the frontend's permission module
+/// uses, so the server and the UI resolve rights the same way instead of disagreeing.
+model Role {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String?
+  panels      Json
+  actions     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  users User[]
+
+  @@index([deletedAt])
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  roleId       String?
+
+  /// Set when this login belongs to someone on the register. It is what lets a volunteer act as
+  /// themselves — asking for cover on their own duty — instead of only an administrator acting for
+  /// them, which is a claim the server could not otherwise verify.
+  memberId     String?   @unique
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+
+  // Account lockout, counted per account rather than per IP: the reference parish system locks for
+  // 15 minutes after a configured number of failures, and a shared office machine makes per-account
+  // the only meaningful counter.
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  role                Role?                @relation(fields: [roleId], references: [id])
+  member              Member?              @relation("UserAccount", fields: [memberId], references: [id], onDelete: SetNull)
+  tithes              Tithe[]
+  offerings           Offering[]
+  announcements       Announcement[]       @relation("AnnouncementAuthor")
+  broadcasts          Broadcast[]          @relation("BroadcastAuthor")
+  auditLogs           AuditLog[]
+  softDeletes         SoftDeletedRecord[]  @relation("SoftDeleteActor")
+  softRestores        SoftDeletedRecord[]  @relation("SoftRestoreActor")
+  welfareApprovals    WelfareDisbursement[] @relation("WelfareApprover")
+  serviceReports      ServiceReport[]       @relation("ServiceReportAuthor")
+  swapDecisions       SwapRequest[]         @relation("SwapDecider")
+  charityLed          CharityActivity[]     @relation("CharityLead")
+  financeAudit        FinanceAuditEntry[]   @relation("FinanceAuditActor")
+  settingsChanged     AppSetting[]          @relation("SettingEditor")
+
+  @@index([roleId])
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------------------------
+// The church's own profile
+// ---------------------------------------------------------------------------------------------
+
+/// One row. The console's Settings > Organization Profile screen reads and writes exactly this.
+model OrganizationProfile {
+  id          String   @id @default(uuid())
+  name        String
+  tagline     String?
+  location    String
+  address     String?
+  phone       String?
+  email       String?
+  website     String?
+  vision      String?
+  mission     String?
+  coreValues  String[]
+  serviceTimes Json?
+  socials     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------------------------
+// People
+// ---------------------------------------------------------------------------------------------
+
+enum MemberStatus {
+  active
+  transferred
+  deceased
+  inactive
+}
+
+enum BaptismType {
+  baptized
+  dedicated
+  none
+}
+
+model Household {
+  id         String    @id @default(uuid())
+  name       String
+  unitNumber String    @unique
+  location   String
+  address    String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  members Member[]
+
+  @@index([deletedAt])
+}
+
+model Member {
+  id           String       @id @default(uuid())
+  memberId     String       @unique
+  firstName    String
+  lastName     String
+  initials     String?
+  email        String?
+  phone        String?
+  nationalId   String?
+  dateOfBirth  DateTime?
+  location     String
+
+  householdId    String?
+  householdRole  String?
+  isHouseholdHead Boolean  @default(false)
+
+  status             MemberStatus @default(active)
+  baptismType        BaptismType  @default(baptized)
+  baptismDate        DateTime?
+  baptismOfficiant   String?
+  envelopeNumber     String?      @unique
+  pastoralNotes      String?
+  tags               String[]
+  joinedAt           DateTime     @default(now())
+
+  /// The console's Birthdays & Anniversaries screen counts "X years of marriage", so a wedding date
+  /// has to be storable. Nullable because most of a register will not have one.
+  weddingAnniversary DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  household      Household?            @relation(fields: [householdId], references: [id])
+  userAccount    User?                 @relation("UserAccount")
+  ministries     MinistryMember[]
+  ledMinistries  Ministry[]            @relation("MinistryLeader")
+  officiatedServices Service[]         @relation("ServiceOfficiant")
+  attendance     Attendance[]
+  welfareAssigned WelfareDisbursement[] @relation("WelfareAssignee")
+  chairedMeetings Meeting[]             @relation("MeetingChair")
+  minuteKeeping   Meeting[]             @relation("MeetingSecretary")
+  tithes         Tithe[]
+  contributions  ProjectContribution[]
+  welfareCases   WelfareDisbursement[]
+  prayerRequests PrayerRequest[]
+  rosterDuties   RosterDuty[]          @relation("DutyHolder")
+  swapRequests   SwapRequest[]         @relation("SwapRequester")
+  reliefSwaps    SwapRequest[]         @relation("SwapReplacement")
+
+  @@index([householdId])
+  @@index([status])
+  @@index([lastName, firstName])
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Groups and ministry
+// ---------------------------------------------------------------------------------------------
+
+model Ministry {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  leaderId    String?
+  meetingDay  String?
+  location    String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  leader       Member?               @relation("MinistryLeader", fields: [leaderId], references: [id])
+  members      MinistryMember[]
+  rosterDuties RosterDuty[]
+  liturgyItems OrderOfServiceItem[]
+
+  @@index([leaderId])
+  @@index([deletedAt])
+}
+
+model MinistryMember {
+  id        String    @id @default(uuid())
+  ministryId String
+  memberId   String
+  roleTitle  String    @default("Member")
+  joinedAt   DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  ministry Ministry @relation(fields: [ministryId], references: [id], onDelete: Cascade)
+  member   Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([ministryId, memberId])
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Services and attendance
+// ---------------------------------------------------------------------------------------------
+
+model Service {
+  id         String    @id @default(uuid())
+  title      String
+  heldAt     DateTime
+  startTime  String?
+  venue      String
+  theme      String?
+  officiantId String?
+  notes      String?
+  isTemplate Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  officiant  Member?      @relation("ServiceOfficiant", fields: [officiantId], references: [id])
+  attendance Attendance[]
+  offerings  Offering[]
+  liturgy    OrderOfServiceItem[]
+  roster     RosterDuty[]
+  report     ServiceReport?
+
+  @@index([heldAt])
+  @@index([officiantId])
+  @@index([deletedAt])
+}
+
+enum AttendanceKind {
+  service
+  group
+  meeting
+}
+
+/// One row is one counted attendance, so a census ("712 adults, 140 children, 23 visitors") is a
+/// handful of rows rather than a schema change.
+model Attendance {
+  id          String         @id @default(uuid())
+  serviceId   String?
+  memberId    String?
+  kind        AttendanceKind @default(service)
+  count       Int            @default(1)
+  visitorName String?
+  notes       String?
+  recordedAt  DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+
+  service Service? @relation(fields: [serviceId], references: [id])
+  member  Member?  @relation(fields: [memberId], references: [id])
+
+  @@index([serviceId])
+  @@index([memberId])
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Giving and money
+// ---------------------------------------------------------------------------------------------
+
+enum PaymentMethod {
+  cash
+  mpesa
+  cheque
+  bank_transfer
+  card
+}
+
+model Tithe {
+  id          String        @id @default(uuid())
+  txCode      String        @unique
+  memberId    String?
+  donorName   String
+  envelopeNo  String?
+  amount      Decimal       @db.Decimal(12, 2)
+  method      PaymentMethod
+  category    String        @default("General Tithe")
+  reference   String?
+  status      String        @default("completed")
+  receivedAt  DateTime      @default(now())
+  recordedById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  member     Member? @relation(fields: [memberId], references: [id])
+  recordedBy User?   @relation(fields: [recordedById], references: [id])
+
+  @@index([memberId])
+  @@index([receivedAt])
+  @@index([deletedAt])
+}
+
+model Offering {
+  id           String        @id @default(uuid())
+  txCode       String        @unique
+  serviceId    String?
+  amount       Decimal       @db.Decimal(12, 2)
+  method       PaymentMethod
+  category     String        @default("Sunday Offering")
+  reference    String?
+  notes        String?
+  receivedAt   DateTime      @default(now())
+  recordedById String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+
+  service    Service? @relation(fields: [serviceId], references: [id])
+  recordedBy User?    @relation(fields: [recordedById], references: [id])
+
+  @@index([serviceId])
+  @@index([receivedAt])
+  @@index([deletedAt])
+}
+
+enum ProjectStatus {
+  planned
+  active
+  completed
+  paused
+}
+
+model Project {
+  id           String        @id @default(uuid())
+  name         String
+  description  String?
+  targetAmount Decimal       @db.Decimal(12, 2)
+  status       ProjectStatus @default(planned)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+
+  contributions ProjectContribution[]
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+/// A pledge is money promised and a cash row is money banked, and the funding screen reports them
+/// separately — "in escrow" against "signed, not yet received". One column, so they cannot be
+/// conflated into a total that overstates what the church holds.
+enum ContributionKind {
+  cash
+  pledge
+}
+
+model ProjectContribution {
+  id            String           @id @default(uuid())
+  txCode        String           @unique
+  projectId     String
+  memberId      String?
+  donorName     String
+  amount        Decimal          @db.Decimal(12, 2)
+  method        PaymentMethod
+  kind          ContributionKind  @default(cash)
+  reference     String?
+  contributedAt DateTime         @default(now())
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  member  Member? @relation(fields: [memberId], references: [id])
+
+  @@index([projectId])
+  @@index([deletedAt])
+}
+
+enum WelfareStatus {
+  requested
+  approved
+  disbursed
+  declined
+}
+
+/// The relief a case falls under, as the welfare screen groups it — a deacon reporting back on the
+/// year needs "how much went to medical" to be answerable.
+enum WelfareCategory {
+  medical
+  education
+  food
+  funeral
+  rent
+  utility
+  other
+}
+
+model WelfareDisbursement {
+  id              String          @id @default(uuid())
+  caseCode        String          @unique
+  memberId        String?
+  beneficiaryName String
+  amount          Decimal         @db.Decimal(12, 2)
+  purpose         String
+  category        WelfareCategory @default(other)
+  status          WelfareStatus   @default(requested)
+  requestedAt     DateTime        @default(now())
+  assignedToId    String?
+  approvedById    String?
+  disbursedAt     DateTime?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+
+  member     Member? @relation(fields: [memberId], references: [id])
+  assignedTo Member? @relation("WelfareAssignee", fields: [assignedToId], references: [id])
+  approvedBy User?   @relation("WelfareApprover", fields: [approvedById], references: [id])
+
+  @@index([memberId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+enum CharityStatus {
+  recorded
+  verified
+  flagged
+}
+
+/// Money or goods the church gives away.
+///
+/// Modelled as an expenditure rather than a vague "activity" because every row costs something
+/// somebody must account for: the console's screen shows the item bought, the initiative it belongs
+/// to, the vendor paid, and whether it has been audited.
+model CharityActivity {
+  id         String        @id @default(uuid())
+  code       String        @unique
+  item       String
+  initiative String
+  vendor     String?
+  amount     Decimal       @db.Decimal(12, 2)
+  occurredAt DateTime      @default(now())
+  status     CharityStatus @default(recorded)
+  notes      String?
+  ledById    String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  deletedAt  DateTime?
+
+  ledBy User? @relation("CharityLead", fields: [ledById], references: [id])
+
+  @@index([occurredAt])
+  @@index([initiative])
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Settings the church changes about itself
+// ---------------------------------------------------------------------------------------------
+
+/// One key per settings screen: `notifications`, `integrations`, `customization`.
+///
+/// A key/value row rather than a column per toggle, because these are the screens that change most
+/// often and each change of shape would otherwise be a migration. The organization profile keeps its
+/// own table: it is read on every page and is not a bag of preferences.
+model AppSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  description String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  updatedBy User? @relation("SettingEditor", fields: [updatedById], references: [id])
+}
+
+// ---------------------------------------------------------------------------------------------
+// The finance ledger's own audit trail
+// ---------------------------------------------------------------------------------------------
+
+enum FinanceAuditAction {
+  recorded
+  voided
+  restored
+  approved
+  declined
+  disbursed
+  updated
+}
+
+/// Why this exists beside `AuditLog`, and what makes it "immutable".
+///
+/// `AuditLog` records what the console did; this records what happened to the money, and it is
+/// *chained*: each entry carries a SHA-256 hash over its own canonical fields plus the previous
+/// entry's hash, so altering or removing any row after the fact breaks every hash that follows it
+/// and `GET /api/finance/audit/verify` reports exactly where. `sequence` is handed out under a
+/// transaction-scoped advisory lock, which is what stops two simultaneous payments claiming the same
+/// position and forking the ledger.
+///
+/// There is no `updatedAt` and no `deletedAt`, deliberately: an entry that can be edited is not an
+/// audit trail.
+model FinanceAuditEntry {
+  id           String             @id @default(uuid())
+  sequence     Int                @unique
+  action       FinanceAuditAction
+  entityName   String
+  entityId     String
+  summary      String
+  amount       Decimal?           @db.Decimal(12, 2)
+  actorId      String?
+  before       Json?
+  after        Json?
+  previousHash String
+  hash         String
+  createdAt    DateTime           @default(now())
+
+  actor User? @relation("FinanceAuditActor", fields: [actorId], references: [id])
+
+  @@index([entityName, entityId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Governance
+// ---------------------------------------------------------------------------------------------
+
+enum MeetingKind {
+  stated
+  executive
+  emergency
+}
+
+enum MeetingStatus {
+  scheduled
+  held
+  cancelled
+}
+
+/// One sitting of a council or the congregational meeting.
+///
+/// `minutes` is stored on the meeting rather than as a separate document because the two are written
+/// together and a minute that can drift from its meeting is worse than no minute at all.
+model Meeting {
+  id           String        @id @default(uuid())
+  title        String
+  kind         MeetingKind   @default(stated)
+  status       MeetingStatus @default(scheduled)
+  heldAt       DateTime
+  venue        String
+  chairId      String?
+  secretaryId  String?
+  attendees    Int?
+  quorumMet    Boolean?
+  agenda       Json?
+  minutes      String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+
+  chair       Member?      @relation("MeetingChair", fields: [chairId], references: [id], onDelete: SetNull)
+  secretary   Member?      @relation("MeetingSecretary", fields: [secretaryId], references: [id], onDelete: SetNull)
+  resolutions Resolution[]
+
+  @@index([heldAt])
+  @@index([kind])
+  @@index([deletedAt])
+}
+
+enum ResolutionStage {
+  proposed
+  voted_approved
+  implementing
+  closed
+}
+
+/// A decision put to a council. The vote is stored as a summary line plus its three counts, because
+/// the minute records "carried 7-0" and a parish reads it that way.
+model Resolution {
+  id             String          @id @default(uuid())
+  code           String          @unique
+  title          String
+  summary        String
+  sponsor        String
+  sponsorOfficer String?
+  meetingId      String?
+  councilDate    DateTime
+  stage          ResolutionStage @default(proposed)
+  voteSummary    String?
+  votesFor       Int?
+  votesAgainst   Int?
+  votesAbstain   Int?
+  lead           String?
+  leadNote       String?
+  decidedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+
+  meeting Meeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+
+  @@index([stage])
+  @@index([councilDate])
+  @@index([deletedAt])
+}
+
+enum DocumentKind {
+  bylaw
+  policy
+  constitution
+  minutes
+  certificate
+  other
+}
+
+/// The repository the governance screen calls "the foundational bylaws". `isActive` marks the
+/// version currently in force, so a superseded policy stays readable without being mistaken for law.
+model GovernanceDocument {
+  id         String       @id @default(uuid())
+  title      String
+  kind       DocumentKind @default(bylaw)
+  reference  String       @unique
+  version    String       @default("1.0")
+  adoptedAt  DateTime?
+  body       String?
+  fileUrl    String?
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  deletedAt  DateTime?
+
+  @@index([kind])
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Communications and community
+// ---------------------------------------------------------------------------------------------
+
+model Announcement {
+  id          String    @id @default(uuid())
+  title       String
+  body        String
+  audience    String    @default("Everyone")
+  isPinned    Boolean   @default(false)
+  publishedAt DateTime  @default(now())
+  expiresAt   DateTime?
+  authorId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  author User? @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+
+  @@index([publishedAt])
+  @@index([authorId])
+  @@index([deletedAt])
+}
+
+/// A stored message. Sending is a separate concern, deliberately: a campaign that is composed and a
+/// campaign that has been delivered are different states of the same row.
+model Broadcast {
+  id           String    @id @default(uuid())
+  channel      String
+  subject      String?
+  body         String
+  audience     String
+  status       String    @default("draft")
+  scheduledFor DateTime?
+  sentAt       DateTime?
+  recipients   Int       @default(0)
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  createdBy User? @relation("BroadcastAuthor", fields: [createdById], references: [id])
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+enum EventKind {
+  service
+  conference
+  meeting
+  outreach
+}
+
+model Event {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  kind        EventKind @default(service)
+  venue       String
+  startsAt    DateTime
+  endsAt      DateTime
+  isRecurring Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([startsAt])
+  @@index([deletedAt])
+}
+
+enum PrayerStatus {
+  open
+  praying
+  answered
+  archived
+}
+
+model PrayerRequest {
+  id            String       @id @default(uuid())
+  memberId      String?
+  requesterName String?
+  request       String
+  status        PrayerStatus @default(open)
+  isPrivate     Boolean      @default(false)
+  submittedAt   DateTime     @default(now())
+  answeredAt    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+
+  member Member? @relation(fields: [memberId], references: [id])
+
+  @@index([status])
+  @@index([memberId])
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Audit and recovery
+// ---------------------------------------------------------------------------------------------
+
+/// Append-only. No `updatedAt`, no `deletedAt`, and no update path in the code: the value of this
+/// table is that its rows cannot change after they are written.
+model AuditLog {
+  id         String      @id @default(uuid())
+  actorId    String?
+  action     AuditAction
+  entityName String
+  entityId   String
+  summary    String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  createdAt  DateTime    @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entityName, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+/// What the Trash screen reads. `snapshot` holds the deleted row so a restore does not depend on
+/// the original still being reachable, and `restoreDeadline` is the 30-day window the console shows
+/// a countdown for.
+model SoftDeletedRecord {
+  id              String    @id @default(uuid())
+  entityName      String
+  entityId        String
+  entityLabel     String?
+  reason          String
+  reasonLabel     String
+  snapshot        Json
+  deletedAt       DateTime  @default(now())
+  deletedById     String?
+  restoreDeadline DateTime?
+  restoredAt      DateTime?
+  restoredById    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  deletedBy  User? @relation("SoftDeleteActor", fields: [deletedById], references: [id])
+  restoredBy User? @relation("SoftRestoreActor", fields: [restoredById], references: [id])
+
+  @@index([entityName, entityId])
+  @@index([restoredAt])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Service & Worship
+// ---------------------------------------------------------------------------------------------
+
+enum LiturgyItemKind {
+  call_to_worship
+  praise_worship
+  prayer
+  scripture
+  sermon
+  offering
+  announcements
+  presentation
+  dismissal
+  other
+}
+
+/// One line in an order of service.
+///
+/// `position` is stored rather than implied by insertion order, because a liturgy is *rearranged*
+/// constantly and "which item is third" must be answerable without trusting row ids or timestamps.
+model OrderOfServiceItem {
+  id              String          @id @default(uuid())
+  serviceId       String
+  position        Int
+  title           String
+  kind            LiturgyItemKind  @default(other)
+  durationMinutes Int?
+  responsible     String?
+  ministryId      String?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+
+  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  ministry Ministry? @relation(fields: [ministryId], references: [id], onDelete: SetNull)
+
+  @@unique([serviceId, position])
+  @@index([serviceId])
+}
+
+enum DutyStatus {
+  scheduled
+  confirmed
+  completed
+  missed
+  replaced
+  cancelled
+}
+
+/// One volunteer slot on one service. A person may hold several duties, which is why the unique key
+/// is the role and not the person.
+model RosterDuty {
+  id         String     @id @default(uuid())
+  serviceId  String
+  memberId   String
+  roleTitle  String
+  ministryId String?
+  status     DutyStatus @default(scheduled)
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  deletedAt  DateTime?
+
+  service      Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  holder       Member        @relation("DutyHolder", fields: [memberId], references: [id])
+  ministry     Ministry?     @relation(fields: [ministryId], references: [id], onDelete: SetNull)
+  swapRequests SwapRequest[]
+
+  @@unique([serviceId, memberId, roleTitle])
+  @@index([serviceId])
+  @@index([memberId])
+}
+
+enum SwapStatus {
+  requested
+  approved
+  declined
+  cancelled
+}
+
+/// A handover of one duty. Kept as its own row rather than an edit to the duty, so the fact that a
+/// volunteer asked, who agreed, and when, survives the handover itself.
+model SwapRequest {
+  id            String     @id @default(uuid())
+  dutyId        String
+  requestedById String
+  replacementId String?
+  status        SwapStatus @default(requested)
+  reason        String?
+  decidedById   String?
+  decidedAt     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  duty        RosterDuty @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+  requestedBy Member     @relation("SwapRequester", fields: [requestedById], references: [id])
+  replacement Member?    @relation("SwapReplacement", fields: [replacementId], references: [id])
+  decidedBy   User?      @relation("SwapDecider", fields: [decidedById], references: [id])
+
+  @@index([dutyId])
+  @@index([status])
+}
+
+/// The write-up of one service. `serviceId` is unique: a service has one report, revised, not a
+/// growing pile of drafts that disagree.
+model ServiceReport {
+  id             String    @id @default(uuid())
+  serviceId      String    @unique
+  summary        String
+  adultsCount    Int?
+  childrenCount  Int?
+  visitorsCount  Int?
+  offeringsTotal Decimal?  @db.Decimal(12, 2)
+  highlights     String?
+  preparedById   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  service    Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  preparedBy User?   @relation("ServiceReportAuthor", fields: [preparedById], references: [id])
+}
