@@ -4,6 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import { assertMemberOnRegister } from './member.service';
 import { page } from '../lib/respond';
 import { retireRecord } from '../lib/archive';
+import { findLive, includingRetired, live } from '../lib/live';
 import type { RetireReason } from '../schemas/common';
 import type {
   AddMinistryMemberInput,
@@ -31,7 +32,7 @@ const rosterInclude = {
 
 export async function listMinistries(query: ListMinistriesQuery) {
   const where: Prisma.MinistryWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
     ...(query.leaderId ? { leaderId: query.leaderId } : {}),
     ...(query.q ? { name: { contains: query.q, mode: 'insensitive' as const } } : {}),
@@ -44,7 +45,7 @@ export async function listMinistries(query: ListMinistriesQuery) {
       include: {
         leader: { select: memberSelect },
         // The roll size is what the ministries screen shows beside each name.
-        _count: { select: { members: { where: { deletedAt: null } } } },
+        _count: { select: { members: { where: live } } },
       },
       orderBy: { name: 'asc' },
       skip: (query.page - 1) * query.pageSize,
@@ -55,20 +56,22 @@ export async function listMinistries(query: ListMinistriesQuery) {
   return { data, meta: page(total, query) };
 }
 
-export async function getMinistry(id: string) {
-  const ministry = await prisma.ministry.findFirst({
-    where: { id, deletedAt: null },
-    include: {
-      leader: { select: memberSelect },
-      members: {
-        where: { deletedAt: null },
-        include: { member: { select: memberSelect } },
-        orderBy: [{ roleTitle: 'asc' }, { joinedAt: 'asc' }],
+export function getMinistry(id: string) {
+  return findLive(
+    {
+      where: { id },
+      include: {
+        leader: { select: memberSelect },
+        members: {
+          where: live,
+          include: { member: { select: memberSelect } },
+          orderBy: [{ roleTitle: 'asc' }, { joinedAt: 'asc' }],
+        },
       },
     },
-  });
-  if (!ministry) throw new AppError(404, 'That ministry does not exist', 'not_found');
-  return ministry;
+    prisma.ministry,
+    'That ministry does not exist',
+  );
 }
 
 export async function createMinistry(input: CreateMinistryInput, actorId: string) {
@@ -93,8 +96,7 @@ export async function createMinistry(input: CreateMinistryInput, actorId: string
 }
 
 export async function updateMinistry(id: string, input: UpdateMinistryInput, actorId: string) {
-  const before = await prisma.ministry.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That ministry does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.ministry, 'That ministry does not exist');
   if (input.leaderId) await assertMemberOnRegister(input.leaderId, 'That leader');
 
   return prisma.$transaction(async (tx) => {
@@ -127,10 +129,9 @@ export async function updateMinistry(id: string, input: UpdateMinistryInput, act
 export async function retireMinistry(id: string, input: RetireReason, actorId: string) {
   // A ministry disappears only once nobody serves on it; the alternative is living people pointing at
   // a department the screen no longer lists. Read for the count, not for existence.
-  const ministry = await prisma.ministry.findFirst({ where: { id, deletedAt: null } });
-  if (!ministry) throw new AppError(404, 'That ministry does not exist', 'not_found');
+  const ministry = await findLive({ where: { id } }, prisma.ministry, 'That ministry does not exist');
 
-  const serving = await prisma.ministryMember.count({ where: { ministryId: id, deletedAt: null } });
+  const serving = await prisma.ministryMember.count({ where: { ministryId: id, ...live } });
   if (serving > 0) {
     throw new AppError(409, `${serving} member(s) still serve on ${ministry.name}; take them off the roll first`, 'ministry_has_members');
   }
@@ -148,11 +149,11 @@ export async function retireMinistry(id: string, input: RetireReason, actorId: s
 // -------------------------------------------------------------------------------------------
 
 export async function addMinistryMember(ministryId: string, input: AddMinistryMemberInput, actorId: string) {
-  const ministry = await prisma.ministry.findFirst({ where: { id: ministryId, deletedAt: null } });
-  if (!ministry) throw new AppError(404, 'That ministry does not exist', 'not_found');
+  const ministry = await findLive({ where: { id: ministryId } }, prisma.ministry, 'That ministry does not exist');
   await assertMemberOnRegister(input.memberId);
 
-  const existing = await prisma.ministryMember.findFirst({ where: { ministryId, memberId: input.memberId } });
+  // Retired rows too: the unique key still holds their row, so a second insert would collide.
+  const existing = await prisma.ministryMember.findFirst({ where: { ministryId, memberId: input.memberId, ...includingRetired } });
 
   return prisma.$transaction(async (tx) => {
     // Someone who left and came back is re-rolled rather than refused: the unique key still holds
@@ -182,8 +183,7 @@ export async function addMinistryMember(ministryId: string, input: AddMinistryMe
 }
 
 export async function updateMinistryMember(id: string, input: UpdateMinistryMemberInput, actorId: string) {
-  const before = await prisma.ministryMember.findFirst({ where: { id, deletedAt: null }, include: rosterInclude });
-  if (!before) throw new AppError(404, 'That member is not on this ministry roll', 'not_found');
+  const before = await findLive({ where: { id }, include: rosterInclude }, prisma.ministryMember, 'That member is not on this ministry roll');
 
   return prisma.$transaction(async (tx) => {
     const row = await tx.ministryMember.update({ where: { id }, data: { roleTitle: input.roleTitle }, include: rosterInclude });
@@ -203,8 +203,7 @@ export async function updateMinistryMember(id: string, input: UpdateMinistryMemb
 }
 
 export async function removeMinistryMember(id: string, actorId: string) {
-  const row = await prisma.ministryMember.findFirst({ where: { id, deletedAt: null }, include: rosterInclude });
-  if (!row) throw new AppError(404, 'That member is not on this ministry roll', 'not_found');
+  const row = await findLive({ where: { id }, include: rosterInclude }, prisma.ministryMember, 'That member is not on this ministry roll');
 
   return prisma.$transaction(async (tx) => {
     await tx.ministryMember.update({ where: { id }, data: { deletedAt: new Date() } });
@@ -229,7 +228,7 @@ export async function removeMinistryMember(id: string, actorId: string) {
  */
 export async function roster(query: RosterQuery) {
   const where: Prisma.MinistryMemberWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.ministryId ? { ministryId: query.ministryId } : {}),
     ...(query.leadershipOnly ? { roleTitle: { not: 'Member' } } : {}),
     ...(query.q
@@ -252,7 +251,7 @@ export async function roster(query: RosterQuery) {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),
-    prisma.ministryMember.groupBy({ by: ['ministryId'], where: { deletedAt: null }, _count: true }),
+    prisma.ministryMember.groupBy({ by: ['ministryId'], where: live, _count: true }),
   ]);
 
   return { data, meta: page(total, query), totals: { serving: byMinistry.reduce((sum, row) => sum + row._count, 0) } };

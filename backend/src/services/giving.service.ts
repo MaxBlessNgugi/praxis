@@ -4,6 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import { appendFinanceEntry, lockFinanceLedger } from '../lib/financeAudit';
 import { assertMemberOnRegister } from './member.service';
 import { page } from '../lib/respond';
+import { findLive, live } from '../lib/live';
 import type { ListGivingQuery, RecordOfferingInput, RecordTitheInput } from '../schemas/finance.schema';
 
 /**
@@ -102,7 +103,7 @@ export async function recordTithe(input: RecordTitheInput, actorId: string) {
 
 export async function listTithes(query: ListGivingQuery) {
   const where: Prisma.TitheWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.memberId ? { memberId: query.memberId } : {}),
     ...(query.method ? { method: query.method } : {}),
     ...(query.category ? { category: query.category } : {}),
@@ -143,8 +144,7 @@ export async function listTithes(query: ListGivingQuery) {
 }
 
 export async function getTithe(id: string) {
-  const tithe = await prisma.tithe.findFirst({ where: { id, deletedAt: null }, include: titheInclude });
-  if (!tithe) throw new AppError(404, 'That tithe record does not exist', 'not_found');
+  const tithe = await findLive({ where: { id }, include: titheInclude }, prisma.tithe, 'That tithe record does not exist');
   return toPublicTithe(tithe);
 }
 
@@ -154,7 +154,7 @@ export async function getTithe(id: string) {
 
 export async function recordOffering(input: RecordOfferingInput, actorId: string) {
   if (input.serviceId) {
-    const service = await prisma.service.findFirst({ where: { id: input.serviceId, deletedAt: null }, select: { id: true } });
+    const service = await prisma.service.findFirst({ where: { id: input.serviceId, ...live }, select: { id: true } });
     if (!service) throw new AppError(400, 'That service does not exist', 'unknown_service');
   }
 
@@ -202,7 +202,7 @@ export async function recordOffering(input: RecordOfferingInput, actorId: string
 
 export async function listOfferings(query: ListGivingQuery) {
   const where: Prisma.OfferingWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.method ? { method: query.method } : {}),
     ...(query.category ? { category: query.category } : {}),
     ...(query.minAmount === undefined ? {} : { amount: { gte: query.minAmount } }),
@@ -241,8 +241,7 @@ export async function listOfferings(query: ListGivingQuery) {
 }
 
 export async function getOffering(id: string) {
-  const offering = await prisma.offering.findFirst({ where: { id, deletedAt: null }, include: offeringInclude });
-  if (!offering) throw new AppError(404, 'That offering record does not exist', 'not_found');
+  const offering = await findLive({ where: { id }, include: offeringInclude }, prisma.offering, 'That offering record does not exist');
   return toPublicOffering(offering);
 }
 

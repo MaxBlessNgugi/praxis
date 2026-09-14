@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { live } from '../lib/live';
 import type { SettingKey, UpdateProfileInput, UpdateSettingInput } from '../schemas/settings.schema';
 
 /**
@@ -133,22 +134,22 @@ export async function updateSetting(key: SettingKey, input: UpdateSettingInput, 
  */
 export async function backupManifest() {
   const counts = {
-    members: prisma.member.count({ where: { deletedAt: null } }),
-    households: prisma.household.count({ where: { deletedAt: null } }),
-    ministries: prisma.ministry.count({ where: { deletedAt: null } }),
-    services: prisma.service.count({ where: { deletedAt: null } }),
-    tithesAndOfferings: prisma.tithe.count({ where: { deletedAt: null } }).then(async (tithes) => tithes + (await prisma.offering.count({ where: { deletedAt: null } }))),
-    projectContributions: prisma.projectContribution.count({ where: { deletedAt: null } }),
-    welfareCases: prisma.welfareDisbursement.count({ where: { deletedAt: null } }),
-    charityActivities: prisma.charityActivity.count({ where: { deletedAt: null } }),
-    announcements: prisma.announcement.count({ where: { deletedAt: null } }),
-    broadcasts: prisma.broadcast.count({ where: { deletedAt: null } }),
-    events: prisma.event.count({ where: { deletedAt: null } }),
-    prayerRequests: prisma.prayerRequest.count({ where: { deletedAt: null } }),
-    meetings: prisma.meeting.count({ where: { deletedAt: null } }),
-    resolutions: prisma.resolution.count({ where: { deletedAt: null } }),
-    documents: prisma.governanceDocument.count({ where: { deletedAt: null } }),
-    users: prisma.user.count({ where: { deletedAt: null } }),
+    members: prisma.member.count({ where: live }),
+    households: prisma.household.count({ where: live }),
+    ministries: prisma.ministry.count({ where: live }),
+    services: prisma.service.count({ where: live }),
+    tithesAndOfferings: prisma.tithe.count({ where: live }).then(async (tithes) => tithes + (await prisma.offering.count({ where: live }))),
+    projectContributions: prisma.projectContribution.count({ where: live }),
+    welfareCases: prisma.welfareDisbursement.count({ where: live }),
+    charityActivities: prisma.charityActivity.count({ where: live }),
+    announcements: prisma.announcement.count({ where: live }),
+    broadcasts: prisma.broadcast.count({ where: live }),
+    events: prisma.event.count({ where: live }),
+    prayerRequests: prisma.prayerRequest.count({ where: live }),
+    meetings: prisma.meeting.count({ where: live }),
+    resolutions: prisma.resolution.count({ where: live }),
+    documents: prisma.governanceDocument.count({ where: live }),
+    users: prisma.user.count({ where: live }),
   };
 
   const [totals, archived, lastAudit, lastLedger] = await Promise.all([

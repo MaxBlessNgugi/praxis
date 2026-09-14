@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { ARCHIVE_TABLES, restoreArchived } from '../lib/archive';
+import { includingRetired, live } from '../lib/live';
 import { page } from '../lib/respond';
 import type { CreateRoleInput, ListAuditQuery, ListTrashQuery, UpdateRoleInput } from '../schemas/admin.schema';
 
@@ -133,8 +134,8 @@ export async function recordHistory(entityName: string, entityId: string) {
 
 export async function listRoles() {
   const roles = await prisma.role.findMany({
-    where: { deletedAt: null },
-    include: { _count: { select: { users: { where: { deletedAt: null } } } } },
+    where: live,
+    include: { _count: { select: { users: { where: live } } } },
     orderBy: { key: 'asc' },
   });
 
@@ -150,13 +151,14 @@ export async function listRoles() {
 }
 
 export async function getRole(key: string) {
-  const role = await prisma.role.findFirst({ where: { key, deletedAt: null } });
+  const role = await prisma.role.findFirst({ where: { key, ...live } });
   if (!role) throw new AppError(404, 'That role does not exist', 'not_found');
   return role;
 }
 
 export async function createRole(input: CreateRoleInput, actorId: string) {
-  const existing = await prisma.role.findFirst({ where: { key: input.key } });
+  // Retired roles too: the key is unique across the table, so reusing one would collide.
+  const existing = await prisma.role.findFirst({ where: { key: input.key, ...includingRetired } });
 
   return prisma.$transaction(async (tx) => {
     if (existing) throw new AppError(409, `A role with the key "${input.key}" already exists`, 'role_exists');
@@ -185,7 +187,7 @@ export async function createRole(input: CreateRoleInput, actorId: string) {
  * take something away.
  */
 export async function updateRole(key: string, input: UpdateRoleInput, actorId: string) {
-  const before = await prisma.role.findFirst({ where: { key, deletedAt: null } });
+  const before = await prisma.role.findFirst({ where: { key, ...live } });
   if (!before) throw new AppError(404, 'That role does not exist', 'not_found');
   if (before.key === 'super_admin' && (input.panels || input.actions)) {
     throw new AppError(409, 'The super administrator role cannot be narrowed; it is the way back in', 'protected_role');

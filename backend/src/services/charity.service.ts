@@ -1,8 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { money, prisma } from '../lib/prisma';
-import { AppError } from '../middleware/errorHandler';
 import { appendFinanceEntry, lockFinanceLedger } from '../lib/financeAudit';
 import { page } from '../lib/respond';
+import { findLive, live } from '../lib/live';
 import type {
   CreateCharityActivityInput,
   ListCharityQuery,
@@ -24,7 +24,7 @@ const toPublicActivity = (row: ActivityRow) => ({ ...row, amount: money(row.amou
 
 export async function listActivities(query: ListCharityQuery) {
   const where: Prisma.CharityActivityWhereInput = {
-    deletedAt: null,
+    ...live,
     ...(query.initiative ? { initiative: query.initiative } : {}),
     ...(query.status ? { status: query.status } : {}),
     ...(query.from || query.to
@@ -70,8 +70,7 @@ export async function listActivities(query: ListCharityQuery) {
 }
 
 export async function getActivity(id: string) {
-  const activity = await prisma.charityActivity.findFirst({ where: { id, deletedAt: null }, include: activityInclude });
-  if (!activity) throw new AppError(404, 'That charity record does not exist', 'not_found');
+  const activity = await findLive({ where: { id }, include: activityInclude }, prisma.charityActivity, 'That charity record does not exist');
   return toPublicActivity(activity);
 }
 
@@ -124,8 +123,7 @@ export async function createActivity(input: CreateCharityActivityInput, actorId:
  * amount is one of the things that can be corrected, so the ledger shows both figures.
  */
 export async function updateActivity(id: string, input: UpdateCharityActivityInput, actorId: string) {
-  const before = await prisma.charityActivity.findFirst({ where: { id, deletedAt: null } });
-  if (!before) throw new AppError(404, 'That charity record does not exist', 'not_found');
+  const before = await findLive({ where: { id } }, prisma.charityActivity, 'That charity record does not exist');
 
   return prisma.$transaction(async (tx) => {
     const activity = await tx.charityActivity.update({

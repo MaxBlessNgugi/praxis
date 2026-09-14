@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { signAccessToken, verifyPassword } from '../lib/auth';
 import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
+import { live } from '../lib/live';
 import type { LoginInput } from '../schemas/auth.schema';
 
 /**
@@ -70,7 +71,7 @@ async function recordFailedAttempt(user: UserWithRole): Promise<void> {
  */
 export async function login(input: LoginInput, ip?: string) {
   const user = await prisma.user.findFirst({
-    where: { email: input.email.toLowerCase(), deletedAt: null },
+    where: { email: input.email.toLowerCase(), ...live },
     include: { role: true },
   });
 
@@ -137,7 +138,7 @@ export async function logout(userId: string, ip?: string): Promise<void> {
 /** The caller's own record, for the console to hydrate on load. */
 export async function currentUser(userId: string) {
   const user = await prisma.user.findFirst({
-    where: { id: userId, deletedAt: null },
+    where: { id: userId, ...live },
     include: { role: true },
   });
   if (!user) throw new AppError(404, 'That account no longer exists', 'not_found');
