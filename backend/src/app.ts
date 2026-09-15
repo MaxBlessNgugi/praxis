@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { corsOrigins, env } from './config/env';
 import { prisma } from './lib/prisma';
+import { assertStorageConfigured } from './lib/storage';
+import { rateLimit } from './middleware/rateLimit';
 import { notFound } from './middleware/notFound';
 import { errorHandler } from './middleware/errorHandler';
 import { authRouter } from './routes/auth.routes';
@@ -17,6 +19,7 @@ import { governanceRouter } from './routes/governance.routes';
 import { reportRouter } from './routes/report.routes';
 import { settingsRouter } from './routes/settings.routes';
 import { adminRouter } from './routes/admin.routes';
+import { fileRouter } from './routes/file.routes';
 
 /**
  * The application, with no `listen` in it.
@@ -30,9 +33,16 @@ import { adminRouter } from './routes/admin.routes';
  * error handler is last because Express only treats a four-argument handler as an error handler.
  */
 export function createApp(): Express {
+  // A misconfigured storage driver should stop the process at boot, not on the first logo upload.
+  assertStorageConfigured();
+
   const app = express();
 
   app.disable('x-powered-by');
+  // Only believe `X-Forwarded-For` as far as the deployment says to. See `TRUST_PROXY_HOPS`.
+  if (env.TRUST_PROXY_HOPS > 0) {
+    app.set('trust proxy', env.TRUST_PROXY_HOPS);
+  }
   app.use(helmet());
   app.use(
     cors({
@@ -42,6 +52,14 @@ export function createApp(): Express {
   );
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
+
+  // A ceiling on the whole API, applied before any route so a new endpoint is protected by default
+  // rather than by remembering. `/health` sits above it and stays unlimited, because a monitoring
+  // poller being rate-limited is how a healthy service gets restarted.
+  app.use(
+    '/api',
+    rateLimit({ name: 'api', windowMs: env.RATE_LIMIT_WINDOW_MS, max: env.RATE_LIMIT_MAX }),
+  );
 
   /**
    * Liveness and readiness in one endpoint, because the parish deployment needs both answers and a
@@ -76,6 +94,7 @@ export function createApp(): Express {
   app.use('/api/governance', governanceRouter);
   app.use('/api/reports', reportRouter);
   app.use('/api/settings', settingsRouter);
+  app.use('/api/files', fileRouter);
 
   app.use(notFound);
   app.use(errorHandler);

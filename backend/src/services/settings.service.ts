@@ -31,6 +31,7 @@ export async function getProfile() {
     coreValues: [] as string[],
     serviceTimes: null,
     socials: null,
+    logoFileId: null,
     createdAt: null,
     updatedAt: null,
   };
@@ -53,6 +54,7 @@ export async function updateProfile(input: UpdateProfileInput, actorId: string) 
       ...(input.coreValues === undefined ? {} : { coreValues: input.coreValues }),
       ...(input.serviceTimes === undefined ? {} : { serviceTimes: input.serviceTimes }),
       ...(input.socials === undefined ? {} : { socials: input.socials }),
+      ...(input.logoFileId === undefined ? {} : { logoFileId: input.logoFileId }),
     };
 
     // The profile is one row, created on first save rather than by a migration, so a fresh install

@@ -15,7 +15,7 @@
  *
  * Read-only: it never clicks a control, only navigates the sidebar and sub-tabs.
  */
-import { launchChrome, reportFailures, sleep, waitForDevTools } from './lib/harness.mjs';
+import { launchChrome, reportFailures, requireSignIn, sleep, waitForDevTools } from './lib/harness.mjs';
 
 const APP_URL = process.env.APP_URL || 'http://127.0.0.1:3000/';
 const PORT = Number(process.env.CDP_PORT || 9335);
@@ -221,12 +221,10 @@ await sleep(4000);
 const title = await evaluate('document.title');
 if (!/Praxis Church OS/.test(title || '')) throw new Error(`unexpected app at ${APP_URL}: ${JSON.stringify(title)}`);
 
-const signedIn = await evaluate(`(() => {
-  const btn = [...document.querySelectorAll('button')].find((b) => /Sign In to Praxis/.test(b.textContent || ''));
-  if (btn) { btn.click(); return true; }
-  return false;
-})()`);
-await sleep(signedIn ? 2200 : 400);
+// The console is behind a real login; without this the walk below would reach no screen at all and
+// the run would fail for having measured nothing.
+await requireSignIn(evaluate);
+await sleep(1200);
 
 const report = { screens: 0, icons: [], svgs: [], controls: [], labels: [], buttons: [], nameMismatch: [], controlsWithRealLabel: 0, controlsSeen: 0 };
 for (const section of ALL_SECTIONS) {

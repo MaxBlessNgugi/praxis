@@ -55,14 +55,17 @@ export const updateBroadcastSchema = broadcastFields
   .refine((value) => Object.keys(value).length > 0, { message: 'Send at least one field to change' });
 
 /**
- * Marking a campaign delivered.
+ * Sending a campaign.
  *
- * Sending is not performed here — this service stores campaigns; the SMS and email gateways are a
- * separate concern. So the endpoint records that a send happened and how many devices it reached,
- * and refuses to invent a recipient count.
+ * `recipients` is now optional, because the server no longer needs to be told. For an email or SMS
+ * campaign the audience is resolved from the register and the gateway reports what actually landed,
+ * so the count the console stores is one the server measured rather than one a client claimed.
+ *
+ * It is still accepted for a **notice sheet**, which has no gateway: that send is printed and pinned
+ * up, so the office says how many copies went out and the record keeps their answer.
  */
 export const sendBroadcastSchema = z.object({
-  recipients: z.number().int().min(0).max(1_000_000),
+  recipients: z.number().int().min(0).max(1_000_000).optional(),
   sentAt: z.coerce.date().optional(),
 });
 

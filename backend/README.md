@@ -5,6 +5,13 @@ Express + TypeScript + Prisma + PostgreSQL. Built in the blueprint's order: **B1
 members and households, **B4** Services & Worship, **B5** Finances, **B6** Communications,
 Ministries, Governance, Reports, Settings and Admin.
 
+## Deploy it to the cloud
+
+The database (Neon), the API (Railway) and the console (Cloudflare Pages) each have a home and there
+is a step-by-step runbook in [`../docs/cloud-deploy.md`](../docs/cloud-deploy.md). Locally, the
+service talks to a Postgres on `localhost`; in the cloud the only differences are the two Neon
+connection strings and where `JWT_SECRET` and `CORS_ORIGIN` come from.
+
 ## Run it
 
 ```bash

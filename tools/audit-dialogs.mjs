@@ -24,7 +24,7 @@
  *
  * Read-only apart from a temporary `data-dialog-probe` / `data-trigger-index` attribute.
  */
-import { launchChrome, reportFailures, sleep, waitForDevTools } from './lib/harness.mjs';
+import { launchChrome, reportFailures, requireSignIn, sleep, waitForDevTools } from './lib/harness.mjs';
 
 const APP_URL = process.env.APP_URL || 'http://127.0.0.1:3000/';
 const PORT = Number(process.env.CDP_PORT || 9337);
@@ -36,7 +36,7 @@ const MAX_CLICKS = Number(process.env.MAX_CLICKS || 45);
 /** Clicks that mutate the mock's data are skipped — later screens assert on that data. */
 const DESTRUCTIVE = /delete|remove|discard|permanently|restore|empty|reset|clear|sign out|undo|commit|save|enrol|enroll|confirm/i;
 /** Every list the walk can fill; any of them populated fails the run. */
-const FINDINGS = ['stalled', 'findings', 'notMoved', 'leaked', 'notEscaped', 'notRestored', 'notReached', 'noRing', 'unnamed'];
+const FINDINGS = ['stalled', 'unreached', 'findings', 'notMoved', 'leaked', 'notEscaped', 'notRestored', 'notReached', 'noRing', 'unnamed'];
 
 const ALL_SECTIONS = [
   { title: 'Home', screens: [] },
@@ -155,7 +155,7 @@ const OPEN_INFO = `(() => {
 })()`;
 
 /** Stamp the dialog's controls and remember their unfocused style. */
-const PREP_DIALOG = `(() => {
+const PREP_DIALOG = `(async () => {
   const el = document.querySelector('[data-dialog-probe]');
   if (!el) return 0;
   const keys = ['outlineStyle','outlineWidth','outlineColor','boxShadow','borderTopColor','backgroundColor','color','textDecorationLine'];
@@ -163,6 +163,10 @@ const PREP_DIALOG = `(() => {
   // otherwise the control the dialog auto-focuses on open has its *focused* style recorded as the
   // baseline and gets reported as having no ring when it is focused again.
   el.focus({ preventScroll: true });
+  // Parking focus *blurs* the auto-focused control, which starts its transition back to the resting
+  // style. Reading the baseline in the same tick would capture a frame of the focused look instead,
+  // and the control would then be reported as having no ring when it is focused again.
+  await new Promise((r) => setTimeout(r, 300));
   const nodeList = [...el.querySelectorAll('a[href],button,input,select,textarea,summary,[tabindex]:not([tabindex="-1"])')]
     .filter((x) => x.offsetParent !== null && !x.disabled);
   nodeList.forEach((x, i) => x.setAttribute('data-dialog-index', String(i)));
@@ -292,7 +296,11 @@ await sleep(4000);
 const title = await evaluate('document.title');
 if (!/Praxis Church OS/.test(title || '')) throw new Error(`unexpected app at ${APP_URL}: ${JSON.stringify(title)}`);
 
-const report = { dialogs: 0, screens: 0, stalled: [], findings: [], noRing: [], leaked: [], notEscaped: [], notRestored: [], notMoved: [], notReached: [], unnamed: [] };
+// Every dialog this audit opens lives behind the sign-in gate, so it has to be past it first.
+await requireSignIn(evaluate);
+await sleep(1200);
+
+const report = { dialogs: 0, screens: 0, stalled: [], unreached: [], findings: [], noRing: [], leaked: [], notEscaped: [], notRestored: [], notMoved: [], notReached: [], unnamed: [] };
 
 /** Run every check against the dialog that is currently open. */
 async function testDialog(screen, trigger) {
@@ -370,8 +378,10 @@ async function testDialog(screen, trigger) {
       triggerStillThere: !!document.querySelector('[data-dialog-trigger="1"]'),
     };
   })()`);
-  if (!stillOpen && !restored.ok) {
-    report.notRestored.push({ ...entry, issue: `focus not returned to the trigger (landed on ${restored.landedOn}, trigger still in the document: ${restored.triggerStillThere})` });
+  // A verdict needs the node this walk marked. React is free to replace a button while a dialog is
+  // open, which drops the marker and leaves focus on body with the app doing nothing wrong.
+  if (!stillOpen && !restored.ok && restored.triggerStillThere) {
+    report.notRestored.push({ ...entry, issue: `focus not returned to the trigger (landed on ${restored.landedOn})` });
   }
   return entry;
 }
@@ -423,10 +433,16 @@ await sleep(signedIn ? 2200 : 400);
 
 for (const section of ALL_SECTIONS) {
   if (ONLY && section.title !== ONLY) continue;
-  if (!(await clickSection(section.title))) continue;
+  if (!(await clickSection(section.title))) {
+    report.unreached.push({ screen: section.title, issue: 'no sidebar button carries this title' });
+    continue;
+  }
   await sleep(500);
   for (const tab of section.screens.length ? section.screens : [null]) {
-    if (tab && !(await clickTab(tab))) continue;
+    if (tab && !(await clickTab(tab))) {
+      report.unreached.push({ screen: `${section.title} / ${tab}`, issue: 'no tab control carries this label' });
+      continue;
+    }
     await sleep(650);
     try {
       await walkScreen(section.title, tab);
@@ -444,6 +460,7 @@ const dialogsReport = {
   screens: report.screens,
   dialogs: report.dialogs,
   stalled: report.stalled,
+  unreached: report.unreached,
   nativeDialogs,
   findings: report.findings,
   notMoved: report.notMoved,

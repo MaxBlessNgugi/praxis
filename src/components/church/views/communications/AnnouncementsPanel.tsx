@@ -1,15 +1,27 @@
 import React, { useState } from 'react';
 import { AnnouncementItem, AnnouncementAudience } from '../../../../types';
 import { useDialog } from '../../dialog';
-import { INITIAL_ANNOUNCEMENTS } from '../../../../data/churchMockData';
+import { announcementsApi } from '../../../../lib/api';
+import { toAnnouncementItem } from '../../../../lib/adapters';
+import { useAnnouncements, useMutation } from '../../../../hooks/useApi';
+import { usePermissions } from '../../../../lib/permissions';
+import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 
 export const AnnouncementsPanel: React.FC = () => {
-  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(INITIAL_ANNOUNCEMENTS);
+  const { items, loading, error, refetch } = useAnnouncements();
+  const createAnnouncement = useMutation(announcementsApi.create);
+  const updateAnnouncement = useMutation(announcementsApi.update);
+  const retireAnnouncement = useMutation(announcementsApi.retire);
+  const { canEdit, canDelete } = usePermissions();
+
+  const announcements = items.map(toAnnouncementItem);
+
   const [selectedAudience, setSelectedAudience] = useState<string>('all');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const creatingDialog = useDialog(() => setIsCreating(false), "Publish Announcement");
 
-  // Form State
+  // Form state. `priority` and `category` keep the existing controls, but the announcements table
+  // stores neither yet, so they are not submitted (see the Phase 2 notes).
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [audience, setAudience] = useState<AnnouncementAudience>('everyone');
@@ -24,48 +36,47 @@ export const AnnouncementsPanel: React.FC = () => {
     return true;
   });
 
-  const handleCreateAnnouncement = (e: React.FormEvent) => {
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
 
-    const audienceLabels: Record<AnnouncementAudience, string> = {
-      everyone: 'All Members & Guests',
-      'members-only': 'Members & Baptized Believers',
-      'ministry-leaders': 'Group Leaders & Deacons',
-      'youth-roll': 'Youth & Discipleship Class',
-      'church-council': 'Church Council Only',
-    };
-
-    const newAnn: AnnouncementItem = {
-      id: `ann-${Date.now()}`,
-      title,
-      content,
-      audience,
-      audienceLabel: audienceLabels[audience] || 'Congregation',
-      isPinned,
-      priority,
-      publishDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      expiryDate,
-      author,
-      category,
-      status: 'active',
-    };
-
-    setAnnouncements([newAnn, ...announcements]);
-    setIsCreating(false);
-    setTitle('');
-    setContent('');
+    try {
+      await createAnnouncement.run({
+        title: title.trim(),
+        body: content.trim(),
+        audience,
+        isPinned,
+      });
+      await refetch();
+      setIsCreating(false);
+      setTitle('');
+      setContent('');
+    } catch {
+      // createAnnouncement.error is rendered inside the modal.
+    }
   };
 
-  const handleTogglePin = (id: string) => {
-    setAnnouncements(
-      announcements.map((a) => (a.id === id ? { ...a, isPinned: !a.isPinned } : a))
-    );
+  const handleTogglePin = async (id: string) => {
+    const current = announcements.find((a) => a.id === id);
+    if (!current) return;
+    try {
+      await updateAnnouncement.run(id, { isPinned: !current.isPinned });
+      await refetch();
+    } catch {
+      // updateAnnouncement.error is rendered below the list.
+    }
   };
 
-  const handleDeleteAnnouncement = (id: string) => {
-    setAnnouncements(announcements.filter((a) => a.id !== id));
+  const handleDeleteAnnouncement = async (id: string) => {
+    try {
+      await retireAnnouncement.run(id);
+      await refetch();
+    } catch {
+      // retireAnnouncement.error is rendered below the list.
+    }
   };
+
+  const writeError = updateAnnouncement.error ?? retireAnnouncement.error;
 
   return (
     <div className="flex flex-col space-y-6">
@@ -160,6 +171,7 @@ export const AnnouncementsPanel: React.FC = () => {
               <option value="church-council">Church Council</option>
             </select>
 
+            {canEdit && (
             <button
               type="button"
               onClick={() => setIsCreating(true)}
@@ -168,10 +180,24 @@ export const AnnouncementsPanel: React.FC = () => {
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
               New Announcement
             </button>
+            )}
           </div>
         </div>
 
+        {writeError && <ErrorBlock message={writeError} onRetry={() => void refetch()} className="mb-4" />}
+
         {/* Announcements Cards Grid */}
+        {loading && items.length === 0 ? (
+          <LoadingBlock label="Loading announcements…" />
+        ) : error ? (
+          <ErrorBlock message={error} onRetry={() => void refetch()} />
+        ) : filteredAnnouncements.length === 0 ? (
+          <EmptyBlock
+            icon="campaign"
+            title="No announcements yet"
+            hint="Publish the first notice and it appears here for the whole church."
+          />
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredAnnouncements.map((ann) => (
             <div
@@ -206,9 +232,10 @@ export const AnnouncementsPanel: React.FC = () => {
                     </span>
                   </div>
 
+                  {canEdit && (
                   <button
                     type="button"
-                    onClick={() => handleTogglePin(ann.id)}
+                    onClick={() => void handleTogglePin(ann.id)}
                     className={`p-1 rounded-md transition-colors cursor-pointer ${
                       ann.isPinned ? 'text-[#C2410C] bg-[#C2410C]/10' : 'text-[#A8A29E] hover:text-[#1C1917]'
                     }`}
@@ -216,6 +243,7 @@ export const AnnouncementsPanel: React.FC = () => {
                   >
                     <span aria-hidden="true" className="material-symbols-outlined text-[18px]">push_pin</span>
                   </button>
+                  )}
                 </div>
 
                 <h4 className="font-headline text-sm font-bold text-[#1C1917] mb-1.5 leading-snug">
@@ -231,18 +259,21 @@ export const AnnouncementsPanel: React.FC = () => {
                 <div>
                   By <strong className="text-[#1C1917]">{ann.author}</strong> · <span className="font-mono">{ann.publishDate}</span>
                 </div>
+                {canDelete && (
                 <button
                   type="button"
-                  onClick={() => handleDeleteAnnouncement(ann.id)}
+                  onClick={() => void handleDeleteAnnouncement(ann.id)}
                   className="text-[#DC2626] hover:text-[#B91C1C] p-1 rounded transition-colors cursor-pointer"
                   title="Remove Bulletin"
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[16px]">delete</span>
                 </button>
+                )}
               </div>
             </div>
           ))}
         </div>
+        )}
       </div>
 
       {/* MODAL: Publish Announcement */}
@@ -353,6 +384,12 @@ export const AnnouncementsPanel: React.FC = () => {
                 </label>
               </div>
 
+              {createAnnouncement.error && (
+                <div role="alert" className="rounded-[8px] border border-[#FECACA] bg-[#FEF2F2] px-3 py-2 text-[11px] font-semibold text-[#B91C1C]">
+                  {createAnnouncement.error}
+                </div>
+              )}
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
                 <button
                   type="button"
@@ -363,9 +400,10 @@ export const AnnouncementsPanel: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+                  disabled={createAnnouncement.pending}
+                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] disabled:opacity-70 disabled:cursor-wait text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
                 >
-                  Post Announcement
+                  {createAnnouncement.pending ? 'Posting…' : 'Post Announcement'}
                 </button>
               </div>
             </form>

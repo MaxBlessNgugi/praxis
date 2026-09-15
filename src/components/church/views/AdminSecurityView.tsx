@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useDialog } from '../dialog';
 import { AdminSubTab } from '../../../types';
+import { AdminFinanceAuditPanel } from './AdminFinanceAuditPanel';
 
 interface TrashItem {
   id: string;
@@ -966,9 +967,12 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* SUBTAB 3: FINANCE AUDIT (READ-ONLY & IMMUTABLE LEDGER) */}
+      {/* SUBTAB 3: FINANCE AUDIT (READ-ONLY & CHAINED LEDGER) */}
       {/* ========================================================================= */}
-      {activeSubTab === 'finance-audit' && (
+      {activeSubTab === 'finance-audit' && <AdminFinanceAuditPanel />}
+
+      {/* The superseded mock ledger is retained but disabled; the live panel above replaces it. */}
+      {false && (
         <div className="flex flex-col gap-6">
           {/* Read-Only & Immutable Ledger Banner */}
           <div className="p-6 rounded-2xl bg-gradient-to-r from-[#1e1b19] via-[#332e2a] to-[#25201d] text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-[#59413a]/40">

@@ -1,27 +1,42 @@
 import React, { useEffect, useRef, useState } from 'react';
 import logoMark from '../../assets/brand/praxis-icon.webp';
 import logoWordmark from '../../assets/brand/praxis-wordmark.webp';
+import { useAuth } from '../../lib/auth';
+import { ApiError } from '../../lib/api';
 
 /**
  * Praxis sign-in screen — the app's entry gate (`App.tsx` renders it until it
  * reports success). Rendered outside the church navigation shell: no sidebar,
  * no top header.
  *
- * Both fields are pre-filled and the submit is a demo-only transition — there is
- * no backend to authenticate against.
+ * Calls POST /api/auth/login and stores the JWT on success.
+ *
+ * Neither field is filled in for you. The seeded account and password used to sit in this form as
+ * default values, which meant the console opened with working credentials already typed into it — a
+ * demo convenience that is a security defect the moment a real church signs in.
+ *
+ * **Remember Me** is wired to the token storage rather than being decoration, and it starts
+ * *unticked*: ticked keeps the session in `localStorage` across browser restarts, unticked leaves it
+ * in `sessionStorage` so closing the window ends it. The parish computer is shared, so the safe
+ * behaviour is the one that needs no decision.
  */
 interface AuthScreenProps {
-  /** Fired once the demo sign-in transition finishes, so the app can show the console. */
-  onSignIn: () => void;
+  /**
+   * Fired once authentication succeeds. Optional: the gate is driven by the session itself, so
+   * `App` swaps this screen for the console as soon as `useAuth()` reports a signed-in user.
+   */
+  onSignIn?: () => void;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
-  const [email, setEmail] = useState<string>('bishop@destinysanctuary.co.ke');
-  const [password, setPassword] = useState<string>('praxis-demo-2025');
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [rememberMe, setRememberMe] = useState<boolean>(true);
+  const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const submitTimer = useRef<number | null>(null);
+  const { login } = useAuth();
 
   useEffect(() => {
     return () => {
@@ -31,16 +46,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
     };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
     setIsSubmitting(true);
-    // Demo-only: hold the button's loading treatment briefly, then hand off to the console.
-    submitTimer.current = window.setTimeout(() => {
-      submitTimer.current = null;
+    setError(null);
+
+    try {
+      await login(email, password, rememberMe);
+      onSignIn?.();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.body.error ?? 'Invalid credentials');
+      } else if (err instanceof TypeError) {
+        // A rejected fetch (server down, DNS, CORS preflight refused) surfaces as a TypeError — the
+        // common case while the API is not running yet, so say so rather than "unexpected".
+        setError('Cannot reach the Praxis server. Check that the backend is running.');
+      } else {
+        setError('An unexpected error occurred');
+      }
+    } finally {
       setIsSubmitting(false);
-      onSignIn();
-    }, 1400);
+    }
   };
 
   return (
@@ -100,7 +127,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="bishop@destinysanctuary.co.ke"
+                placeholder="you@destinysanctuary.co.ke"
                 className="w-full px-3.5 py-2.5 text-sm rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] text-[#1C1917] placeholder-[#A8A29E] transition-all focus:outline-none focus:border-[#C2410C] focus:ring-4 focus:ring-[#C2410C]/15"
               />
             </div>
@@ -135,8 +162,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
               </div>
             </div>
 
-            {/* Remember me + forgot password */}
-            <div className="flex items-center justify-between pt-0.5">
+            {/* Remember me. Nothing sits opposite it: there is no password-reset flow to link to,
+                and a link that promises one would be the dead "Forgot Password?" button again. What
+                to do about a forgotten password is in the office guide, not on the gate. */}
+            <div className="flex items-center pt-0.5">
               <label className="flex items-center gap-2 text-xs font-semibold text-[#57534E] select-none cursor-pointer">
                 <input
                   type="checkbox"
@@ -146,12 +175,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
                 />
                 Remember Me
               </label>
-              <button
-                type="button"
-                className="text-xs font-bold text-[#C2410C] hover:text-[#EA580C] hover:underline transition-colors cursor-pointer"
-              >
-                Forgot Password?
-              </button>
             </div>
 
             {/* Primary CTA */}
@@ -166,6 +189,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
               {isSubmitting ? 'Signing in…' : 'Sign In to Praxis'}
             </button>
           </form>
+          {error && (
+            <div
+              className="mt-4 p-3 rounded-[7px] bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] text-xs"
+              role="alert"
+            >
+              {error}
+            </div>
+          )}
         </div>
       </main>
     </div>

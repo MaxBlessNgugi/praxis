@@ -487,3 +487,31 @@ export interface TitheTransaction {
   date: string;
   status: 'Completed' | 'Cleared' | 'Pending';
 }
+
+export interface ProjectFunding {
+  id: string;
+  name: string;
+  description: string;
+  targetAmount: number;
+  currentAmount: number;
+  status: 'planned' | 'active' | 'completed' | 'paused';
+  startDate: string;
+  endDate: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  roleKey: 'super_admin' | 'admin' | 'staff' | 'viewer';
+  memberId: string | null;
+  panels: Record<string, boolean>;
+  actions: Record<string, boolean>;
+}
+
+export interface AuthState {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}

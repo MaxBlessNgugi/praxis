@@ -34,6 +34,9 @@ async function nextMemberId(): Promise<string> {
 }
 
 export async function listMembers(query: ListMembersQuery) {
+  // Words, not a phrase. See the search note below for why this is split here rather than inline.
+  const tokens = query.q ? query.q.split(/\s+/).filter(Boolean) : [];
+
   const where: Prisma.MemberWhereInput = {
     ...live,
     ...(query.status ? { status: query.status } : {}),
@@ -43,17 +46,27 @@ export async function listMembers(query: ListMembersQuery) {
     ...(query.headsOnly === undefined ? {} : { isHouseholdHead: query.headsOnly }),
     // One search box across the fields a clerk would actually type into it — including the envelope
     // number, which is what a member hands over on a Sunday.
-    ...(query.q
+    //
+    // The query is split into words and **every** word must match somewhere, instead of the whole
+    // string having to appear inside a single field. That distinction is the difference between the
+    // search box working and not: under a single-field `contains`, typing "Mary Wanjiku" finds
+    // nothing, because no one field holds that phrase — and "Wanjiku Mary", the order people
+    // actually type, fails too. Words are AND-ed so extra words narrow the list rather than empty it.
+    ...(tokens.length
       ? {
-          OR: [
-            { firstName: { contains: query.q, mode: 'insensitive' } },
-            { lastName: { contains: query.q, mode: 'insensitive' } },
-            { memberId: { contains: query.q, mode: 'insensitive' } },
-            { envelopeNumber: { contains: query.q, mode: 'insensitive' } },
-            { email: { contains: query.q, mode: 'insensitive' } },
-            { phone: { contains: query.q } },
-            { household: { name: { contains: query.q, mode: 'insensitive' } } },
-          ],
+          AND: tokens.map(
+            (token): Prisma.MemberWhereInput => ({
+              OR: [
+                { firstName: { contains: token, mode: 'insensitive' } },
+                { lastName: { contains: token, mode: 'insensitive' } },
+                { memberId: { contains: token, mode: 'insensitive' } },
+                { envelopeNumber: { contains: token, mode: 'insensitive' } },
+                { email: { contains: token, mode: 'insensitive' } },
+                { phone: { contains: token } },
+                { household: { name: { contains: token, mode: 'insensitive' } } },
+              ],
+            }),
+          ),
         }
       : {}),
   };

@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "description": "Praxis Church OS API — Express, Prisma, PostgreSQL.",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",

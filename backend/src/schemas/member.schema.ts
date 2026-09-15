@@ -33,11 +33,17 @@ export const createMemberSchema = z.object({
   envelopeNumber: z.string().trim().max(30).optional(),
   pastoralNotes: z.string().trim().max(4000).optional(),
   tags: z.array(z.string().trim().max(40)).max(20).default([]),
+  /** The id of an uploaded photograph. Optional, because a register that refuses to save a person
+   *  until it has a picture of them is a register nobody fills in. */
+  photoFileId: z.string().uuid().optional(),
 });
 
 /** Every field optional, but at least one required — an empty PATCH is a client bug, not a no-op. */
 export const updateMemberSchema = createMemberSchema
   .partial()
+  // `null` clears the photograph; leaving it out leaves the current one alone. The ".partial()" above
+  // cannot express that distinction, which is why the field is restated here.
+  .extend({ photoFileId: z.string().uuid().nullable().optional() })
   .refine((value) => Object.keys(value).length > 0, { message: 'Send at least one field to change' });
 
 export const listMembersQuerySchema = z.object({

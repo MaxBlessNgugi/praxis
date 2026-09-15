@@ -20,6 +20,10 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Neon (and any PgBouncer front end) serves the application and migrations on different
+  // connections: the app uses the pooled URL, `prisma migrate` needs the direct one because a
+  // transaction pooler cannot run the DDL a migration emits. Locally both point at the same line.
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -91,6 +95,7 @@ model User {
   charityLed          CharityActivity[]     @relation("CharityLead")
   financeAudit        FinanceAuditEntry[]   @relation("FinanceAuditActor")
   settingsChanged     AppSetting[]          @relation("SettingEditor")
+  uploadedFiles       StoredFile[]          @relation("FileUploader")
 
   @@index([roleId])
   @@index([deletedAt])
@@ -115,8 +120,13 @@ model OrganizationProfile {
   coreValues  String[]
   serviceTimes Json?
   socials     Json?
+  /// The church's own mark, shown on the console and printed on certificates. Held as a file id so
+  /// the artwork lives in one place rather than being pasted into the profile as a data URL.
+  logoFileId  String?  @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  logo StoredFile? @relation("OrgLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -180,11 +190,17 @@ model Member {
   /// has to be storable. Nullable because most of a register will not have one.
   weddingAnniversary DateTime?
 
+  /// Optional, and optional on purpose: a photograph of a church member is personal data, and a
+  /// register that refuses to save a person until it has a picture of them is a register nobody fills
+  /// in. A file id rather than a URL, so the picture is served by the API behind the same auth.
+  photoFileId  String?  @unique
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   household      Household?            @relation(fields: [householdId], references: [id])
+  photo          StoredFile?           @relation("MemberPhoto", fields: [photoFileId], references: [id], onDelete: SetNull)
   userAccount    User?                 @relation("UserAccount")
   ministries     MinistryMember[]
   ledMinistries  Ministry[]            @relation("MinistryLeader")
@@ -954,4 +970,56 @@ model ServiceReport {
 
   service    Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   preparedBy User?   @relation("ServiceReportAuthor", fields: [preparedById], references: [id])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Uploaded files
+// ---------------------------------------------------------------------------------------------
+
+/// What an uploaded file is for, which is what decides who may read it and how long it is kept.
+///
+/// Named by purpose rather than by mime type because the question the system actually asks is
+/// "is this the church's logo?" and "is this a member's photograph?" — a PDF of a minute and a PDF
+/// of a certificate have different audiences even though they are the same kind of file.
+enum FilePurpose {
+  logo
+  member_photo
+  document
+  certificate_template
+  other
+}
+
+/// A file the church has uploaded: the logo, a member's photograph, a scanned minute, a certificate
+/// template.
+///
+/// The bytes are held in the database by default rather than in a directory on disk, because the
+/// console is deployed to ephemeral containers (Railway, Render, Fly) where a local uploads folder is
+/// wiped on every redeploy — a logo that disappears after a deploy is worse than no upload at all.
+///
+/// `storageKey` is the seam for object storage: when an S3-compatible bucket is configured, new
+/// uploads record their object key there and leave `data` null, so one record shape serves both
+/// drivers and a later migration to a bucket is a backfill rather than a rewrite.
+model StoredFile {
+  id           String      @id @default(uuid())
+  purpose      FilePurpose @default(other)
+  fileName     String
+  mimeType     String
+  byteSize     Int
+  /// Populated when the file is held in the database; null when it lives in object storage.
+  data         Bytes?
+  /// Populated when the file lives in object storage; null when it is held in the database.
+  storageKey   String?
+  uploadedById String?
+  createdAt    DateTime    @default(now())
+  deletedAt    DateTime?
+
+  uploadedBy User? @relation("FileUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  /// The two places a file is currently referenced. Kept explicit rather than polymorphic so the
+  /// foreign keys do their job and a deleted file cannot be left dangling on a profile.
+  orgProfile  OrganizationProfile? @relation("OrgLogo")
+  memberPhoto Member?              @relation("MemberPhoto")
+
+  @@index([purpose])
+  @@index([deletedAt])
 }

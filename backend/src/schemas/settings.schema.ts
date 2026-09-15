@@ -20,6 +20,8 @@ export const updateProfileSchema = z
     coreValues: z.array(z.string().trim().min(2).max(200)).max(20).optional(),
     serviceTimes: z.record(z.string().trim().max(60)).optional(),
     socials: z.record(z.string().trim().max(300)).optional(),
+    /** The id of an uploaded logo. `null` removes it; leaving it out leaves it alone. */
+    logoFileId: z.string().uuid().nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, { message: 'Send at least one field to change' });
 

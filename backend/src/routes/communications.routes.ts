@@ -19,6 +19,8 @@ communicationsRouter.use(requireAuth);
 
 // Named paths first, or "celebrations" parses as an announcement id.
 communicationsRouter.get('/celebrations', asyncHandler(communications.listCelebrations));
+// Whether outbound email and SMS are actually configured, read before the console offers to send.
+communicationsRouter.get('/channels', asyncHandler(communications.channels));
 
 communicationsRouter.get('/announcements', asyncHandler(communications.listAnnouncements));
 communicationsRouter.post('/announcements', WRITERS, asyncHandler(communications.createAnnouncement));
