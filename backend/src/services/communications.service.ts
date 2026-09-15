@@ -75,11 +75,9 @@ export async function listAnnouncements(query: ListAnnouncementsQuery) {
 }
 
 export function getAnnouncement(id: string) {
-  return findLive(
-    { where: { id }, include: { author: { select: { id: true, name: true } } } },
-    prisma.announcement,
-    'That announcement does not exist',
-  );
+  return findLive(prisma.announcement, id, 'That announcement does not exist', {
+    include: { author: { select: { id: true, name: true } } },
+  });
 }
 
 export async function createAnnouncement(input: CreateAnnouncementInput, actorId: string) {
@@ -109,7 +107,7 @@ export async function createAnnouncement(input: CreateAnnouncementInput, actorId
 }
 
 export async function updateAnnouncement(id: string, input: UpdateAnnouncementInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.announcement, 'That announcement does not exist');
+  const before = await findLive(prisma.announcement, id, 'That announcement does not exist');
 
   return prisma.$transaction(async (tx) => {
     const announcement = await tx.announcement.update({
@@ -183,11 +181,9 @@ export async function listBroadcasts(query: ListBroadcastsQuery) {
 }
 
 export function getBroadcast(id: string) {
-  return findLive(
-    { where: { id }, include: { createdBy: { select: { id: true, name: true } } } },
-    prisma.broadcast,
-    'That broadcast does not exist',
-  );
+  return findLive(prisma.broadcast, id, 'That broadcast does not exist', {
+    include: { createdBy: { select: { id: true, name: true } } },
+  });
 }
 
 export async function createBroadcast(input: CreateBroadcastInput, actorId: string) {
@@ -217,7 +213,7 @@ export async function createBroadcast(input: CreateBroadcastInput, actorId: stri
 }
 
 export async function updateBroadcast(id: string, input: UpdateBroadcastInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.broadcast, 'That broadcast does not exist');
+  const before = await findLive(prisma.broadcast, id, 'That broadcast does not exist');
   // A campaign that has already gone out is a record of what was said, not a draft.
   if (before.status === 'sent') throw new AppError(409, 'That broadcast has already been sent', 'already_sent');
 
@@ -240,7 +236,7 @@ export async function updateBroadcast(id: string, input: UpdateBroadcastInput, a
 }
 
 export async function sendBroadcast(id: string, input: SendBroadcastInput, actorId: string) {
-  const existing = await findLive({ where: { id } }, prisma.broadcast, 'That broadcast does not exist');
+  const existing = await findLive(prisma.broadcast, id, 'That broadcast does not exist');
   if (existing.status === 'sent') throw new AppError(409, 'That broadcast has already been marked sent', 'already_sent');
 
   const sentAt = input.sentAt ?? new Date();
@@ -310,7 +306,7 @@ export async function listEvents(query: ListEventsQuery) {
 }
 
 export function getEvent(id: string) {
-  return findLive({ where: { id } }, prisma.event, 'That event does not exist');
+  return findLive(prisma.event, id, 'That event does not exist');
 }
 
 export async function createEvent(input: CreateEventInput, actorId: string) {
@@ -324,7 +320,7 @@ export async function createEvent(input: CreateEventInput, actorId: string) {
 }
 
 export async function updateEvent(id: string, input: UpdateEventInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.event, 'That event does not exist');
+  const before = await findLive(prisma.event, id, 'That event does not exist');
 
   return prisma.$transaction(async (tx) => {
     const event = await tx.event.update({ where: { id }, data: input });
@@ -392,11 +388,9 @@ export async function listPrayerRequests(query: ListPrayerRequestsQuery) {
 }
 
 export function getPrayerRequest(id: string) {
-  return findLive(
-    { where: { id }, include: { member: { select: { id: true, firstName: true, lastName: true } } } },
-    prisma.prayerRequest,
-    'That prayer request does not exist',
-  );
+  return findLive(prisma.prayerRequest, id, 'That prayer request does not exist', {
+    include: { member: { select: { id: true, firstName: true, lastName: true } } },
+  });
 }
 
 export async function createPrayerRequest(input: CreatePrayerRequestInput, actorId: string) {
@@ -427,7 +421,7 @@ export async function createPrayerRequest(input: CreatePrayerRequestInput, actor
 }
 
 export async function updatePrayerRequest(id: string, input: UpdatePrayerRequestInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.prayerRequest, 'That prayer request does not exist');
+  const before = await findLive(prisma.prayerRequest, id, 'That prayer request does not exist');
 
   return prisma.$transaction(async (tx) => {
     const request = await tx.prayerRequest.update({
@@ -456,7 +450,7 @@ export async function updatePrayerRequest(id: string, input: UpdatePrayerRequest
 }
 
 export async function answerPrayerRequest(id: string, input: AnswerPrayerRequestInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.prayerRequest, 'That prayer request does not exist');
+  const before = await findLive(prisma.prayerRequest, id, 'That prayer request does not exist');
   if (before.status === 'answered') throw new AppError(409, 'That request has already been marked answered', 'already_answered');
 
   const answeredAt = input.answeredAt ?? new Date();

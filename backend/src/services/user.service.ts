@@ -70,7 +70,7 @@ export async function createUser(input: CreateUserInput, actorId: string) {
 }
 
 export async function updateUser(id: string, input: UpdateUserInput, actorId: string) {
-  await findLive({ where: { id } }, prisma.user, 'That account does not exist');
+  await findLive(prisma.user, id, 'That account does not exist');
 
   // Deactivating the last active administrator would leave the installation with nobody able to
   // administer it, and no way back in through the UI.
@@ -92,7 +92,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actorId: st
 }
 
 export async function assignRole(id: string, roleKey: RoleKey, actorId: string) {
-  const existing = await findLive({ where: { id }, include: { role: true } }, prisma.user, 'That account does not exist');
+  const existing = await findLive(prisma.user, id, 'That account does not exist', { include: { role: true } });
   if (existing.role?.key === 'super_admin' && roleKey !== 'super_admin') await assertNotLastAdministrator(id);
 
   const updated = await prisma.user.update({
@@ -111,7 +111,7 @@ export async function assignRole(id: string, roleKey: RoleKey, actorId: string) 
  * and the snapshot makes the restore possible months later.
  */
 export async function removeUser(id: string, input: RetireReason, actorId: string) {
-  const existing = await findLive({ where: { id }, include: { role: true } }, prisma.user, 'That account does not exist');
+  const existing = await findLive(prisma.user, id, 'That account does not exist', { include: { role: true } });
   if (id === actorId) throw new AppError(400, 'You cannot retire your own account', 'self_delete');
   await assertNotLastAdministrator(id);
 

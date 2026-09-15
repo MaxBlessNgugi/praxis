@@ -69,11 +69,9 @@ export async function listMeetings(query: ListMeetingsQuery) {
 }
 
 export function getMeeting(id: string) {
-  return findLive(
-    { where: { id }, include: { ...meetingInclude, resolutions: { where: live, orderBy: { councilDate: 'asc' } } } },
-    prisma.meeting,
-    'That meeting does not exist',
-  );
+  return findLive(prisma.meeting, id, 'That meeting does not exist', {
+    include: { ...meetingInclude, resolutions: { where: live, orderBy: { councilDate: 'asc' } } },
+  });
 }
 
 export async function createMeeting(input: CreateMeetingInput, actorId: string) {
@@ -105,7 +103,7 @@ export async function createMeeting(input: CreateMeetingInput, actorId: string) 
 }
 
 export async function updateMeeting(id: string, input: UpdateMeetingInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.meeting, 'That meeting does not exist');
+  const before = await findLive(prisma.meeting, id, 'That meeting does not exist');
   if (input.chairId) await assertMemberOnRegister(input.chairId, 'That chair');
   if (input.secretaryId) await assertMemberOnRegister(input.secretaryId, 'That secretary');
 
@@ -193,7 +191,7 @@ export async function listResolutions(query: ListResolutionsQuery) {
 }
 
 export function getResolution(id: string) {
-  return findLive({ where: { id }, include: resolutionInclude }, prisma.resolution, 'That resolution does not exist');
+  return findLive(prisma.resolution, id, 'That resolution does not exist', { include: resolutionInclude });
 }
 
 export async function createResolution(input: CreateResolutionInput, actorId: string) {
@@ -241,7 +239,7 @@ export async function createResolution(input: CreateResolutionInput, actorId: st
 }
 
 export async function updateResolution(id: string, input: UpdateResolutionInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.resolution, 'That resolution does not exist');
+  const before = await findLive(prisma.resolution, id, 'That resolution does not exist');
 
   return prisma.$transaction(async (tx) => {
     const resolution = await tx.resolution.update({
@@ -276,7 +274,7 @@ export async function updateResolution(id: string, input: UpdateResolutionInput,
 }
 
 export async function decideResolution(id: string, input: DecideResolutionInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.resolution, 'That resolution does not exist');
+  const before = await findLive(prisma.resolution, id, 'That resolution does not exist');
   if (before.stage === input.decision) {
     throw new AppError(409, `That resolution is already ${input.decision.replace('_', ' ')}`, 'already_decided');
   }
@@ -357,7 +355,7 @@ export async function listDocuments(query: ListDocumentsQuery) {
 }
 
 export function getDocument(id: string) {
-  return findLive({ where: { id } }, prisma.governanceDocument, 'That document does not exist');
+  return findLive(prisma.governanceDocument, id, 'That document does not exist');
 }
 
 export async function createDocument(input: CreateDocumentInput, actorId: string) {
@@ -388,7 +386,7 @@ export async function createDocument(input: CreateDocumentInput, actorId: string
 }
 
 export async function updateDocument(id: string, input: UpdateDocumentInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.governanceDocument, 'That document does not exist');
+  const before = await findLive(prisma.governanceDocument, id, 'That document does not exist');
 
   return prisma.$transaction(async (tx) => {
     const document = await tx.governanceDocument.update({
