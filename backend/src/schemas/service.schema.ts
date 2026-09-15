@@ -80,15 +80,24 @@ export const replaceLiturgySchema = z.object({
 
 export const attendanceKindSchema = z.enum(['service', 'group', 'meeting']);
 
-export const recordAttendanceSchema = z.object({
-  kind: attendanceKindSchema.default('service'),
-  /** A census row carries a count; a named row carries a member and counts one. */
-  count: z.number().int().min(1).max(20_000).default(1),
-  memberId: z.string().uuid().optional(),
-  visitorName: z.string().trim().max(160).optional(),
-  notes: z.string().trim().max(500).optional(),
-  recordedAt: z.coerce.date().optional(),
-});
+export const recordAttendanceSchema = z
+  .object({
+    kind: attendanceKindSchema.default('service'),
+    /**
+     * A counted row carries its number, a named row counts one person, and a row that is only an
+     * observation — "overflow seating used", the correction to last week's figure — carries none.
+     */
+    count: z.number().int().min(0).max(20_000).default(1),
+    memberId: z.string().uuid().optional(),
+    visitorName: z.string().trim().max(160).optional(),
+    notes: z.string().trim().max(500).optional(),
+    recordedAt: z.coerce.date().optional(),
+  })
+  // A row that says nothing at all is not a census row; it is a blank line in the register.
+  .refine((row) => row.count > 0 || Boolean(row.memberId || row.visitorName || row.notes), {
+    message: 'A row needs a count, a name or a note',
+    path: ['count'],
+  });
 
 export const recordAttendanceBulkSchema = z.object({
   rows: z.array(recordAttendanceSchema).min(1).max(200),

@@ -30,6 +30,8 @@ import { CommunicationsView } from './views/CommunicationsView';
 import { useDialog } from './dialog';
 import { SettingsView } from './views/SettingsView';
 import { CommandPalette, type CommandAction } from './CommandPalette';
+import { SubscriptionBanner } from './SubscriptionBanner';
+import { SupportSessionBanner } from './SupportSessionBanner';
 
 interface ChurchSystemAppProps {
   initialTab?: ParishNavTab;
@@ -156,6 +158,17 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
           onQuickAction={() => setQuickActionModal(true)}
           onOpenCommandPalette={() => setPaletteOpen(true)}
           activeTabTitle={getHeaderTitle()}
+        />
+
+        {/* Above everything, because whose access this is outranks what the church is on. */}
+        <SupportSessionBanner />
+
+        {/* The commercial state, when it needs an answer. Silent otherwise. */}
+        <SubscriptionBanner
+          onOpenBilling={() => {
+            setActiveSettingsSubTab('subscription');
+            setActiveTab('settings-profile');
+          }}
         />
 
         {/* Inner Scrollable Workspace */}

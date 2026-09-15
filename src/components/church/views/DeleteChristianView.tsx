@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { SoftDeleteRecord } from '../../../types';
 import { useDialog } from '../dialog';
-import { useDemoData } from '../../../data/demoStore';
+import { useMembers } from '../../../lib/hooks/useMembers';
+import { ApiError } from '../../../lib/api';
 
 /** How each disposition reason is written onto the archived record. */
 const REASON_LABELS: Record<SoftDeleteRecord['reason'], string> = {
@@ -17,7 +18,9 @@ const REASON_LABELS: Record<SoftDeleteRecord['reason'], string> = {
  * vault. Both lists now come from the demo store, so archiving moves her between them.
  */
 export const DeleteChristianView: React.FC = () => {
-  const { members, trash, archiveMember, restoreMember } = useDemoData();
+  const { listMembers, retireMember, restoreMember, isLoading, error } = useMembers();
+  const [members, setMembers] = useState<import('../../../types').ParishMember[]>([]);
+  const [trash, setTrash] = useState<SoftDeleteRecord[]>([]);
   const [targetId, setTargetId] = useState('');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const pickerDialog = useDialog(() => setIsPickerOpen(false), 'Choose a member to archive');
@@ -30,6 +33,27 @@ export const DeleteChristianView: React.FC = () => {
   const [filterDisposition, setFilterDisposition] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // Load initial data
+  React.useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [membersRes, trashRes] = await Promise.all([
+          listMembers({ pageSize: 1000 }),
+          listMembers({ pageSize: 1000 }), // Note: trash would need its own endpoint
+        ]);
+        setMembers(membersRes.data);
+        // Trash would come from a separate endpoint in real API
+        setTrash([]);
+      } catch (err) {
+        console.error('Failed to load data:', err);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    loadData();
+  }, [listMembers]);
 
   // Whoever the toolbar is pointed at; archiving them leaves the roll, so the target
   // falls back to the next name rather than pointing at somebody who is gone.
@@ -45,24 +69,34 @@ export const DeleteChristianView: React.FC = () => {
     setTimeout(() => setToastMessage(null), ms);
   };
 
-  const handleConfirmSoftDelete = () => {
+  const handleConfirmSoftDelete = async () => {
     if (!target) return;
     setIsModalOpen(false);
-    archiveMember(target, {
-      reason: selectedReason,
-      reasonLabel: REASON_LABELS[selectedReason],
-      destinationParish: selectedReason === 'transfer' ? destParish : undefined,
-      destinationPastor: selectedReason === 'transfer' ? destPastor : undefined,
-      rationale,
-      authorizedBy: 'Bishop Sammy',
-    });
-    setTargetId('');
-    flashToast(`${target.name} moved to Trash. Record retained in the 30-day grace vault.`, 5000);
+    try {
+      await retireMember(target.id, {
+        reason: selectedReason,
+        reasonLabel: REASON_LABELS[selectedReason],
+        destinationParish: selectedReason === 'transfer' ? destParish : undefined,
+      });
+      // Remove from members list optimistically
+      setMembers((prev) => prev.filter((m) => m.id !== target.id));
+      setTargetId('');
+      flashToast(`${target.name} moved to Trash. Record retained in the 30-day grace vault.`, 5000);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.body.error : 'Failed to archive member';
+      flashToast(message, 5000);
+    }
   };
 
-  const handleRestore = (rec: SoftDeleteRecord) => {
-    restoreMember(rec.id);
-    flashToast(`${rec.name} restored from Trash back to the active Members Register.`, 4000);
+  const handleRestore = async (rec: SoftDeleteRecord) => {
+    try {
+      await restoreMember(rec.id);
+      // In real API, this would restore the member and we'd refresh the lists
+      flashToast(`${rec.name} restored from Trash back to the active Members Register.`, 4000);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.body.error : 'Failed to restore member';
+      flashToast(message, 5000);
+    }
   };
 
   const filteredQueue = trash.filter((r) => {

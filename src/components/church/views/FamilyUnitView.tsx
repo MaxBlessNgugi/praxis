@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HouseholdUnit } from '../../../types';
-import { INITIAL_HOUSEHOLDS } from '../../../data/churchMockData';
 import { useDialog } from '../dialog';
 import { EmptyState } from '../../ui';
 import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
+import { useMembers } from '../../../lib/hooks/useMembers';
+import { ApiError } from '../../../lib/api';
 
 /** The statuses the mock households actually carry, so the filter cannot go dead. */
-const HOUSEHOLD_STATUSES = [...new Set(INITIAL_HOUSEHOLDS.map((household) => household.statusBadge))];
+const HOUSEHOLD_STATUSES = ['Family Head', 'Relocation Pending', 'Elder Emeritus', 'Single Adult Household', 'Appointed Staff', 'Visionary Leader'];
 
 interface FamilyUnitViewProps {
   onNavigateToAddChristian?: () => void;
@@ -15,7 +16,8 @@ interface FamilyUnitViewProps {
 export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
   onNavigateToAddChristian,
 }) => {
-  const [households, setHouseholds] = useState<HouseholdUnit[]>(INITIAL_HOUSEHOLDS);
+  const { listHouseholds, createHousehold: apiCreateHousehold } = useMembers();
+  const [households, setHouseholds] = useState<HouseholdUnit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [campusFilter, setCampusFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -26,6 +28,23 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
   const [newAddress, setNewAddress] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newCampus, setNewCampus] = useState<string>(DEFAULT_LOCATION);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadHouseholds = async () => {
+      try {
+        const response = await listHouseholds({ pageSize: 1000 });
+        setHouseholds(response.data);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.body.error : 'Failed to load households');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadHouseholds();
+  }, [listHouseholds]);
 
   const filteredHouseholds = households.filter((h) => {
     const matchSearch =
@@ -41,32 +60,27 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
     return matchSearch && matchCampus && matchStatus;
   });
 
-  const handleCreateHousehold = (e: React.FormEvent) => {
+  const handleCreateHousehold = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSurname || !newHead) return;
 
-    const newUnit: HouseholdUnit = {
-      id: `house-${Date.now()}`,
-      name: `The ${newSurname} Household`,
-      unitNumber: `#${Math.floor(100 + Math.random() * 899)}`,
-      campus: newCampus,
-      statusBadge: 'Family Head',
-      statusType: 'secondary',
-      headName: newHead,
-      headInitials: newHead.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase(),
-      headDob: 'Active Member',
-      headTitle: 'Household Head',
-      dependents: [],
-      address: newAddress || 'Plot 100, Milimani Estate, Nyahururu',
-      phone: newPhone || '+254 700 000 000',
-    };
-
-    setHouseholds([newUnit, ...households]);
-    setIsCreateModalOpen(false);
-    setNewSurname('');
-    setNewHead('');
-    setNewAddress('');
-    setNewPhone('');
+    try {
+      const newUnit = await apiCreateHousehold({
+        name: `The ${newSurname} Household`,
+        unitNumber: `#${Math.floor(100 + Math.random() * 899)}`,
+        campus: newCampus,
+        address: newAddress || 'Plot 100, Milimani Estate, Nyahururu',
+      });
+      setHouseholds([newUnit, ...households]);
+      setIsCreateModalOpen(false);
+      setNewSurname('');
+      setNewHead('');
+      setNewAddress('');
+      setNewPhone('');
+      setError(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.body.error : 'Failed to create household');
+    }
   };
 
   return (

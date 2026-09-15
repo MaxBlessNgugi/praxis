@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { ParishMember } from '../../../types';
 import { DEFAULT_LOCATION } from '../../../data/churchDomain';
-import { useDemoData } from '../../../data/demoStore';
+import { useMemberReport } from '../../../lib/hooks/useReports';
+import { useMembers } from '../../../lib/hooks/useMembers';
+import { ApiError } from '../../../lib/api';
 
 interface AddNewChristianViewProps {
-  onSaveMember: (member: Partial<ParishMember>) => void;
   onNavigateToFind: () => void;
 }
 
 export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
-  onSaveMember,
   onNavigateToFind,
 }) => {
   const [firstName, setFirstName] = useState('');
@@ -23,8 +23,14 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
   const [notes, setNotes] = useState('');
   const [assignHousehold, setAssignHousehold] = useState(true);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   // The census cards report the roll itself, so enrolling someone moves them.
-  const { memberStats, enrolledIds } = useDemoData();
+  const { data: register, refetch: refetchRegister } = useMemberReport();
+  const [enrolledThisSession, setEnrolledThisSession] = useState(0);
+  const rollTotal = register?.total ?? 0;
+  const householdCount = register?.households.total ?? 0;
+  const { createMember, isLoading: apiLoading } = useMembers();
 
   const handleAddTag = (tagText: string) => {
     setNotes((prev) => {
@@ -35,49 +41,61 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
     });
   };
 
-  const handleSubmit = (clearAfter = false) => {
+  const handleSubmit = async (clearAfter = false) => {
     if (!firstName.trim() || !lastName.trim()) {
-      alert('Please fill in the required First Name and Last Name fields.');
+      setSubmitError('Enter both a first name and a last name.');
       return;
     }
 
-    const newMember: Partial<ParishMember> = {
-      name: `${firstName.trim()} ${lastName.trim()}`,
-      initials: `${firstName.charAt(0).toUpperCase()}${lastName.charAt(0).toUpperCase()}`,
-      phone: phone || '+254 750 000 000',
-      email: email || `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
-      residentialAddress: address || 'Nyahururu, Laikipia',
-      membershipTier,
-      baptismType: baptismStatus,
-      dateOfBirth: dob || '1996-01-01',
-      pastoralNotes: notes,
-      pastoralStatus: 'active-regular',
-      statusLabel: 'Active Regular',
-      church: DEFAULT_LOCATION,
-      householdName: `The ${lastName.trim()} Household`,
-      householdId: `#${Math.floor(100 + Math.random() * 899)}`,
-      householdRole: 'Head',
-      memberId: `#MBR-${Math.floor(1100 + Math.random() * 500)}`,
-      envelopeNumber: `ENV-${Math.floor(1400 + Math.random() * 200)}`,
-    };
+    setIsSubmitting(true);
+    setSubmitError(null);
 
-    onSaveMember(newMember);
+    try {
+      const newMember = {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        // Only what the clerk entered: a fabricated phone number, email or date of birth is a
+        // fiction the parish would have to unpick one record at a time.
+        phone: phone || undefined,
+        email: email || undefined,
+        dateOfBirth: dob || undefined,
+        baptismType: baptismStatus === 'awaiting' ? 'none' : baptismStatus,
+        pastoralNotes: notes,
+        location: DEFAULT_LOCATION,
+        householdId: undefined,
+        householdRole: assignHousehold ? 'Head' : undefined,
+        isHouseholdHead: assignHousehold,
+        status: 'active' as const,
+        // No envelope number: the API issues the next one from the register, so two clerks cannot
+        // both invent the same one on a column that has to be unique.
+        tags: [],
+      };
 
-    setFeedbackToast(`Christian record for ${firstName} ${lastName} successfully saved to members register.`);
-    setTimeout(() => setFeedbackToast(null), 4000);
+      await createMember(newMember);
+      setEnrolledThisSession((count) => count + 1);
+      void refetchRegister();
 
-    if (clearAfter) {
-      setFirstName('');
-      setLastName('');
-      setPhone('');
-      setEmail('');
-      setAddress('');
-      setDob('');
-      setNotes('');
-    } else {
-      setTimeout(() => {
-        onNavigateToFind();
-      }, 1200);
+      setFeedbackToast(`Christian record for ${firstName} ${lastName} successfully saved to members register.`);
+      setTimeout(() => setFeedbackToast(null), 4000);
+
+      if (clearAfter) {
+        setFirstName('');
+        setLastName('');
+        setPhone('');
+        setEmail('');
+        setAddress('');
+        setDob('');
+        setNotes('');
+      } else {
+        setTimeout(() => {
+          onNavigateToFind();
+        }, 1200);
+      }
+    } catch (err) {
+      const message = err instanceof ApiError ? err.body.error : 'Failed to save member';
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -98,16 +116,16 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2 relative z-10">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
-              {memberStats.total}
+              {rollTotal}
             </span>
-            {enrolledIds.length > 0 && (
+            {enrolledThisSession > 0 && (
               <span className="font-headline text-xs text-[#006243] font-semibold flex items-center gap-0.5">
                 <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_upward</span>
-                +{enrolledIds.length} you enrolled
+                +{enrolledThisSession} you enrolled
               </span>
             )}
           </div>
-          <p className="mt-1 font-body text-xs text-[#59413a]/80">Active members directory count</p>
+          <p className="mt-1 font-body text-xs text-[#59413a]/80">Members on the live register</p>
         </div>
 
         {/* Stat 2: New Baptisms */}
@@ -123,9 +141,9 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2 relative z-10">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
-              18
+              {register?.baptismsThisYear ?? 0}
             </span>
-            <span className="font-headline text-xs text-[#904d00] font-medium">Q1 Jan-Mar</span>
+            <span className="font-headline text-xs text-[#904d00] font-medium">This year</span>
           </div>
           <p className="mt-1 font-body text-xs text-[#59413a]/80">Recorded baptism & communion records</p>
         </div>
@@ -135,7 +153,7 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           <div className="absolute -right-4 -top-4 w-20 h-20 bg-[#ffdbd0]/40 rounded-full blur-xl group-hover:scale-125 transition-transform"></div>
           <div className="flex items-center justify-between relative z-10">
             <span className="font-headline text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              Pending Verification
+              Awaiting Baptism Record
             </span>
             <span className="w-8 h-8 rounded-lg bg-[#ffdbd0] flex items-center justify-center text-[#9b2f00]">
               <span aria-hidden="true" className="material-symbols-outlined text-[18px]">pending_actions</span>
@@ -143,10 +161,10 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2 relative z-10">
             <span className="font-headline text-3xl text-[#9b2f00] font-bold tracking-tight">
-              6
+              {register?.byBaptismType.none ?? 0}
             </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#c2410c]/15 text-[#9b2f00] font-headline text-xs font-semibold">
-              Requires Review
+              Pastoral follow-up
             </span>
           </div>
           <p className="mt-1 font-body text-xs text-[#59413a]/80">Baptism letters & pastoral triage</p>
@@ -165,13 +183,13 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2 relative z-10">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
-              {memberStats.households}
+              {householdCount}
             </span>
             <span className="font-headline text-xs text-[#006243] font-semibold flex items-center gap-0.5">
               <span aria-hidden="true" className="material-symbols-outlined text-[14px]">family_restroom</span>
-              {memberStats.households === 0
+              {householdCount === 0
                 ? 'none yet'
-                : `${(memberStats.total / memberStats.households).toFixed(1)} souls per unit`}
+                : `${(rollTotal / householdCount).toFixed(1)} souls per unit`}
             </span>
           </div>
           <p className="mt-1 font-body text-xs text-[#59413a]/80">Family units registered</p>
@@ -213,6 +231,11 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
 
         {/* Form Body */}
         <form onSubmit={(e) => { e.preventDefault(); handleSubmit(false); }} className="space-y-6 relative z-10">
+          {submitError && (
+            <div className="p-3 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] text-xs" role="alert">
+              {submitError}
+            </div>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Column 1: Personal & Contact */}
             <div className="space-y-4">
@@ -443,17 +466,28 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleSubmit(true)}
-                className="px-4 py-2.5 rounded-lg bg-[#f4ece8] hover:bg-[#eee7e3] text-[#1e1b19] font-headline text-xs font-bold transition-all shadow-sm cursor-pointer border border-[#e1bfb5]/50"
+                disabled={isSubmitting || apiLoading}
+                className="px-4 py-2.5 rounded-lg bg-[#f4ece8] hover:bg-[#eee7e3] text-[#1e1b19] font-headline text-xs font-bold transition-all shadow-sm cursor-pointer border border-[#e1bfb5]/50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save & Add Another
+                {isSubmitting ? (
+                  <>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                    Saving…
+                  </>
+                ) : (
+                  'Save & Add Another'
+                )}
               </button>
               <button
                 type="button"
                 onClick={() => handleSubmit(false)}
-                className="px-5 py-2.5 rounded-lg bg-[#c2410c] hover:bg-[#9b2f00] text-white font-headline text-xs font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer"
+                disabled={isSubmitting || apiLoading}
+                className="px-5 py-2.5 rounded-lg bg-[#c2410c] hover:bg-[#9b2f00] text-white font-headline text-xs font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">check_circle</span>
-                <span>Save Member</span>
+                <span aria-hidden="true" className={`material-symbols-outlined text-[18px] ${isSubmitting ? 'animate-spin' : ''}`}>
+                  {isSubmitting ? 'progress_activity' : 'check_circle'}
+                </span>
+                <span>{isSubmitting ? 'Saving…' : 'Save Member'}</span>
               </button>
             </div>
           </div>

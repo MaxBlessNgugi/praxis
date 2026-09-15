@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "description": "Praxis Church OS API — Express, Prisma, PostgreSQL.",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
@@ -12,6 +15,11 @@
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
+    "check:isolation": "tsx tools/tenant-isolation.ts",
+    "check:vendor": "tsx tools/vendor-smoke.ts",
+    "check:import": "tsx tools/member-import.ts",
+    "check:launch": "tsx tools/launch-check.ts",
+    "check:security": "tsx tools/security-smoke.ts",
     "studio": "prisma studio"
   },
   "prisma": {

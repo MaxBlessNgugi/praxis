@@ -8,6 +8,30 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # The console's browser audits sign in against the **real** API — they call POST /api/auth/login
+    # through the gate, and `requireSignIn` aborts the run when that is refused. So this job needs a
+    # database and a running API of its own; without them the audits cannot even reach the console,
+    # and a green tick would mean the audits never ran rather than that they passed.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: praxis
+          POSTGRES_PASSWORD: praxis
+          POSTGRES_DB: praxis
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U praxis" --health-interval 5s --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://praxis:praxis@localhost:5432/praxis?schema=public
+      DIRECT_URL: postgresql://praxis:praxis@localhost:5432/praxis?schema=public
+      JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
+      PORT: 4000
+      # The audits open the console at 127.0.0.1:3000, which is a different origin from localhost:3000
+      # as far as a browser is concerned. Both are listed so the sign-in is not refused by CORS.
+      CORS_ORIGIN: http://localhost:3000,http://127.0.0.1:3000
     steps:
       - uses: actions/checkout@v4
 
@@ -16,7 +40,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: install
+      - name: install the console
         run: npm ci
 
       - name: typecheck
@@ -25,15 +49,38 @@ jobs:
       - name: build
         run: npm run build
 
-      # The audits drive a real browser, so they need the app actually serving.
-      - name: start the app
+      - name: install the API
+        working-directory: backend
+        run: npm ci
+
+      - name: build the database from the migrations and seed it
+        working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npm run seed
+
+      # Started detached and then *waited for*: the audits drive a browser, and a browser pointed at
+      # an API that is still booting reports a CORS failure rather than a slow start.
+      - name: start the API
+        working-directory: backend
+        run: |
+          npm run dev > /tmp/api.log 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:4000/health > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "the API never answered on :4000"
+          cat /tmp/api.log
+          exit 1
+
+      - name: start the console
         run: |
           npm run dev > /tmp/dev.log 2>&1 &
           for _ in $(seq 1 60); do
             if curl -sf http://127.0.0.1:3000/ > /dev/null; then exit 0; fi
             sleep 2
           done
-          echo "the app never answered on :3000"
+          echo "the console never answered on :3000"
           cat /tmp/dev.log
           exit 1
 
@@ -44,9 +91,46 @@ jobs:
       - name: dialog audit
         run: node tools/audit-dialogs.mjs
 
-  # The job above no longer compiles `backend/`: the root `tsconfig.json` excludes it, because the
-  # service has its own compiler options (commonjs, `strict`, `noUnusedLocals`), its own lockfile and
-  # its own generated Prisma client. Checking it here instead keeps that exclusion from being a hole.
+      # Multi-tenancy is enforced in the request path, so it is verified there: this signs in as a
+      # second church and tries to read, change, retire and restore the first church's records with
+      # the API's own endpoints. It exits non-zero on any check that succeeds when it should not, and
+      # it removes the church it provisioned either way.
+      - name: one church cannot reach another's records
+        working-directory: backend
+        run: npx tsx tools/tenant-isolation.ts
+
+      # The operator's side, which crosses tenants by design and so needs its own proof: suspension
+      # refusing a sign-in and saying why, a support session that is scoped, audited and one-way, and
+      # an outbound send that is refused rather than recorded as delivered when no provider is set.
+      - name: the vendor console and the outbound gateways
+        working-directory: backend
+        run: npm run check:vendor
+
+      # The register arriving as a spreadsheet, which is how every parish's data actually gets in.
+      # It checks the report a clerk reads before anything is written, the duplicate keys that make a
+      # second import safe, and the spreadsheet shapes that break a naive parser — a BOM, semicolon
+      # delimiters, Excel date serials — then removes the rows it wrote.
+      - name: a register can be imported from a spreadsheet
+        working-directory: backend
+        run: npm run check:import
+
+      # The commercial path end to end, on a church that did not exist a minute ago: sign itself up,
+      # finish the welcome wizard, enrol a member, record a tithe, plan a service, publish an
+      # announcement, watch the next church be unable to see any of it, sign out. It removes the
+      # church it created whether it passes or fails.
+      - name: a church can sign itself up and use the whole system
+        working-directory: backend
+        run: npm run check:launch
+
+      # Deliberately last of the API checks: it exercises the sign-in rate limiter to prove the
+      # ceiling exists, which leaves this address throttled for up to a minute afterwards.
+      - name: the security posture
+        working-directory: backend
+        run: npm run check:security
+
+  # The console's typecheck does not compile `backend/`: the root `tsconfig.json` excludes it, because
+  # the service has its own compiler options (commonjs, `strict`, `noUnusedLocals`), its own lockfile
+  # and its own generated Prisma client. Checking it here instead keeps that exclusion from being a hole.
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -71,6 +155,7 @@ jobs:
       - name: validate the schema
         env:
           DATABASE_URL: postgresql://praxis:praxis@localhost:5432/praxis?schema=public
+          DIRECT_URL: postgresql://praxis:praxis@localhost:5432/praxis?schema=public
         run: npx prisma validate
 
       - name: typecheck
@@ -100,6 +185,8 @@ jobs:
         working-directory: backend
     env:
       DATABASE_URL: postgresql://praxis:praxis@localhost:5432/praxis?schema=public
+      # Locally the pooled and direct connections are the same line; the split only matters on Neon.
+      DIRECT_URL: postgresql://praxis:praxis@localhost:5432/praxis?schema=public
       JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
       PORT: 4000
     steps:
@@ -119,10 +206,32 @@ jobs:
 
       # The seed is what proves the schema is not merely present but usable: it writes through the
       # generated client, and the counts are asserted so an empty database cannot pass as provisioned.
-      - name: seed it, and assert the seed wrote rows
+      # The numbers are the shape of a parish — a register, the seven departments, and real giving
+      # history behind them — because "1 member" provisioned correctly is not a database anybody can
+      # hand to the office.
+      - name: seed it, and assert the seed wrote a parish
         run: |
           npm run seed
-          node -e 'const {PrismaClient}=require("@prisma/client");const p=new PrismaClient();p.member.count().then(async (members)=>{const ministries=await p.ministry.count();await p.$disconnect();console.log(`seed wrote ${members} members and ${ministries} ministries`);if(members===0||ministries!==7)process.exit(1);})'
+          node -e '
+            const { PrismaClient } = require("@prisma/client");
+            const prisma = new PrismaClient();
+            (async () => {
+              const members = await prisma.member.count();
+              const ministries = await prisma.ministry.count();
+              const services = await prisma.service.count();
+              const tithes = await prisma.tithe.count();
+              const ledger = await prisma.financeAuditEntry.count();
+              // The commercial layer too: without plans there is nothing for a church to be on, and
+              // without a subscription the console opens on a church that has never been provisioned.
+              const plans = await prisma.plan.count();
+              const subscriptions = await prisma.subscription.count();
+              const church = await prisma.organization.findFirst({ where: { slug: "destiny-sanctuary" } });
+              await prisma.$disconnect();
+              console.log(`seed wrote ${members} members, ${ministries} departments, ${services} services, ${tithes} tithes, ${ledger} ledger entries, ${plans} plans and ${subscriptions} subscription(s)`);
+              if (members < 10 || ministries !== 7 || services < 5 || tithes < 20 || ledger < 40) process.exit(1);
+              if (plans !== 3 || subscriptions < 1 || !church || !church.onboardedAt) process.exit(1);
+            })();
+          '
 
       # `migrate diff` needs an empty shadow database to replay the migrations into; `db execute`
       # creates it so this job needs no Postgres client of its own. `--exit-code` returns 2 on any

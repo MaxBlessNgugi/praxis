@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as serviceController from '../controllers/service.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { requireAuth, requireRole } from '../middleware/authenticate';
+import { requireWritableSubscription } from '../middleware/subscription';
 
 /**
  * `/api/services` — Services & Worship.
@@ -13,7 +14,7 @@ export const serviceRouter = Router();
 
 const WRITERS = requireRole('super_admin', 'admin', 'staff');
 
-serviceRouter.use(requireAuth);
+serviceRouter.use(requireAuth, requireWritableSubscription);
 
 serviceRouter.get('/', asyncHandler(serviceController.listServices));
 serviceRouter.get('/roster', asyncHandler(serviceController.listRoster));

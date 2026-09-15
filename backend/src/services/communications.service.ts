@@ -1,6 +1,10 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
+import { resolveAudience } from '../lib/audience';
+import { emailStatus, sendEmail } from '../lib/email';
+import { sendSms, smsStatus } from '../lib/sms';
 import { assertMemberOnRegister } from './member.service';
 import { page } from '../lib/respond';
 import { between } from '../schemas/common';
@@ -235,15 +239,86 @@ export async function updateBroadcast(id: string, input: UpdateBroadcastInput, a
   });
 }
 
+/** What a send actually did, reported so the console can be specific rather than reassuring. */
+export interface BroadcastDelivery {
+  channel: string;
+  /** The provider that carried it, or null when nothing was dispatched (a notice sheet). */
+  driver: string | null;
+  /** The audience in words, as it resolved: "sent to *ministry leaders*". */
+  audienceLabel: string;
+  attempted: number;
+  delivered: number;
+  failed: number;
+  failures: Array<{ recipient: string; reason: string }>;
+  recordedOnly: boolean;
+}
+
+/**
+ * Send a campaign, or record a send that has no gateway.
+ *
+ * The difference between this and what it replaced is *who counts*. The count used to be supplied by
+ * the caller, which meant the console could mark a campaign "sent to 400" over a provider that was
+ * never configured. Now an email or SMS campaign goes through the gateway, the gateway's own outcome
+ * per recipient is what gets stored, and an audience that resolves to nobody is a refusal rather than
+ * a cheerful zero.
+ */
 export async function sendBroadcast(id: string, input: SendBroadcastInput, actorId: string) {
   const existing = await findLive(prisma.broadcast, id, 'That broadcast does not exist');
   if (existing.status === 'sent') throw new AppError(409, 'That broadcast has already been marked sent', 'already_sent');
 
+  const audience = await resolveAudience(existing.audience);
   const sentAt = input.sentAt ?? new Date();
-  return prisma.$transaction(async (tx) => {
-    const broadcast = await tx.broadcast.update({
+
+  let delivery: BroadcastDelivery;
+
+  if (existing.channel === 'email') {
+    const report = await sendEmail({
+      to: audience.emails,
+      subject: existing.subject ?? `${env.APP_NAME} notice`,
+      text: existing.body,
+    });
+    delivery = { channel: 'email', audienceLabel: audience.label, ...report, recordedOnly: false };
+  } else if (existing.channel === 'sms') {
+    const report = await sendSms({ to: audience.phones, text: existing.body });
+    delivery = { channel: 'sms', audienceLabel: audience.label, ...report, recordedOnly: false };
+  } else {
+    // A notice sheet is printed and pinned up. There is no gateway to ask, so the office's own count
+    // is the record — stored as both attempted and delivered, because here they mean the same thing:
+    // copies that went out.
+    const counted = input.recipients ?? 0;
+    delivery = {
+      channel: existing.channel,
+      driver: null,
+      audienceLabel: audience.label,
+      attempted: counted,
+      delivered: counted,
+      failed: 0,
+      failures: [],
+      recordedOnly: true,
+    };
+  }
+
+  // Sending to nobody is a mistake the operator has to see; marking it "sent" would hide it.
+  if (!delivery.recordedOnly && delivery.attempted === 0) {
+    throw new AppError(
+      400,
+      `That audience resolved to no ${existing.channel === 'sms' ? 'phone numbers' : 'email addresses'} on the register, so nothing was sent.`,
+      'no_recipients',
+    );
+  }
+
+  const broadcast = await prisma.$transaction(async (tx) => {
+    const updated = await tx.broadcast.update({
       where: { id },
-      data: { status: 'sent', sentAt, recipients: input.recipients },
+      // The provider's own verdict is stored beside the campaign rather than described once in a
+      // toast: the office asks "did the funeral notice reach people?" a week later, and this is the
+      // row that answers it — how many went out, how many did not, and the first reasons why.
+      data: {
+        status: 'sent',
+        sentAt,
+        recipients: delivery.delivered,
+        lastReport: delivery as unknown as Prisma.InputJsonValue,
+      },
     });
     await tx.auditLog.create({
       data: {
@@ -251,13 +326,25 @@ export async function sendBroadcast(id: string, input: SendBroadcastInput, actor
         action: 'update',
         entityName: 'Broadcast',
         entityId: id,
-        summary: `Marked a ${broadcast.channel} to ${broadcast.audience} as sent to ${input.recipients} recipients`,
+        summary: `Sent a ${updated.channel} to ${delivery.audienceLabel} — ${delivery.delivered} delivered, ${delivery.failed} failed`,
         before: { status: existing.status, recipients: existing.recipients },
-        after: { status: broadcast.status, recipients: broadcast.recipients },
+        after: { status: updated.status, recipients: updated.recipients },
       },
     });
-    return broadcast;
+    return updated;
   });
+
+  return { ...broadcast, delivery };
+}
+
+/**
+ * Whether each channel can actually send.
+ *
+ * The console reads this before it offers a "Send" action, so an installation with no provider shows
+ * what to configure rather than failing at the moment somebody needs to tell the church something.
+ */
+export function channels() {
+  return { email: emailStatus(), sms: smsStatus() };
 }
 
 export function retireBroadcast(id: string, input: RetireReason, actorId: string) {

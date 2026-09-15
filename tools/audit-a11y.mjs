@@ -15,7 +15,7 @@
  *
  * Read-only: it never clicks a control, only navigates the sidebar and sub-tabs.
  */
-import { launchChrome, reportFailures, sleep, waitForDevTools } from './lib/harness.mjs';
+import { launchChrome, reportFailures, requireSignIn, sleep, waitForDevTools } from './lib/harness.mjs';
 
 const APP_URL = process.env.APP_URL || 'http://127.0.0.1:3000/';
 const PORT = Number(process.env.CDP_PORT || 9335);
@@ -32,10 +32,12 @@ const ALL_SECTIONS = [
   { title: 'Giving & Stewardship', screens: ['Tithes', 'Offerings', 'Project Funding', 'Welfare', 'Charity Activities'] },
   { title: 'Inventory & Assets', screens: [] },
   { title: 'Groups & Fellowships', screens: ['Departmental', 'Leadership Roles', 'Volunteer Roles'] },
-  { title: 'Reports & Certs', screens: ['Baptism Certificate', 'Dedication', 'Matrimony', 'Discipleship'] },
+  // Two, not four: the screen now offers the two ordinances the register actually records, so a
+  // matrimony or discipleship certificate is not a form that exists to be reached.
+  { title: 'Reports & Certs', screens: ['Baptism', 'Dedication'] },
   { title: 'Communications', screens: ['Announcements', 'Broadcasts', 'Events & Calendar', 'Prayer Requests', 'Birthdays & Milestones'] },
-  { title: 'Settings & Profile', screens: ['Organization Profile', 'Notifications & Alerts', 'Integrations & APIs', 'Data Sovereignty & Backup', 'Customization & Lexicon'] },
-  { title: 'Admin Portal', screens: ['Users & Rights', 'Trash', 'Finance Audit'] },
+  { title: 'Settings & Profile', screens: ['Organization Profile', 'Subscription & Billing', 'Notifications & Alerts', 'Integrations & APIs', 'Data Sovereignty & Backup', 'Customization & Lexicon'] },
+  { title: 'Admin Portal', screens: ['Users & rights', 'Trash', 'Audit log', 'Finance audit', 'Churches'] },
 ];
 
 const chrome = launchChrome({ port: PORT, profile: 'praxis-a11y', width: WIDTH, height: HEIGHT });
@@ -221,12 +223,10 @@ await sleep(4000);
 const title = await evaluate('document.title');
 if (!/Praxis Church OS/.test(title || '')) throw new Error(`unexpected app at ${APP_URL}: ${JSON.stringify(title)}`);
 
-const signedIn = await evaluate(`(() => {
-  const btn = [...document.querySelectorAll('button')].find((b) => /Sign In to Praxis/.test(b.textContent || ''));
-  if (btn) { btn.click(); return true; }
-  return false;
-})()`);
-await sleep(signedIn ? 2200 : 400);
+// The console is behind a real login; without this the walk below would reach no screen at all and
+// the run would fail for having measured nothing.
+await requireSignIn(evaluate);
+await sleep(1200);
 
 const report = { screens: 0, icons: [], svgs: [], controls: [], labels: [], buttons: [], nameMismatch: [], controlsWithRealLabel: 0, controlsSeen: 0 };
 for (const section of ALL_SECTIONS) {

@@ -2,11 +2,12 @@ import { Router } from 'express';
 import * as householdController from '../controllers/household.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { requireAuth, requireRole } from '../middleware/authenticate';
+import { requireWritableSubscription } from '../middleware/subscription';
 
 /** `/api/households` — grouping, membership and headship. Same read/write/retire split as members. */
 export const householdRouter = Router();
 
-householdRouter.use(requireAuth);
+householdRouter.use(requireAuth, requireWritableSubscription);
 
 householdRouter.get('/', asyncHandler(householdController.listHouseholds));
 householdRouter.get('/:id', asyncHandler(householdController.getHousehold));

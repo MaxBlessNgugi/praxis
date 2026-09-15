@@ -4,6 +4,11 @@ dist/
 dist-share/
 coverage/
 .DS_Store
+
+# Database dumps belong in the church's own storage, never in git: a dump is the whole register, the
+# giving ledger and every password hash in one file, and a repository's history keeps it forever.
+backups/
+*.dump
 *.log
 .env*
 !.env.example

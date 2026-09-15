@@ -1,9 +1,45 @@
-import React, { useState } from 'react';
-import { useDemoData } from '../../../data/demoStore';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ParishNavTab, MembersSubTab, ParishMember } from '../../../types';
 import { DEFAULT_LOCATION, formatKes } from '../../../data/churchDomain';
 import { useDialog } from '../dialog';
 import { interactiveCard } from '../interactiveCard';
+import { useOverviewReport } from '../../../lib/hooks/useReports';
+import { useAuth } from '../../../lib/auth';
+import { GettingStartedCard } from '../GettingStartedCard';
+import {
+  ApiError,
+  api,
+  governanceApi,
+  tithesApi,
+  type ItemEnvelope,
+  type PaymentMethod,
+} from '../../../lib/api';
+
+/**
+ * The tender labels the console shows, mapped to the values the ledger's enum actually accepts.
+ * Keeping the Warm Ember wording on screen while sending `mpesa` over the wire is the whole job of
+ * this table — the two vocabularies were never going to match, and someone has to do the translation.
+ */
+const TITHE_METHODS: Record<string, PaymentMethod> = {
+  'M-PESA / Online': 'mpesa',
+  'Sunday Offering': 'cash',
+  Cheque: 'cheque',
+  'Card Terminal': 'card',
+};
+
+/** `YYYY-MM-DDTHH:mm` in local time, which is exactly what `<input type="datetime-local">` reads. */
+/** The salutation for the local clock. A fixed one greets nobody correctly past noon. */
+function salutation(date: Date): string {
+  const hour = date.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function localDateTimeValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 interface ActivityItem {
   id: string;
@@ -22,104 +58,36 @@ interface ActivityItem {
   icon: string;
 }
 
-const INITIAL_ACTIVITIES: ActivityItem[] = [
-  {
-    id: 'act-1',
-    category: 'giving',
-    categoryLabel: 'Stewardship',
-    title: 'Batch #042 Automated Bank & Tithes Reconciled',
-    description: 'Bank deposits and recurring online tithes cleared into General Operating Fund #101 with dual-signatory verification.',
-    timeAgo: '12m ago',
-    timestamp: 'Today, 10:48 AM',
-    actor: 'Clara Wambui',
-    actorRole: 'Church Bookkeeper',
-    avatarText: 'CW',
-    badgeColor: '#059669',
-    badgeBg: '#059669/10',
-    amount: '+KSh 14,280.00',
-    icon: 'account_balance_wallet',
-  },
-  {
-    id: 'act-2',
-    category: 'pastoral',
-    categoryLabel: 'Pastoral Care',
-    title: 'Home Mercy Visit & Holy Communion Logged',
-    description: 'Visited Evelyn & Thomas Wanjala following outpatient hip surgery. Anointed with prayer; requested floral delivery and homebound bulletin.',
-    timeAgo: '45m ago',
-    timestamp: 'Today, 10:15 AM',
-    actor: 'Rev. Alice',
-    actorRole: 'Co-Visionary Leader',
-    avatarText: 'DK',
-    badgeColor: '#D97706',
-    badgeBg: '#D97706/10',
-    icon: 'home_health',
-  },
-  {
-    id: 'act-3',
-    category: 'sacraments',
-    categoryLabel: 'Baptism & Communion',
-    title: 'Certificate of Holy Baptism Sealed (#CERT-914)',
-    description: 'Baptismal certificate and official registry roll entry completed for infant Clara Otieno. Celebrant: Bishop Sammy.',
-    timeAgo: '2h ago',
-    timestamp: 'Today, 08:50 AM',
-    actor: 'Eleanor Campbell',
-    actorRole: 'Church Secretary',
-    avatarText: 'EC',
-    badgeColor: '#C2410C',
-    badgeBg: '#C2410C/10',
-    icon: 'water_drop',
-  },
-  {
-    id: 'act-4',
-    category: 'ministries',
-    categoryLabel: 'Ministries',
-    title: 'Youth Retreat Roster Finalized',
-    description: '38 secondary school students confirmed and all 6 volunteer drivers background-cleared (CPP Safeguarding Level 2).',
-    timeAgo: '3h ago',
-    timestamp: 'Today, 07:45 AM',
-    actor: 'Hannah Kimani',
-    actorRole: 'Youth Director',
-    avatarText: 'HK',
-    badgeColor: '#57534E',
-    badgeBg: '#F8F1E9',
-    icon: 'hiking',
-  },
-  {
-    id: 'act-5',
-    category: 'governance',
-    categoryLabel: 'Council Docket',
-    title: 'Council Resolution RES-2025-041 Tabled',
-    description: 'Resolution draft submitted for Council consideration: "Sanctuary Sound Board Replacement Escrow (KSh 12,500)".',
-    timeAgo: '5h ago',
-    timestamp: 'Today, 05:30 AM',
-    actor: 'Elder Marcus Kamau',
-    actorRole: 'Church Elder',
-    avatarText: 'MK',
-    badgeColor: '#C2410C',
-    badgeBg: '#C2410C/10',
-    icon: 'gavel',
-  },
-  {
-    id: 'act-6',
-    category: 'giving',
-    categoryLabel: 'Benevolence',
-    title: 'Benevolence Emergency Voucher #402 Disbursed',
-    description: 'Food relief & electricity aid released to a neighbour family in crisis under confidential Deacon escrow.',
-    timeAgo: 'Yesterday',
-    timestamp: 'Yesterday, 04:15 PM',
-    actor: 'Sarah Wanjiku',
-    actorRole: 'Treasurer',
-    avatarText: 'SW',
-    badgeColor: '#059669',
-    badgeBg: '#059669/10',
-    amount: '-KSh 850.00',
-    icon: 'volunteer_activism',
-  },
-];
-
 interface HomeDashboardViewProps {
   onNavigateTab?: (tab: ParishNavTab, subTab?: MembersSubTab | string) => void;
   onAddMember?: (member: Partial<ParishMember>) => void;
+}
+
+/** Relative label for an audit entry, e.g. "3h ago". */
+function formatTimeAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return 'Just now';
+  const minutes = Math.floor((Date.now() - then) / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
+}
+
+/** Absolute label for an audit entry, e.g. "09 Feb 2025, 10:12". */
+function formatTimestamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'Just now';
+  return date.toLocaleString('en-KE', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
@@ -131,22 +99,67 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [lastSyncedTime, setLastSyncedTime] = useState('Just now');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Operational metrics
-  // Read from the demo store, never held here: the register and the ledger are the
-  // town squares for these two numbers, and this card used to disagree with both.
-  const { memberStats, titheStats, enrolledIds, recordTithe } = useDemoData();
-  const activeMembersCount = memberStats.total - memberStats.inquirers;
-  const monthlyTithesCurrent = titheStats.total;
-  const monthlyTithesTarget = 80000;
-  const [activeMinistriesCount] = useState(24);
-  const [pendingActionsCount, setPendingActionsCount] = useState(3);
+  // Fetch real data from backend
+  const { data: overview, isLoading: overviewLoading, error: overviewError, refetch } = useOverviewReport();
+  // Who is signed in, and which church they are looking at. Both used to be literals here.
+  const { user, organization } = useAuth();
 
-  // Activity Feed state
-  const [activities, setActivities] = useState<ActivityItem[]>(INITIAL_ACTIVITIES);
+  // Operational metrics from real API
+  const activeMembersCount = overview?.cards.activeMembers ?? 0;
+  const monthlyTithesCurrent = overview?.cards.tithes ?? 0;
+  const monthlyTithesTarget = 80000;
+  const activeMinistriesCount = overview?.cards.activeMinistries ?? 0;
+  const membersTotal = overview?.cards.membersTotal ?? 0;
+  const householdsCount = overview?.cards.households ?? 0;
+  const pendingResolutionsCount = overview?.cards.pendingResolutions ?? 0;
+  const upcomingMeetingsCount = overview?.cards.upcomingMeetings ?? 0;
+
+  // The giving target is monthly, so the cycle *is* the calendar month. Counting the days to the end
+  // of it is a fact the console can establish; a hard-coded "19 days left" was an assertion that
+  // stayed wrong forever.
+  const now = new Date();
+  const daysLeftInMonth = Math.max(
+    0,
+    new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate(),
+  );
+
+  // Activity Feed state - map from audit log
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [activityFilter, setActivityFilter] = useState<string>('all');
   const [activitySearch, setActivitySearch] = useState<string>('');
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null);
   const selectedActivityDialog = useDialog(() => setSelectedActivity(null), "Activity Detail");
+
+  // Convert audit log entries to activity items
+  useEffect(() => {
+    if (overview?.recentActivity) {
+      const mapped = overview.recentActivity.map((entry, index): ActivityItem => {
+        const actionMap: Record<string, ActivityItem['category']> = {
+          create: 'giving',
+          update: 'governance',
+          delete: 'pastoral',
+          restore: 'sacraments',
+          login: 'ministries',
+        };
+        return {
+          id: `act-${entry.id ?? index}`,
+          category: actionMap[entry.action] ?? 'giving',
+          categoryLabel: entry.action === 'create' ? 'Stewardship' : entry.action === 'update' ? 'Council Docket' : entry.action === 'delete' ? 'Pastoral Care' : 'Ministries',
+          title: entry.summary || `${entry.action} ${entry.entityName}`,
+          description: entry.after ? JSON.stringify(entry.after) : 'No details',
+          timeAgo: formatTimeAgo(entry.createdAt),
+          timestamp: formatTimestamp(entry.createdAt),
+          actor: entry.actor?.name ?? 'System',
+          actorRole: 'Staff',
+          avatarText: entry.actor?.name?.split(' ').map(n => n[0]).join('') ?? 'SY',
+          badgeColor: entry.action === 'create' ? '#059669' : entry.action === 'update' ? '#C2410C' : entry.action === 'delete' ? '#D97706' : '#57534E',
+          badgeBg: entry.action === 'create' ? '#059669/10' : entry.action === 'update' ? '#C2410C/10' : entry.action === 'delete' ? '#D97706/10' : '#F8F1E9',
+          icon: entry.action === 'create' ? 'account_balance_wallet' : entry.action === 'update' ? 'gavel' : entry.action === 'delete' ? 'home_health' : 'hiking',
+        };
+      });
+      setActivities(mapped);
+    }
+  }, [overview?.recentActivity]);
 
   // Modals for sticky bottom quick action pills
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
@@ -170,8 +183,16 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
   const [meetingTitle, setMeetingTitle] = useState('');
   const [meetingCommittee, setMeetingCommittee] = useState('Church Council');
-  const [meetingDate, setMeetingDate] = useState('2025-02-20T19:00');
+  // A week out, computed. The mockup shipped a fixed `2025-02-20T19:00`, so the form was pre-filled
+  // with a date in the past from the first day it was ever written.
+  const [meetingDate, setMeetingDate] = useState(() => localDateTimeValue(new Date(Date.now() + 7 * 86_400_000)));
+  const [isSavingMeeting, setIsSavingMeeting] = useState(false);
+  const [meetingError, setMeetingError] = useState<string | null>(null);
   const [meetingLocation, setMeetingLocation] = useState('Sanctuary Council Chamber');
+  const [isSavingMember, setIsSavingMember] = useState(false);
+  const [memberError, setMemberError] = useState<string | null>(null);
+  const [isSavingTithe, setIsSavingTithe] = useState(false);
+  const [titheError, setTitheError] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -189,108 +210,99 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     }, 850);
   };
 
-  const handleSaveQuickMember = (e: React.FormEvent) => {
+  const handleSaveQuickMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMemberName.trim()) return;
+    const fullName = newMemberName.trim();
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    // The register needs a first *and* a last name. Saying so here beats letting the API reject the
+    // request with a field error this modal has nowhere to show.
+    if (parts.length < 2) {
+      setMemberError('Enter the person’s first and last name, for example “Mary Wanjiku”.');
+      return;
+    }
+    if (isSavingMember) return;
 
-    const newMbr: Partial<ParishMember> = {
-      name: newMemberName.trim(),
-      householdName: newMemberHousehold.trim() || `${newMemberName.trim().split(' ').slice(-1)[0]} Household`,
-      email: newMemberEmail.trim() || 'member@destinysanctuary.co.ke',
-      phone: newMemberPhone.trim() || '+254 750 192 830',
-      membershipTier: newMemberTier as any,
-      church: DEFAULT_LOCATION,
-      baptismType: 'baptized',
-      pastoralStatus: 'active-regular',
-      statusLabel: 'Active Regular',
-    };
-
-    onAddMember?.(newMbr);
-
-    // Add to activity feed
-    const newAct: ActivityItem = {
-      id: `act-${Date.now()}`,
-      category: 'pastoral',
-      categoryLabel: 'Intake',
-      title: `New Member Enrolled: ${newMemberName}`,
-      description: `Enrolled under ${newMemberHousehold || 'Independent Household'} (${newMemberTier.toUpperCase()}). Welcome packet and pastoral intake dispatched.`,
-      timeAgo: 'Just now',
-      timestamp: 'Just now',
-      actor: 'Bishop Sammy',
-      actorRole: 'Lead Clergy',
-      avatarText: 'PA',
-      badgeColor: '#c2410c',
-      badgeBg: '#ffdbd0]/50',
-      icon: 'person_add',
-    };
-    setActivities([newAct, ...activities]);
-
-    showToast(`Member ${newMemberName} successfully enrolled!`);
-    setIsAddMemberOpen(false);
-    setNewMemberName('');
-    setNewMemberHousehold('');
-    setNewMemberEmail('');
-    setNewMemberPhone('');
+    setIsSavingMember(true);
+    setMemberError(null);
+    try {
+      await api.post<ItemEnvelope<ParishMember>>('/api/members', {
+        firstName: parts[0],
+        lastName: parts.slice(1).join(' '),
+        location: DEFAULT_LOCATION,
+        ...(newMemberEmail.trim() ? { email: newMemberEmail.trim() } : {}),
+        ...(newMemberPhone.trim() ? { phone: newMemberPhone.trim() } : {}),
+      });
+      // The register belongs to the server, and the count on the card above is read from this same
+      // overview — so refetching is what makes the two agree.
+      await refetch();
+      showToast(`${fullName} is now on the register.`);
+      setIsAddMemberOpen(false);
+      setNewMemberName('');
+      setNewMemberHousehold('');
+      setNewMemberEmail('');
+      setNewMemberPhone('');
+    } catch (error) {
+      setMemberError(error instanceof ApiError ? error.body.error : 'The member could not be saved.');
+    } finally {
+      setIsSavingMember(false);
+    }
   };
 
-  const handleSaveQuickTithe = (e: React.FormEvent) => {
+  const handleSaveQuickTithe = async (e: React.FormEvent) => {
     e.preventDefault();
     const val = parseFloat(titheAmount);
-    if (isNaN(val) || val <= 0) return;
+    if (Number.isNaN(val) || val <= 0) {
+      setTitheError('Enter an amount greater than zero.');
+      return;
+    }
+    if (isSavingTithe) return;
 
-    // Posted to the same ledger the Giving & Stewardship screens read, so the row turns
-    // up there and both totals move together.
-    recordTithe({ donor: titheDonorName, amount: val, method: titheMethod, category: titheFund });
-
-    const newAct: ActivityItem = {
-      id: `act-${Date.now()}`,
-      category: 'giving',
-      categoryLabel: 'Tithe Ingestion',
-      title: `Offering Recorded: ${titheDonorName} (+KSh ${val.toLocaleString()})`,
-      description: `Stewardship receipt confirmed for ${titheFund} via ${titheMethod}. Auto-receipted with signature seal.`,
-      timeAgo: 'Just now',
-      timestamp: 'Just now',
-      actor: 'Sarah Wanjiku',
-      actorRole: 'Treasurer',
-      avatarText: 'SW',
-      badgeColor: '#059669',
-      badgeBg: '#059669/10',
-      amount: `+KSh ${val.toLocaleString()}`,
-      icon: 'attach_money',
-    };
-    setActivities([newAct, ...activities]);
-
-    showToast(`Tithe of KSh ${val.toLocaleString()} posted to ${titheFund}!`);
-    setIsRecordTitheOpen(false);
-    setTitheAmount('500');
+    setIsSavingTithe(true);
+    setTitheError(null);
+    try {
+      // The ledger is the server's, and every write is chained into its audit trail. Posting here —
+      // rather than to a browser store — is what makes a recorded tithe a recorded tithe.
+      await tithesApi.create({
+        donorName: titheDonorName.trim() || 'Anonymous / Plate Offering',
+        amount: val,
+        method: TITHE_METHODS[titheMethod] ?? 'cash',
+        category: titheFund,
+      });
+      await refetch();
+      showToast(`Tithe of KSh ${val.toLocaleString()} posted to ${titheFund}.`);
+      setIsRecordTitheOpen(false);
+      setTitheAmount('500');
+    } catch (error) {
+      setTitheError(error instanceof ApiError ? error.body.error : 'The tithe could not be recorded.');
+    } finally {
+      setIsSavingTithe(false);
+    }
   };
 
-  const handleSaveQuickMeeting = (e: React.FormEvent) => {
+  const handleSaveQuickMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!meetingTitle.trim()) return;
-
-    setPendingActionsCount((prev) => prev + 1);
-
-    const newAct: ActivityItem = {
-      id: `act-${Date.now()}`,
-      category: 'governance',
-      categoryLabel: 'Meeting Notice',
-      title: `Meeting Scheduled: ${meetingTitle}`,
-      description: `${meetingCommittee} scheduled at ${meetingLocation}. Agenda items and elder notifications dispatched.`,
-      timeAgo: 'Just now',
-      timestamp: 'Just now',
-      actor: 'Eleanor Campbell',
-      actorRole: 'Church Secretary',
-      avatarText: 'EC',
-      badgeColor: '#C2410C',
-      badgeBg: '#C2410C/10',
-      icon: 'calendar_month',
-    };
-    setActivities([newAct, ...activities]);
-
-    showToast(`Meeting "${meetingTitle}" added to official docket!`);
-    setIsScheduleMeetingOpen(false);
-    setMeetingTitle('');
+    if (!meetingTitle.trim() || isSavingMeeting) return;
+    setIsSavingMeeting(true);
+    setMeetingError(null);
+    try {
+      await governanceApi.createMeeting({
+        title: meetingTitle.trim(),
+        kind: 'stated',
+        heldAt: new Date(meetingDate).toISOString(),
+        venue: meetingLocation.trim(),
+        agenda: [meetingCommittee],
+      });
+      // The docket belongs to the server. Refetching the overview is what puts the new meeting into
+      // the audit feed as a real entry, rather than a line this component invented for itself.
+      await refetch();
+      showToast(`Meeting "${meetingTitle}" added to the council docket.`);
+      setIsScheduleMeetingOpen(false);
+      setMeetingTitle('');
+    } catch (error) {
+      setMeetingError(error instanceof ApiError ? error.body.error : 'The meeting could not be saved.');
+    } finally {
+      setIsSavingMeeting(false);
+    }
   };
 
   const filteredActivities = activities.filter((act) => {
@@ -303,6 +315,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   });
 
   const progressPercent = Math.min(100, Math.round((monthlyTithesCurrent / monthlyTithesTarget) * 100));
+  // A church with nobody on the roll yet: the figures below are all zeros, and zeros teach nobody
+  // anything. What belongs at the top of the screen on day one is what to do next.
+  const isFirstRun = !overviewLoading && membersTotal === 0;
 
   return (
     <div className="flex flex-col w-full min-h-full pb-28 text-[#1C1917] font-['Inter',sans-serif] bg-[#FDF8F3]">
@@ -311,6 +326,25 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
         <div role="status" aria-live="polite" className="fixed bottom-24 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-[9px] bg-[#1C1917] text-white shadow-2xl border border-[#E7E5E4] animate-in slide-in-from-bottom-5 duration-300">
           <span aria-hidden="true" className="material-symbols-outlined text-[#059669] text-[20px]">verified</span>
           <span className="text-xs font-semibold">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Backend unreachable — the sign-in gate is real now, so a dead API is a visible state. */}
+      {overviewError && (
+        <div role="alert" className="w-full px-6 sm:px-8 pt-4">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-[14px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-[#B91C1C]">
+            <span className="flex items-center gap-2 text-xs font-semibold">
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">cloud_off</span>
+              Could not reach the church database: {overviewError}
+            </span>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="self-start sm:self-auto rounded-[9px] bg-[#B91C1C] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#991B1B] transition-colors cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
@@ -327,14 +361,17 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             </div>
             <div className="flex items-baseline gap-2.5">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1C1917]">
-                Good morning, Bishop Sammy
+                {salutation(new Date())}, {user?.name ?? 'friend'}
               </h1>
-              <span className="hidden sm:inline-block text-xs font-medium px-2.5 py-0.5 rounded-[9px] bg-[#F8F1E9] text-[#57534E] border border-[#E7E5E4]">
-                Destiny Sanctuary Int'L
-              </span>
+              {organization && (
+                <span className="hidden sm:inline-block text-xs font-medium px-2.5 py-0.5 rounded-[9px] bg-[#F8F1E9] text-[#57534E] border border-[#E7E5E4]">
+                  {organization.name}
+                </span>
+              )}
             </div>
             <p className="text-xs text-[#57534E]">
-              Nyahururu Main Church • {memberStats.total} souls on the roll across {memberStats.households} households.
+              {membersTotal} souls on the roll across {householdsCount} households.
+              {overviewLoading && <span className="ml-1 text-[#A8A29E]">• Refreshing…</span>}
             </p>
           </div>
 
@@ -385,6 +422,17 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
+      {/* FIRST-RUN GUIDANCE — a new church has nothing to read in figures yet */}
+      {/* ========================================================================= */}
+      {isFirstRun && (
+        <div className="w-full px-6 sm:px-8 pt-6">
+          <div className="max-w-7xl mx-auto">
+            <GettingStartedCard onNavigate={onNavigateTab} />
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* 4 CORE METRIC CARDS */}
       {/* ========================================================================= */}
       <div className="w-full px-6 sm:px-8 pt-6">
@@ -403,12 +451,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <span className="text-3xl font-bold tracking-tight text-[#1C1917]">
                     {activeMembersCount.toLocaleString()}
                   </span>
-                  {enrolledIds.length > 0 && (
-                    <span className="inline-flex items-center text-[11px] font-bold text-[#059669] bg-[#059669]/10 px-2 py-0.5 rounded-[9px]">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[13px] mr-0.5">trending_up</span>
-                      +{enrolledIds.length} enrolled by you
-                    </span>
-                  )}
                 </div>
               </div>
               <div className="w-11 h-11 rounded-[9px] bg-[#F5EDE4] flex items-center justify-center text-[#C2410C] group-hover:scale-105 transition-transform shrink-0">
@@ -418,7 +460,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
             <div className="mt-4 pt-3 border-t border-[#E7E5E4] flex items-center justify-between text-[11px]">
               <span className="text-[#57534E]">
-                <strong className="text-[#1C1917] font-bold">912</strong> Member • <strong className="text-[#1C1917] font-bold">214</strong> First Timers
+                <strong className="text-[#1C1917] font-bold">{membersTotal.toLocaleString()}</strong> on the roll •{' '}
+                <strong className="text-[#1C1917] font-bold">{activeMembersCount.toLocaleString()}</strong> active
               </span>
               <span className="font-bold text-[#C2410C] group-hover:text-[#EA580C] flex items-center gap-0.5">
                 Roll <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_forward</span>
@@ -463,7 +506,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             </div>
 
             <div className="mt-3 pt-2.5 border-t border-[#E7E5E4] flex items-center justify-between text-[11px]">
-              <span className="text-[#57534E]">19 days left in cycle</span>
+              <span className="text-[#57534E]">
+                {daysLeftInMonth} {daysLeftInMonth === 1 ? 'day' : 'days'} left this month
+              </span>
               <span className="font-bold text-[#C2410C] group-hover:text-[#EA580C] flex items-center gap-0.5">
                 Ledger <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_forward</span>
               </span>
@@ -484,9 +529,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <span className="text-3xl font-bold tracking-tight text-[#1C1917]">
                     {activeMinistriesCount}
                   </span>
-                  <span className="inline-flex items-center text-[11px] font-bold text-[#059669] bg-[#059669]/10 px-2 py-0.5 rounded-[9px]">
-                    100% Rostered
-                  </span>
                 </div>
               </div>
               <div className="w-11 h-11 rounded-[9px] bg-[#F5EDE4] flex items-center justify-center text-[#C2410C] group-hover:scale-105 transition-transform shrink-0">
@@ -495,9 +537,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             </div>
 
             <div className="mt-4 pt-3 border-t border-[#E7E5E4] flex items-center justify-between text-[11px]">
-              <span className="text-[#57534E]">
-                <strong className="text-[#1C1917] font-bold">142</strong> Volunteers active this week
-              </span>
+              <span className="text-[#57534E]">Departments and fellowships</span>
               <span className="font-bold text-[#C2410C] group-hover:text-[#EA580C] flex items-center gap-0.5">
                 Hub <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_forward</span>
               </span>
@@ -516,7 +556,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </span>
                 <div className="flex items-baseline gap-2 mt-1">
                   <span className="text-3xl font-bold tracking-tight text-[#1C1917]">
-                    {pendingActionsCount}
+                    {pendingResolutionsCount}
                   </span>
                   <span className="inline-flex items-center text-[11px] font-bold text-[#C2410C] bg-[#F5EDE4] px-2 py-0.5 rounded-[9px]">
                     Council Docket
@@ -529,7 +569,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             </div>
 
             <div className="mt-4 pt-3 border-t border-[#E7E5E4] flex items-center justify-between text-[11px]">
-              <span className="text-[#57534E]">Next Council: Thursday 7 PM</span>
+              <span className="text-[#57534E]">
+                {upcomingMeetingsCount} {upcomingMeetingsCount === 1 ? 'meeting' : 'meetings'} scheduled ahead
+              </span>
               <span className="font-bold text-[#C2410C] group-hover:text-[#EA580C] flex items-center gap-0.5">
                 Review <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_forward</span>
               </span>
@@ -805,6 +847,12 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </div>
               </div>
 
+              {memberError && (
+                <p role="alert" className="text-[11px] font-semibold text-[#B91C1C] bg-[#B91C1C]/5 border border-[#B91C1C]/20 rounded-[9px] px-3 py-2">
+                  {memberError}
+                </p>
+              )}
+
               <div className="pt-3 border-t border-[#E7E5E4] flex items-center justify-end gap-2 mt-2">
                 <button
                   type="button"
@@ -815,7 +863,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white font-bold shadow-[0_2px_8px_rgba(194,65,12,0.25)] cursor-pointer transition-all"
+                  disabled={isSavingMember}
+                  className="px-5 py-2 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white font-bold shadow-[0_2px_8px_rgba(194,65,12,0.25)] cursor-pointer transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   Enroll Member
                 </button>
@@ -912,6 +961,12 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </div>
               </div>
 
+              {titheError && (
+                <p role="alert" className="text-[11px] font-semibold text-[#B91C1C] bg-[#B91C1C]/5 border border-[#B91C1C]/20 rounded-[9px] px-3 py-2">
+                  {titheError}
+                </p>
+              )}
+
               <div className="pt-3 border-t border-[#E7E5E4] flex items-center justify-end gap-2 mt-2">
                 <button
                   type="button"
@@ -922,7 +977,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-[9px] bg-[#D97706] hover:bg-[#F59E0B] text-white font-bold shadow-[0_2px_8px_rgba(217,119,6,0.25)] cursor-pointer transition-all"
+                  disabled={isSavingTithe}
+                  className="px-5 py-2 rounded-[9px] bg-[#D97706] hover:bg-[#F59E0B] text-white font-bold shadow-[0_2px_8px_rgba(217,119,6,0.25)] cursor-pointer transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   Post Tithe to Ledger
                 </button>
@@ -1006,6 +1062,12 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   className="w-full h-9 px-3 rounded-[9px] bg-[#FFFFFF] border border-[#E7E5E4] hover:border-[#D6D3D1] font-medium text-[#1C1917] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/20 transition-all"
                 />
               </div>
+
+              {meetingError && (
+                <p role="alert" className="text-[11px] font-semibold text-[#B91C1C] bg-[#B91C1C]/5 border border-[#B91C1C]/20 rounded-[9px] px-3 py-2">
+                  {meetingError}
+                </p>
+              )}
 
               <div className="pt-3 border-t border-[#E7E5E4] flex items-center justify-end gap-2 mt-2">
                 <button

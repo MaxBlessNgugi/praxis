@@ -9,6 +9,7 @@
     "build:share": "vite build --mode share",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "backup": "node tools/backup-db.mjs",
     "audit:a11y": "node tools/audit-a11y.mjs",
     "audit:dialogs": "node tools/audit-dialogs.mjs"
   },

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChurchOrgProfile } from '../../../../types';
 import { INITIAL_ORG_PROFILE } from '../../../../data/churchMockData';
 import { CHURCH, SERVICE_TIMES } from '../../../../data/churchDomain';
+import { ChurchIdentityPanel } from './ChurchIdentityPanel';
 
 /**
  * The form's editable draft: the church record every screen reads (`CHURCH`), merged with
@@ -21,7 +22,12 @@ export const OrgProfileSettingsPanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#FFFFFF] rounded-[14px] p-6 border border-[#E7E5E4] shadow-warm-card space-y-6">
+    <div className="flex flex-col gap-6">
+      {/* The identity that every other screen and every certificate reads. This one is live. */}
+      <ChurchIdentityPanel />
+
+      {/* The extended profile below is still the local draft: see the README's status table. */}
+      <div className="bg-[#FFFFFF] rounded-[14px] p-6 border border-[#E7E5E4] shadow-warm-card space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4]">
         <div>
           <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
@@ -377,6 +383,7 @@ export const OrgProfileSettingsPanel: React.FC = () => {
           </button>
         </div>
       </form>
+      </div>
     </div>
   );
 };

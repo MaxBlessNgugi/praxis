@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as ministryController from '../controllers/ministry.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { requireAuth, requireRole } from '../middleware/authenticate';
+import { requireWritableSubscription } from '../middleware/subscription';
 
 /**
  * `/api/ministries` — the groups, their leaders, and who serves on them.
@@ -14,7 +15,7 @@ export const ministryRouter = Router();
 const WRITERS = requireRole('super_admin', 'admin', 'staff');
 const ADMINS = requireRole('admin');
 
-ministryRouter.use(requireAuth);
+ministryRouter.use(requireAuth, requireWritableSubscription);
 
 ministryRouter.get('/roster', asyncHandler(ministryController.roster));
 

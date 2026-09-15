@@ -63,6 +63,11 @@ export async function sendBroadcast(req: Request, res: Response): Promise<void> 
   ok(res, await communications.sendBroadcast(id(req), sendBroadcastSchema.parse(req.body), actor(req)));
 }
 
+/** Whether a channel can actually send, so the console can say so before the Send button. */
+export async function channels(_req: Request, res: Response): Promise<void> {
+  ok(res, communications.channels());
+}
+
 export async function retireBroadcast(req: Request, res: Response): Promise<void> {
   ok(res, await communications.retireBroadcast(id(req), retireReasonSchema.parse(req.query), actor(req)));
 }

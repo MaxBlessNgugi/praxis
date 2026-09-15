@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { passwordSchema } from './auth.schema';
+import { passwordSchema, resetPasswordSchema } from './auth.schema';
 import { archiveReasonSchema, booleanQuery, retireReasonSchema } from './common';
 
 /** The four role keys the console and the seeded Role rows both use. */
@@ -23,6 +23,9 @@ export const updateUserSchema = z
     memberId: z.string().uuid().nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, { message: 'Send at least one field to change' });
+
+/** The policy is the one every account's password is held to, wherever it is set. */
+export { resetPasswordSchema };
 
 export const assignRoleSchema = z.object({ roleKey: roleKeySchema });
 

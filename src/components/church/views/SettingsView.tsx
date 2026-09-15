@@ -1,6 +1,7 @@
 import React from 'react';
 import { SettingsSubTab } from '../../../types';
 import { OrgProfileSettingsPanel } from './settings/OrgProfileSettingsPanel';
+import { SubscriptionPanel } from './settings/SubscriptionPanel';
 import { NotificationSettingsPanel } from './settings/NotificationSettingsPanel';
 import { IntegrationsSettingsPanel } from './settings/IntegrationsSettingsPanel';
 import { DataBackupSettingsPanel } from './settings/DataBackupSettingsPanel';
@@ -17,6 +18,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const subTabs = [
     { id: 'org-profile' as SettingsSubTab, label: 'Organization Profile', icon: 'church' },
+    { id: 'subscription' as SettingsSubTab, label: 'Subscription & Billing', icon: 'workspace_premium' },
     { id: 'notifications' as SettingsSubTab, label: 'Notifications & Alerts', icon: 'notifications_active' },
     { id: 'integrations' as SettingsSubTab, label: 'Integrations & APIs', icon: 'hub' },
     { id: 'data-backup' as SettingsSubTab, label: 'Data Sovereignty & Backup', icon: 'backup' },
@@ -68,6 +70,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* Render Active Sub-panel */}
       {activeSubTab === 'org-profile' && <OrgProfileSettingsPanel />}
+      {activeSubTab === 'subscription' && <SubscriptionPanel />}
       {activeSubTab === 'notifications' && <NotificationSettingsPanel />}
       {activeSubTab === 'integrations' && <IntegrationsSettingsPanel />}
       {activeSubTab === 'data-backup' && <DataBackupSettingsPanel />}

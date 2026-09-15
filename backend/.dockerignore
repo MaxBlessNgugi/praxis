@@ -1,0 +1,24 @@
+# What a container build must not carry.
+#
+# `node_modules` is the important line: a host's modules are built for the host's platform and
+# architecture, and copying them into a Linux image is how a build fails with a message about a
+# missing binary that is actually there. The image installs its own.
+node_modules
+dist
+
+# Secrets. A `.env` inside an image is a credential in a layer, which is worse than a credential in a
+# file — the image can be pushed somewhere.
+.env
+.env.*
+!.env.example
+
+# Tools and tests: the running service needs none of them, and `tools/` reaches for a live database.
+tools
+tmp-*.ts
+*.log
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md

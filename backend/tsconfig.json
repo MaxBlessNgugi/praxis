@@ -16,5 +16,8 @@
     "skipLibCheck": true,
     "sourceMap": true
   },
-  "include": ["src", "prisma"]
+  // `tools` holds the checks an operator runs against a live service — the tenant isolation test.
+  // Included here so `npm run typecheck` reads them too: a proof that is not compiled is a proof
+  // that can be quietly broken.
+  "include": ["src", "prisma", "tools"]
 }

@@ -3,6 +3,9 @@ import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
 import { isProduction } from '../config/env';
 import { PRISMA_ERRORS } from '../lib/prisma';
+import { log, describeError } from '../lib/log';
+import { reportError } from '../lib/monitoring';
+import { tenantId } from '../lib/tenant';
 
 /** A failure the service chose, with a status the client can act on. */
 export class AppError extends Error {
@@ -21,6 +24,18 @@ export const conflictError = (message: string) => new AppError(409, message, 'co
 export const unauthorizedError = (message = 'Authentication required') => new AppError(401, message, 'unauthorized');
 export const forbiddenError = (message = 'Not permitted') => new AppError(403, message, 'forbidden');
 
+/** What body-parser refuses, and the sentence to give back for it. */
+function bodyParserFailure(error: unknown): { status: number; message: string; code: string } | null {
+  const { type } = (error ?? {}) as { type?: unknown };
+  if (type === 'entity.too.large') {
+    return { status: 413, message: 'That request was too large for this endpoint', code: 'payload_too_large' };
+  }
+  if (type === 'entity.parse.failed') {
+    return { status: 400, message: 'That request body is not valid JSON', code: 'invalid_json' };
+  }
+  return null;
+}
+
 /**
  * The last handler in the chain, so every failure leaves through one door.
  *
@@ -29,15 +44,29 @@ export const forbiddenError = (message = 'Not permitted') => new AppError(403, m
  * registering the same envelope number is an ordinary event at a parish desk. And anything else is
  * logged in full but reported as a bare 500 in production, because a stack trace in a response body
  * is an information leak, not a courtesy.
+ *
+ * A failure that is the server's fault — a 500, whether it arrived as an unknown throw or as an
+ * `AppError` nobody expected — is also *reported*: logged as one structured line, and sent to the
+ * error tracker when one is configured. A 4xx is not: those are the client being told no, and
+ * streaming them into an error tracker is how a tracker becomes noise nobody reads.
  */
 export function errorHandler(
   error: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): void {
   if (res.headersSent) {
     next(error);
+    return;
+  }
+
+  // A body the parser itself refused. body-parser marks these with `type` and a 4xx `status`, and
+  // without this they leave as 500s — which is both the wrong answer to the caller and a client's
+  // mistake reported to whoever watches the error tracker.
+  const bodyFailure = bodyParserFailure(error);
+  if (bodyFailure) {
+    res.status(bodyFailure.status).json({ error: bodyFailure.message, code: bodyFailure.code });
     return;
   }
 
@@ -66,10 +95,36 @@ export function errorHandler(
   }
 
   if (error instanceof AppError) {
+    if (error.statusCode >= 500) {
+      log('error', 'request_failed', {
+        requestId: res.getHeader('X-Request-Id') ?? null,
+        code: error.code ?? null,
+        path: req.path,
+        ...describeError(error),
+      });
+      reportError(error, contextOf(req));
+    }
     res.status(error.statusCode).json({ error: error.message, code: error.code });
     return;
   }
 
-  console.error('[unhandled]', error);
+  log('error', 'unhandled_error', {
+    requestId: res.getHeader('X-Request-Id') ?? null,
+    path: req.path,
+    method: req.method,
+    ...describeError(error),
+  });
+  reportError(error, contextOf(req));
   res.status(500).json({ error: isProduction ? 'Something went wrong' : String((error as Error)?.message ?? error) });
+}
+
+/** Enough to find the request again, and nothing that could carry a member's data to a third party. */
+function contextOf(req: Request): Record<string, unknown> {
+  return {
+    method: req.method,
+    path: req.path,
+    requestId: req.res?.getHeader('X-Request-Id') ?? null,
+    ...(req.user ? { actorId: req.user.id } : {}),
+    ...(tenantId() ? { organizationId: tenantId() } : {}),
+  };
 }

@@ -1,4 +1,3 @@
-import type { LiturgyItem } from '../types';
 
 /**
  * The mock church's shared facts.
@@ -40,16 +39,18 @@ export const LOCATIONS = ['Nyahururu Main Church', 'Nyahururu Annex'] as const;
 export type ChurchLocation = (typeof LOCATIONS)[number];
 export const DEFAULT_LOCATION: ChurchLocation = LOCATIONS[0];
 
-/** Their published Sunday running order (home page Service Schedule). */
-export const SUNDAY_ORDER: ReadonlyArray<
-  Pick<LiturgyItem, 'type' | 'title' | 'durationMinutes' | 'leader' | 'notes'>
-> = [
-  { type: 'call-to-worship', title: 'First Service', durationMinutes: 120, leader: CHURCH.visionaryLeader, notes: '8:00 AM – 10:00 AM' },
-  { type: 'worship-praise', title: 'Praise & Worship', durationMinutes: 60, leader: 'Caleb Timothy Mwangi', notes: '10:00 AM – 11:00 AM' },
-  { type: 'announcements', title: 'Presentation / Visitors', durationMinutes: 30, leader: 'Marcus Kamau', notes: '11:00 AM – 11:30 AM' },
-  { type: 'sermon', title: 'Sermon / Word Ministry', durationMinutes: 75, leader: CHURCH.visionaryLeader, notes: '11:30 AM – 12:45 PM' },
-  { type: 'benediction', title: 'Congregation Dismissed', durationMinutes: 5, leader: CHURCH.visionaryLeader, notes: '12:50 PM' },
-  { type: 'fellowship', title: 'Groups Meetings & Fellowship', durationMinutes: 30, leader: CHURCH.administrator, notes: '1:30 PM – 2:00 PM' },
+/**
+ * The church's published Sunday running order, as the Settings → Organization Profile screen lists
+ * it. It is a *printed schedule* rather than the console's service plan, which is why it is written
+ * here in full rather than read from a service record.
+ */
+export const SUNDAY_ORDER: ReadonlyArray<{ title: string; notes: string }> = [
+  { title: 'First Service', notes: '8:00 AM – 10:00 AM' },
+  { title: 'Praise & Worship', notes: '10:00 AM – 11:00 AM' },
+  { title: 'Presentation / Visitors', notes: '11:00 AM – 11:30 AM' },
+  { title: 'Sermon / Word Ministry', notes: '11:30 AM – 12:45 PM' },
+  { title: 'Congregation Dismissed', notes: '12:50 PM' },
+  { title: 'Groups Meetings & Fellowship', notes: '1:30 PM – 2:00 PM' },
 ];
 
 /**
@@ -91,22 +92,4 @@ export const initialsOf = (name: string) =>
 export const formatKes = (value: number) =>
   `KSh ${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
-/** The Sunday window the six elements add up to: 8:00 AM – 2:00 PM. */
-export const SUNDAY_WINDOW = '8:00 AM – 2:00 PM';
 
-/**
- * Builds one Sunday order of service, with per-element overrides keyed by
- * position (1-based) for the bits a given service changes — its scripture,
- * who preaches, how it was dismissed.
- */
-export function sundayLiturgy(
-  idPrefix: string,
-  patch: Partial<Record<number, Partial<LiturgyItem>>> = {},
-): LiturgyItem[] {
-  return SUNDAY_ORDER.map((element, index) => ({
-    ...element,
-    id: `${idPrefix}${index + 1}`,
-    order: index + 1,
-    ...patch[index + 1],
-  }));
-}

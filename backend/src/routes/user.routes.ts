@@ -17,4 +17,7 @@ userRouter.get('/', asyncHandler(userController.listUsers));
 userRouter.post('/', asyncHandler(userController.createUser));
 userRouter.patch('/:id', asyncHandler(userController.updateUser));
 userRouter.post('/:id/role', asyncHandler(userController.assignRole));
+// Setting somebody else's password. `admin` may do this for anyone below them; the service refuses
+// one administrator taking over another's account.
+userRouter.post('/:id/password', asyncHandler(userController.resetPassword));
 userRouter.delete('/:id', asyncHandler(userController.removeUser));

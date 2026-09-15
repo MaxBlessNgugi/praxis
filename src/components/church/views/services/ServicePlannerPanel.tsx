@@ -1,843 +1,761 @@
-import React, { useState } from 'react';
-import { WorshipService, LiturgyItem, ServiceRoleAssignment, ServiceType } from '../../../../types';
-import { INITIAL_SERVICES } from '../../../../data/churchMockData';
-import { DEFAULT_LOCATION, LOCATIONS, SUNDAY_WINDOW, sundayLiturgy } from '../../../../data/churchDomain';
+import React, { useEffect, useState } from 'react';
+import {
+  memberRefName,
+  servicesApi,
+  type LiturgyItemDto,
+  type LiturgyKind,
+  type ServiceDto,
+} from '../../../../lib/api';
+import { errorMessage, useMemberOptions, useRoster, useService, useServices } from '../../../../hooks/useApi';
+import { usePermissions } from '../../../../lib/permissions';
+import { printDocument } from '../../../../lib/documents';
+import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 import { useDialog } from '../../dialog';
-import { interactiveCard } from '../../interactiveCard';
+
+/**
+ * Planning a service: what it is, who leads it, and the order it runs in.
+ *
+ * This screen used to hold ten invented services with statuses, expected attendances and a roster of
+ * officers, all of it assembled in the browser. It now reads the church's own services from the API,
+ * and the order of service it edits is the row set the planner actually stores — `putLiturgy` replaces
+ * the whole order, so the arrangement on screen *is* the arrangement, saved.
+ *
+ * Two things follow from the API's shape rather than from taste. A service has no "status": whether it
+ * is upcoming or past is a fact about its date, so the filter computes it instead of asking anybody to
+ * keep a field in step. And the officers shown beside the order are the same duty rows the Volunteer
+ * Roster tab edits — one record, two views, rather than a second list that drifts.
+ */
+
+const KIND_LABELS: Record<LiturgyKind, string> = {
+  call_to_worship: 'Call to worship',
+  praise_worship: 'Praise & worship',
+  prayer: 'Prayer',
+  scripture: 'Scripture',
+  sermon: 'Sermon',
+  offering: 'Offering',
+  announcements: 'Announcements',
+  presentation: 'Presentation',
+  dismissal: 'Dismissal',
+  other: 'Other',
+};
+
+const KIND_ORDER = Object.keys(KIND_LABELS) as LiturgyKind[];
+
+const FIELD =
+  'w-full px-3.5 py-2.5 text-sm rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] text-[#1C1917] placeholder-[#A8A29E] transition-all focus:outline-none focus:border-[#C2410C] focus:ring-4 focus:ring-[#C2410C]/15';
+const LABEL = 'block text-xs font-bold text-[#1C1917] mb-1.5';
+
+const whenOf = (iso: string): string =>
+  new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+
+const timeOf = (service: ServiceDto): string => service.startTime ?? 'Time not set';
+
+/** A service's own minutes, from the items that carry a duration. */
+const totalMinutes = (liturgy: LiturgyItemDto[] | undefined): number =>
+  (liturgy ?? []).reduce((sum, item) => sum + (item.durationMinutes ?? 0), 0);
+
+const isPast = (service: ServiceDto): boolean => new Date(service.heldAt).getTime() + 3 * 3_600_000 < Date.now();
 
 export const ServicePlannerPanel: React.FC = () => {
-  const [services, setServices] = useState<WorshipService[]>(INITIAL_SERVICES);
-  const [selectedServiceId, setSelectedServiceId] = useState<string>(INITIAL_SERVICES[0].id);
-  const [filterType, setFilterType] = useState<'all' | 'upcoming' | 'completed'>('all');
-  const [isCreatingService, setIsCreatingService] = useState<boolean>(false);
-  const creatingServiceDialog = useDialog(() => setIsCreatingService(false), "Schedule New Worship Service");
-  const [isAddingLiturgyItem, setIsAddingLiturgyItem] = useState<boolean>(false);
-  const addingLiturgyItemDialog = useDialog(() => setIsAddingLiturgyItem(false), "Add Service Element");
-  const [previewBulletinModal, setPreviewBulletinModal] = useState<boolean>(false);
-  const previewBulletinModalDialog = useDialog(() => setPreviewBulletinModal(false), "Order of Divine Service");
+  const services = useServices({ pageSize: 100, sort: 'upcoming' });
+  const members = useMemberOptions();
+  const { canEdit, canDelete } = usePermissions();
 
-  // New Service Form State
-  const [newServiceTitle, setNewServiceTitle] = useState('');
-  const [newServiceType, setNewServiceType] = useState<ServiceType>('sunday-morning');
-  const [newServiceDate, setNewServiceDate] = useState('2025-02-16');
-  const [newServiceTime, setNewServiceTime] = useState<string>(SUNDAY_WINDOW);
-  const [newServiceCampus, setNewServiceCampus] = useState<string>(DEFAULT_LOCATION);
-  const [newServiceTheme, setNewServiceTheme] = useState('');
-  const [newServiceScripture, setNewServiceScripture] = useState('');
-  const [newServicePreacher, setNewServicePreacher] = useState('Bishop Sammy');
-  const [newServiceWorshipLead, setNewServiceWorshipLead] = useState('Caleb Timothy Mwangi');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'upcoming' | 'past' | 'templates' | 'all'>('upcoming');
+  /** Set once somebody picks a filter themselves, so the opening view is never corrected under them. */
+  const [filterChosen, setFilterChosen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  // New Service Item Form State
-  const [newLiturgyType, setNewLiturgyType] = useState<LiturgyItem['type']>('worship-praise');
-  const [newLiturgyTitle, setNewLiturgyTitle] = useState('');
-  const [newLiturgyDuration, setNewLiturgyDuration] = useState<number>(10);
-  const [newLiturgyLeader, setNewLiturgyLeader] = useState('Caleb Timothy Mwangi');
-  const [newLiturgyNotes, setNewLiturgyNotes] = useState('');
-  const [newLiturgyScripture, setNewLiturgyScripture] = useState('');
+  const detail = useService(selectedId);
+  const current = detail.data?.data ?? null;
+  const duties = useRoster({ serviceId: selectedId ?? undefined });
 
-  const currentService = services.find((s) => s.id === selectedServiceId) || services[0];
+  const [isCreating, setIsCreating] = useState(false);
+  const creatingDialog = useDialog(() => setIsCreating(false), 'Schedule a service');
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const addingItemDialog = useDialog(() => setIsAddingItem(false), 'Add an element to the order');
+  const [isPrinting, setIsPrinting] = useState(false);
+  const printingDialog = useDialog(() => setIsPrinting(false), 'Order of service');
+  const [isRetiring, setIsRetiring] = useState(false);
+  const retiringDialog = useDialog(() => setIsRetiring(false), 'Retire this service');
 
-  const filteredServices = services.filter((s) => {
-    if (filterType === 'all') return true;
-    return s.status === filterType;
+  const [draft, setDraft] = useState({
+    title: '',
+    heldAt: new Date().toISOString().slice(0, 10),
+    startTime: '09:00',
+    venue: '',
+    theme: '',
+    officiantId: '',
+  });
+  const [item, setItem] = useState({
+    title: '',
+    kind: 'praise_worship' as LiturgyKind,
+    durationMinutes: 10,
+    responsible: '',
+    notes: '',
   });
 
-  const handleCreateService = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newServiceTitle.trim()) return;
+  const rows = services.items
+    .filter((service) => {
+      if (filter === 'all') return true;
+      if (filter === 'templates') return service.isTemplate;
+      if (filter === 'upcoming') return !service.isTemplate && !isPast(service);
+      return !service.isTemplate && isPast(service);
+    })
+    .sort((a, b) => (filter === 'past' ? b.heldAt.localeCompare(a.heldAt) : a.heldAt.localeCompare(b.heldAt)));
 
-    const newService: WorshipService = {
-      id: `srv-${Date.now()}`,
-      title: newServiceTitle,
-      serviceType: newServiceType,
-      date: newServiceDate,
-      time: newServiceTime,
-      campus: newServiceCampus,
-      theme: newServiceTheme || 'Grace Abounding in Christ',
-      scriptureFocus: newServiceScripture || 'Ephesians 2:1-10',
-      preacher: newServicePreacher,
-      worshipLeader: newServiceWorshipLead,
-      status: 'upcoming',
-      expectedAttendance: 320,
-      keyRoles: [
-        { role: 'preacher', roleName: 'Minister of the Word', assignedMemberId: 'mbr-1', assignedMemberName: newServicePreacher, status: 'confirmed' },
-        { role: 'worship-lead', roleName: 'Music Director', assignedMemberId: 'mbr-1', assignedMemberName: newServiceWorshipLead, status: 'confirmed' },
-        { role: 'presiding-elder', roleName: 'Elder on Duty', assignedMemberId: 'mbr-2', assignedMemberName: 'Marcus Kamau', status: 'confirmed' },
-        { role: 'scripture-reader', roleName: 'Scripture Reader', assignedMemberId: 'mbr-3', assignedMemberName: 'Clara Wambui', status: 'pending' },
-        { role: 'sound-av', roleName: 'Sound Desk Tech', assignedMemberId: 'mbr-7', assignedMemberName: 'David Kimani', status: 'confirmed' },
-        { role: 'head-usher', roleName: 'Chief Usher', assignedMemberId: 'mbr-5', assignedMemberName: 'Arthur Wanjala', status: 'confirmed' },
-      ],
-      liturgyOrder: sundayLiturgy(`lit-${Date.now()}-`, {
-        2: { leader: newServiceWorshipLead },
-        4: { leader: newServicePreacher, scriptureRef: newServiceScripture },
-        5: { leader: newServicePreacher },
-      }),
-    };
+  /**
+   * Open on the services there are, not on the ones there ought to be.
+   *
+   * "Upcoming" is the right first view for a church planning ahead, and an empty one for a church
+   * whose calendar has not been caught up since the last quarter — which reads as a broken screen. So
+   * if nothing is scheduled ahead, the planner opens on what has been held instead.
+   */
+  useEffect(() => {
+    if (filterChosen || services.loading || services.items.length === 0) return;
+    if (!services.items.some((service) => !service.isTemplate && !isPast(service))) setFilter('past');
+  }, [filterChosen, services.loading, services.items]);
 
-    setServices([newService, ...services]);
-    setSelectedServiceId(newService.id);
-    setIsCreatingService(false);
-    setNewServiceTitle('');
-    setNewServiceTheme('');
-    setNewServiceScripture('');
-  };
-
-  const handleAddLiturgyItem = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newLiturgyTitle.trim()) return;
-
-    const newItem: LiturgyItem = {
-      id: `lit-${Date.now()}`,
-      order: currentService.liturgyOrder.length + 1,
-      type: newLiturgyType,
-      title: newLiturgyTitle,
-      durationMinutes: Number(newLiturgyDuration) || 5,
-      leader: newLiturgyLeader,
-      notes: newLiturgyNotes,
-      scriptureRef: newLiturgyScripture,
-    };
-
-    const updatedLiturgy = [...currentService.liturgyOrder, newItem];
-    const updatedServices = services.map((s) =>
-      s.id === currentService.id ? { ...s, liturgyOrder: updatedLiturgy } : s
-    );
-
-    setServices(updatedServices);
-    setIsAddingLiturgyItem(false);
-    setNewLiturgyTitle('');
-    setNewLiturgyNotes('');
-    setNewLiturgyScripture('');
-  };
-
-  const handleMoveLiturgyItem = (index: number, direction: 'up' | 'down') => {
-    if (
-      (direction === 'up' && index === 0) ||
-      (direction === 'down' && index === currentService.liturgyOrder.length - 1)
-    ) {
+  // Land on something to look at rather than on an empty right-hand column.
+  useEffect(() => {
+    if (rows.length === 0) {
+      setSelectedId(null);
       return;
     }
+    if (!selectedId || !services.items.some((service) => service.id === selectedId)) {
+      setSelectedId(rows[0].id);
+    }
+  }, [rows, selectedId, services.items]);
 
-    const items = [...currentService.liturgyOrder];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    const temp = items[index];
-    items[index] = items[targetIndex];
-    items[targetIndex] = temp;
-
-    // renumber orders
-    const reordered = items.map((item, idx) => ({ ...item, order: idx + 1 }));
-
-    const updatedServices = services.map((s) =>
-      s.id === currentService.id ? { ...s, liturgyOrder: reordered } : s
-    );
-    setServices(updatedServices);
+  const announce = (message: string) => {
+    setNotice(message);
+    setError(null);
   };
 
-  const handleDeleteLiturgyItem = (itemId: string) => {
-    const filtered = currentService.liturgyOrder
-      .filter((item) => item.id !== itemId)
-      .map((item, idx) => ({ ...item, order: idx + 1 }));
-
-    const updatedServices = services.map((s) =>
-      s.id === currentService.id ? { ...s, liturgyOrder: filtered } : s
-    );
-    setServices(updatedServices);
+  const saveLiturgy = async (items: LiturgyItemDto[], done: string) => {
+    if (!current) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await servicesApi.putLiturgy(current.id, items.map((entry) => ({
+        title: entry.title,
+        kind: entry.kind,
+        durationMinutes: entry.durationMinutes ?? undefined,
+        responsible: entry.responsible ?? undefined,
+        // Carried back unchanged: this screen does not set a ministry, but a save that dropped the
+        // link a minister was chosen for would be an edit nobody asked for.
+        ...(entry.ministryId ? { ministryId: entry.ministryId } : {}),
+        notes: entry.notes ?? undefined,
+      })));
+      await detail.refetch();
+      announce(done);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleUpdateRoleAssignment = (
-    roleIndex: number,
-    assignedName: string,
-    status: ServiceRoleAssignment['status']
-  ) => {
-    const updatedRoles = [...currentService.keyRoles];
-    updatedRoles[roleIndex] = {
-      ...updatedRoles[roleIndex],
-      assignedMemberName: assignedName,
-      status,
-    };
-
-    const updatedServices = services.map((s) =>
-      s.id === currentService.id ? { ...s, keyRoles: updatedRoles } : s
-    );
-    setServices(updatedServices);
+  const handleCreate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const { data } = await servicesApi.create({
+        title: draft.title.trim(),
+        heldAt: draft.heldAt,
+        startTime: draft.startTime || undefined,
+        venue: draft.venue.trim() || 'Main Sanctuary',
+        theme: draft.theme.trim() || undefined,
+        officiantId: draft.officiantId || undefined,
+      });
+      setIsCreating(false);
+      setFilter('upcoming');
+      setSelectedId(data.id);
+      setDraft((previous) => ({ ...previous, title: '', theme: '' }));
+      await services.refetch();
+      announce(`${data.title} is on the calendar. Add its order of service next.`);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const totalServiceDuration = currentService.liturgyOrder.reduce(
-    (acc, curr) => acc + curr.durationMinutes,
-    0
-  );
+  const handleAddItem = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!current) return;
+    const existing = current.liturgy ?? [];
+    await saveLiturgy(
+      [
+        ...existing,
+        {
+          id: `new-${Date.now()}`,
+          serviceId: current.id,
+          position: existing.length + 1,
+          title: item.title.trim(),
+          kind: item.kind,
+          durationMinutes: Number(item.durationMinutes) || null,
+          responsible: item.responsible.trim() || null,
+          ministryId: null,
+          notes: item.notes.trim() || null,
+        },
+      ],
+      `Added "${item.title.trim()}" to the order.`,
+    );
+    setIsAddingItem(false);
+    setItem((previous) => ({ ...previous, title: '', notes: '', responsible: '' }));
+  };
+
+  const moveItem = (index: number, direction: 'up' | 'down') => {
+    if (!current) return;
+    const items = [...(current.liturgy ?? [])];
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= items.length) return;
+    [items[index], items[target]] = [items[target], items[index]];
+    void saveLiturgy(items, 'The order of service is saved.');
+  };
+
+  const removeItem = (id: string) => {
+    if (!current) return;
+    void saveLiturgy(
+      (current.liturgy ?? []).filter((entry) => entry.id !== id),
+      'That element was taken out of the order.',
+    );
+  };
+
+  const retire = async () => {
+    if (!current) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await servicesApi.retire(current.id, { reason: 'other', reasonLabel: 'Removed from the planner' });
+      setIsRetiring(false);
+      setSelectedId(null);
+      await services.refetch();
+      announce('The service was retired. It is in the Trash if that was a mistake.');
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const printBulletin = () => {
+    if (!current) return;
+    const items = current.liturgy ?? [];
+    const rowsHtml = items
+      .map(
+        (entry, index) => `<tr>
+          <td class="num">${index + 1}</td>
+          <td><strong>${entry.title}</strong><div class="kind">${KIND_LABELS[entry.kind]}</div>${
+            entry.notes ? `<div class="notes">${entry.notes}</div>` : ''
+          }</td>
+          <td class="leader">${entry.responsible ?? ''}</td>
+          <td class="mins">${entry.durationMinutes ? `${entry.durationMinutes} min` : ''}</td>
+        </tr>`,
+      )
+      .join('');
+
+    void printDocument(`<!doctype html><html><head><meta charset="utf-8"><title>${current.title}</title>
+      <style>
+        body { font-family: Georgia, 'Times New Roman', serif; color: #1c1917; margin: 40px; }
+        h1 { font-size: 22px; margin: 0 0 4px; }
+        .meta { color: #57534e; font-size: 12px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        td { border-bottom: 1px solid #e7e5e4; padding: 8px 6px; vertical-align: top; font-size: 13px; }
+        .num { width: 26px; color: #c2410c; font-weight: bold; }
+        .kind { font-size: 11px; color: #57534e; text-transform: uppercase; letter-spacing: .06em; }
+        .notes { font-size: 11px; color: #57534e; font-style: italic; margin-top: 2px; }
+        .leader { width: 28%; font-size: 12px; }
+        .mins { width: 70px; text-align: right; font-size: 12px; color: #57534e; }
+        .total { margin-top: 14px; font-size: 12px; color: #57534e; }
+      </style></head><body>
+      <h1>Order of service</h1>
+      <div class="meta">${current.title} · ${whenOf(current.heldAt)} · ${timeOf(current)} · ${current.venue}${
+        current.theme ? ` · ${current.theme}` : ''
+      }</div>
+      <table>${rowsHtml || '<tr><td>No order recorded for this service yet.</td></tr>'}</table>
+      <div class="total">${totalMinutes(items)} minutes in all.</div>
+      </body></html>`);
+  };
+
+  const liturgy = current?.liturgy ?? [];
 
   return (
-    <div className="flex flex-col space-y-6">
-      {/* Action Header & Statistics Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Active Services</span>
-            <div className="text-2xl font-black text-[#1C1917] mt-0.5">{services.length} Planned</div>
-            <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">event_available</span>
-              Liturgies Synchronized
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">church</span>
-          </div>
+    <div className="space-y-5">
+      {error && (
+        <div role="alert" className="rounded-[9px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-xs font-semibold text-[#B91C1C]">
+          {error}
         </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Current Service Time</span>
-            <div className="text-2xl font-black text-[#C2410C] mt-0.5">{totalServiceDuration} Mins</div>
-            <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">timer</span>
-              {currentService.liturgyOrder.length} Elements Scheduled
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#D97706]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">schedule</span>
-          </div>
+      )}
+      {notice && (
+        <div role="status" className="rounded-[9px] border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-xs font-semibold text-[#047857]">
+          {notice}
         </div>
+      )}
 
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Key Duty Officers</span>
-            <div className="text-2xl font-black text-[#1C1917] mt-0.5">
-              {currentService.keyRoles.filter((r) => r.status === 'confirmed').length} / {currentService.keyRoles.length}
-            </div>
-            <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span>
-              Confirmed for Duty
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">badge</span>
-          </div>
-        </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Expected Capacity</span>
-            <div className="text-2xl font-black text-[#1C1917] mt-0.5">{currentService.expectedAttendance || 320}</div>
-            <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">groups</span>
-              Sanctuary Main Hall
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">meeting_room</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Dual-Column Workspace: Service Selector & Service Builder */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column (4 cols): Service List & Filter */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="bg-[#FFFFFF] rounded-[14px] p-4 border border-[#E7E5E4] shadow-warm-card">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-headline text-sm font-bold text-[#1C1917] flex items-center gap-1.5">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#C2410C]">event_note</span>
-                Church Services Roll
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
+        {/* LEFT: the services themselves */}
+        <div className="xl:col-span-4">
+          <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="flex items-center gap-1.5 font-headline text-sm font-bold text-[#1C1917]">
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#C2410C]">calendar_month</span>
+                Services
               </h3>
-              <button
-                type="button"
-                onClick={() => setIsCreatingService(true)}
-                className="px-2.5 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add</span>
-                New Service
-              </button>
+              {canEdit('services') && (
+                <button
+                  type="button"
+                  onClick={() => setIsCreating(true)}
+                  className="inline-flex items-center gap-1.5 rounded-[9px] bg-[#C2410C] px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-[#EA580C] cursor-pointer"
+                >
+                  <span aria-hidden="true" className="material-symbols-outlined text-[15px]">add</span>
+                  Schedule
+                </button>
+              )}
             </div>
 
-            {/* Filter Pills */}
-            <div className="flex items-center gap-1.5 p-1 bg-[#F8F1E9] rounded-[10px] mb-3">
-              {(['all', 'upcoming', 'completed'] as const).map((filter) => (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {(['upcoming', 'past', 'templates', 'all'] as const).map((option) => (
                 <button
-                  key={filter}
-                  onClick={() => setFilterType(filter)}
-                  className={`flex-1 py-1 text-[11px] font-bold rounded-[7px] transition-all capitalize cursor-pointer ${
-                    filterType === filter
-                      ? 'bg-[#C2410C] text-white shadow-xs'
-                      : 'text-[#57534E] hover:text-[#1C1917]'
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    setFilter(option);
+                    setFilterChosen(true);
+                  }}
+                  className={`rounded-[8px] px-2.5 py-1 text-[11px] font-bold capitalize transition-colors cursor-pointer ${
+                    filter === option ? 'bg-[#C2410C] text-white' : 'bg-[#F8F1E9] text-[#57534E] hover:text-[#1C1917]'
                   }`}
                 >
-                  {filter}
+                  {option}
                 </button>
               ))}
             </div>
 
-            {/* Service Cards List */}
-            <div className="space-y-2.5 max-h-[580px] overflow-y-auto pr-1">
-              {filteredServices.map((srv) => {
-                const isSelected = srv.id === currentService.id;
+            <div className="mt-4 space-y-2">
+              {services.loading && <LoadingBlock label="Reading the calendar…" />}
+              {services.error && <ErrorBlock message={services.error} onRetry={() => void services.refetch()} />}
+              {!services.loading && !services.error && rows.length === 0 && (
+                <EmptyBlock
+                  icon="event_busy"
+                  title={filter === 'upcoming' ? 'Nothing scheduled yet' : 'Nothing in this view'}
+                  hint={
+                    filter === 'upcoming'
+                      ? 'Schedule this Sunday — the order of service, the roster and attendance all hang off it.'
+                      : 'Try another filter.'
+                  }
+                />
+              )}
+
+              {rows.map((service) => {
+                const selected = service.id === selectedId;
                 return (
-                  <div
-                    key={srv.id}
-                    {...interactiveCard(() => setSelectedServiceId(srv.id))}
-                    className={`p-3.5 rounded-[12px] border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-[#FDF8F3] border-[#C2410C] ring-2 ring-[#C2410C]/20 shadow-sm'
-                        : 'bg-[#FFFFFF] border-[#E7E5E4] hover:bg-[#F8F1E9]/50'
+                  <button
+                    key={service.id}
+                    type="button"
+                    onClick={() => setSelectedId(service.id)}
+                    aria-current={selected ? 'true' : undefined}
+                    className={`w-full rounded-[12px] border p-3 text-left transition-all cursor-pointer ${
+                      selected
+                        ? 'border-[#C2410C] bg-[#FDF8F3] shadow-[0_2px_8px_rgba(194,65,12,0.12)]'
+                        : 'border-[#E7E5E4] bg-[#FFFFFF] hover:border-[#D6D3D1] hover:bg-[#FDF8F3]'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          srv.status === 'upcoming'
-                            ? 'bg-[#059669]/10 text-[#059669]'
-                            : 'bg-[#57534E]/10 text-[#57534E]'
-                        }`}
-                      >
-                        {srv.serviceType.replace('-', ' ')}
-                      </span>
-                      <span className="text-[11px] font-semibold text-[#A8A29E] font-mono">{srv.date}</span>
-                    </div>
-
-                    <h4 className="font-headline text-xs font-bold text-[#1C1917] mt-1.5 leading-snug">
-                      {srv.title}
-                    </h4>
-
-                    <div className="text-[11px] text-[#57534E] mt-1 italic line-clamp-1">
-                      Theme: "{srv.theme}"
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-[#A8A29E] mt-2 pt-2 border-t border-[#E7E5E4]/80">
-                      <span className="flex items-center gap-1 text-[#57534E]">
-                        <span aria-hidden="true" className="material-symbols-outlined text-[14px]">person</span>
-                        {srv.preacher.split(' ').slice(-1)[0]}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span aria-hidden="true" className="material-symbols-outlined text-[14px]">format_list_numbered</span>
-                        {srv.liturgyOrder.length} Items
+                      <span className="text-xs font-bold text-[#1C1917]">{service.title}</span>
+                      <span className="shrink-0 text-[10px] font-semibold text-[#57534E]">
+                        {new Date(service.heldAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                       </span>
                     </div>
-                  </div>
+                    <p className="mt-0.5 text-[11px] text-[#57534E]">
+                      {timeOf(service)} · {service.venue}
+                    </p>
+                    <p className="mt-1.5 flex flex-wrap gap-2 text-[10px] font-semibold text-[#57534E]">
+                      <span>{service._count?.liturgy ?? 0} elements</span>
+                      <span>·</span>
+                      <span>{service._count?.roster ?? 0} on duty</span>
+                      {service.isTemplate && (
+                        <span className="rounded-[5px] bg-[#F8F1E9] px-1.5 py-0.5 uppercase tracking-wide">Template</span>
+                      )}
+                    </p>
+                  </button>
                 );
               })}
             </div>
           </div>
         </div>
 
-        {/* Right Column (8 cols): Active Service Details, Service Builder & Key Roles */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Active Service Banner */}
-          <div className="bg-[#FFFFFF] rounded-[14px] p-5 border border-[#E7E5E4] shadow-warm-card">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4]">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="px-2 py-0.5 rounded-md bg-[#C2410C]/10 text-[#C2410C] text-[11px] font-bold uppercase tracking-wider">
-                    {currentService.campus}
-                  </span>
-                  <span className="text-xs font-semibold text-[#57534E] flex items-center gap-1">
-                    <span aria-hidden="true" className="material-symbols-outlined text-[14px]">calendar_today</span>
-                    {currentService.date} · {currentService.time}
-                  </span>
-                </div>
-                <h2 className="font-headline text-lg sm:text-xl font-extrabold text-[#1C1917]">
-                  {currentService.title}
-                </h2>
-                <p className="text-xs text-[#C2410C] font-semibold mt-0.5">
-                  Theme: <span className="text-[#1C1917] font-normal">{currentService.theme}</span> · Focus: <span className="font-mono text-[#C2410C]">{currentService.scriptureFocus}</span>
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 self-start sm:self-auto">
-                <button
-                  type="button"
-                  onClick={() => setPreviewBulletinModal(true)}
-                  className="px-3 py-2 rounded-[9px] bg-[#F8F1E9] hover:bg-[#F5EDE4] text-[#C2410C] text-xs font-bold border border-[#E7E5E4] transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">menu_book</span>
-                  Print Bulletin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddingLiturgyItem(true)}
-                  className="px-3 py-2 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
-                  Add Service Item
-                </button>
-              </div>
+        {/* RIGHT: the selected service */}
+        <div className="space-y-5 xl:col-span-8">
+          {!current && !detail.loading && (
+            <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card">
+              <EmptyBlock
+                icon="auto_stories"
+                title="Choose a service"
+                hint="Pick one on the left to read its order of service, or schedule a new one."
+              />
             </div>
+          )}
 
-            {/* Key Officers Roster for This Service */}
-            <div className="mt-4">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E] mb-2.5 block">
-                Presiding Ministers & Key Service Officers
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {currentService.keyRoles.map((role, idx) => (
-                  <div
-                    key={role.role}
-                    className="p-2.5 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-between gap-2"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-wider truncate">
-                        {role.roleName}
-                      </div>
-                      <div className="font-headline text-xs font-bold text-[#1C1917] truncate">
-                        {role.assignedMemberName}
-                      </div>
-                    </div>
-                    <select aria-label="Role assignment status"
-                      value={role.status}
-                      onChange={(e) =>
-                        handleUpdateRoleAssignment(idx, role.assignedMemberName, e.target.value as any)
-                      }
-                      className={`text-[10px] font-bold px-1.5 py-1 rounded-[6px] border ${
-                        role.status === 'confirmed'
-                          ? 'bg-[#059669]/10 text-[#059669] border-[#059669]/30'
-                          : role.status === 'pending'
-                          ? 'bg-[#D97706]/10 text-[#D97706] border-[#D97706]/30'
-                          : 'bg-[#DC2626]/10 text-[#DC2626] border-[#DC2626]/30'
-                      }`}
+          {detail.loading && (
+            <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card">
+              <LoadingBlock label="Opening the service…" />
+            </div>
+          )}
+          {detail.error && <ErrorBlock message={detail.error} />}
+
+          {current && (
+            <>
+              <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-[#C2410C]">
+                      {isPast(current) ? 'Past service' : 'Upcoming service'}
+                      {current.isTemplate ? ' · Template' : ''}
+                    </p>
+                    <h2 className="mt-0.5 font-headline text-lg font-extrabold text-[#1C1917] sm:text-xl">
+                      {current.title}
+                    </h2>
+                    <p className="mt-1 text-xs text-[#57534E]">
+                      {whenOf(current.heldAt)} · {timeOf(current)} · {current.venue}
+                    </p>
+                    {current.theme && <p className="mt-1 text-xs text-[#57534E]">Theme: {current.theme}</p>}
+                    <p className="mt-1 text-xs text-[#57534E]">
+                      Officiant: {memberRefName(current.officiant) || 'not recorded'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsPrinting(true)}
+                      className="inline-flex items-center gap-1.5 rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-3 py-1.5 text-xs font-bold text-[#1C1917] transition-colors hover:bg-[#F5EDE4] cursor-pointer"
                     >
-                      <option value="confirmed">Confirmed</option>
-                      <option value="pending">Pending</option>
-                      <option value="replacement">Substitute</option>
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Order of Service / Service Builder Table */}
-          <div className="bg-[#FFFFFF] rounded-[14px] p-5 border border-[#E7E5E4] shadow-warm-card">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">receipt_long</span>
-                  Order of Service
-                </h3>
-                <p className="text-xs text-[#57534E] mt-0.5">
-                  Reorder service items, adjust target durations, and review presiding ministers.
-                </p>
-              </div>
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#F8F1E9] text-[#57534E] border border-[#E7E5E4]">
-                Total: {totalServiceDuration} min
-              </span>
-            </div>
-
-            {/* Service Items List */}
-            <div className="space-y-2">
-              {currentService.liturgyOrder.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 p-3 rounded-[10px] bg-[#FDF8F3] hover:bg-[#F5EDE4]/60 border border-[#E7E5E4] transition-all group"
-                >
-                  {/* Order Number & Reorder Buttons */}
-                  <div className="flex items-center gap-1 text-[#A8A29E]">
-                    <div className="w-6 h-6 rounded-full bg-[#FFFFFF] border border-[#E7E5E4] font-bold text-xs flex items-center justify-center text-[#1C1917]">
-                      {item.order}
-                    </div>
-                    <div className="flex flex-col">
+                      <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#C2410C]">print</span>
+                      Bulletin
+                    </button>
+                    {canDelete('services') && (
                       <button
                         type="button"
-                        disabled={index === 0}
-                        onClick={() => handleMoveLiturgyItem(index, 'up')}
-                        className={`p-0.5 hover:text-[#C2410C] ${index === 0 ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
-                        title="Move Up"
+                        onClick={() => setIsRetiring(true)}
+                        className="inline-flex items-center gap-1.5 rounded-[9px] border border-[#FECACA] bg-[#FFFFFF] px-3 py-1.5 text-xs font-bold text-[#B91C1C] transition-colors hover:bg-[#FEF2F2] cursor-pointer"
                       >
-                        <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_drop_up</span>
+                        Retire
                       </button>
-                      <button
-                        type="button"
-                        disabled={index === currentService.liturgyOrder.length - 1}
-                        onClick={() => handleMoveLiturgyItem(index, 'down')}
-                        className={`p-0.5 hover:text-[#C2410C] ${
-                          index === currentService.liturgyOrder.length - 1 ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'
-                        }`}
-                        title="Move Down"
-                      >
-                        <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_drop_down</span>
-                      </button>
-                    </div>
+                    )}
                   </div>
-
-                  {/* Service Item Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-headline text-xs font-bold text-[#1C1917] truncate">
-                        {item.title}
-                      </span>
-                      {item.scriptureRef && (
-                        <span className="px-1.5 py-0.2 text-[10px] rounded bg-[#C2410C]/10 text-[#C2410C] font-mono">
-                          {item.scriptureRef}
-                        </span>
-                      )}
-                      {item.hymnOrSongTitle && (
-                        <span className="px-1.5 py-0.2 text-[10px] rounded bg-[#059669]/10 text-[#059669] font-medium">
-                          {item.hymnOrSongTitle}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-[11px] text-[#57534E] mt-0.5">
-                      <span className="flex items-center gap-1">
-                        <span aria-hidden="true" className="material-symbols-outlined text-[13px] text-[#A8A29E]">person</span>
-                        {item.leader}
-                      </span>
-                      {item.notes && <span className="text-[#A8A29E] truncate">· {item.notes}</span>}
-                    </div>
-                  </div>
-
-                  {/* Duration Pill */}
-                  <div className="text-right shrink-0">
-                    <span className="px-2 py-1 rounded-[6px] bg-[#FFFFFF] border border-[#E7E5E4] text-xs font-bold text-[#1C1917]">
-                      {item.durationMinutes} min
-                    </span>
-                  </div>
-
-                  {/* Delete Item Action */}
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteLiturgyItem(item.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-[#DC2626] hover:bg-[#FEE2E2] transition-all cursor-pointer"
-                    title="Remove Service Element"
-                  >
-                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete</span>
-                  </button>
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+
+              {/* Officers — the same duty rows the roster tab edits */}
+              <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+                <h3 className="flex items-center gap-2 font-headline text-base font-bold text-[#1C1917]">
+                  <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-[#C2410C]">badge</span>
+                  On duty
+                </h3>
+                <div className="mt-3">
+                  {duties.loading && <LoadingBlock label="Reading the roster…" />}
+                  {duties.error && <ErrorBlock message={duties.error} onRetry={() => void duties.refetch()} />}
+                  {!duties.loading && !duties.error && duties.items.length === 0 && (
+                    <p className="text-xs text-[#57534E]">
+                      Nobody is on the roster for this service yet. Assign volunteers in the{' '}
+                      <strong className="text-[#1C1917]">Volunteer Roster</strong> tab.
+                    </p>
+                  )}
+                  {duties.items.length > 0 && (
+                    <ul className="flex flex-wrap gap-2">
+                      {duties.items.map((duty) => (
+                        <li
+                          key={duty.id}
+                          className="rounded-[10px] border border-[#E7E5E4] bg-[#FDF8F3] px-3 py-2"
+                        >
+                          <p className="text-xs font-bold text-[#1C1917]">{memberRefName(duty.holder) || 'Unassigned'}</p>
+                          <p className="text-[11px] text-[#57534E]">
+                            {duty.roleTitle} · <span className="capitalize">{duty.status}</span>
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              {/* The order of service */}
+              <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="flex items-center gap-2 font-headline text-base font-bold text-[#1C1917]">
+                      <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-[#C2410C]">list_alt</span>
+                      Order of service
+                    </h3>
+                    <p className="mt-0.5 text-xs text-[#57534E]">
+                      {liturgy.length} {liturgy.length === 1 ? 'element' : 'elements'}
+                      {totalMinutes(liturgy) > 0 ? ` · ${totalMinutes(liturgy)} minutes in all` : ''}
+                    </p>
+                  </div>
+                  {canEdit('services') && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingItem(true)}
+                      disabled={busy}
+                      className="inline-flex items-center gap-1.5 self-start rounded-[9px] bg-[#C2410C] px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer"
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add</span>
+                      Add element
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-4">
+                  {liturgy.length === 0 && (
+                    <EmptyBlock
+                      icon="format_list_numbered"
+                      title="No order yet"
+                      hint="Add the elements of the service in the order they run — call to worship, praise, scripture, sermon, and so on."
+                    />
+                  )}
+
+                  {liturgy.length > 0 && (
+                    <ol className="space-y-2">
+                      {liturgy.map((entry, index) => (
+                        <li
+                          key={entry.id}
+                          className="flex flex-col gap-3 rounded-[12px] border border-[#E7E5E4] bg-[#FDF8F3] p-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#C2410C]/10 text-[12px] font-bold text-[#C2410C]">
+                              {index + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-[#1C1917]">{entry.title}</p>
+                              <p className="text-[11px] uppercase tracking-wide text-[#57534E]">
+                                {KIND_LABELS[entry.kind]}
+                                {entry.responsible ? ` · ${entry.responsible}` : ''}
+                              </p>
+                              {entry.notes && <p className="mt-0.5 text-[11px] italic text-[#57534E]">{entry.notes}</p>}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            {entry.durationMinutes ? (
+                              <span className="rounded-[7px] bg-[#F8F1E9] px-2 py-1 text-[11px] font-semibold text-[#57534E]">
+                                {entry.durationMinutes} min
+                              </span>
+                            ) : null}
+                            {canEdit('services') && (
+                              <>
+                                <button
+                                  type="button"
+                                  aria-label={`Move ${entry.title} earlier`}
+                                  disabled={index === 0 || busy}
+                                  onClick={() => moveItem(index, 'up')}
+                                  className="flex h-7 w-7 items-center justify-center rounded-[7px] border border-[#E7E5E4] bg-[#FFFFFF] text-[#57534E] transition-colors hover:text-[#1C1917] disabled:opacity-40 cursor-pointer"
+                                >
+                                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_upward</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`Move ${entry.title} later`}
+                                  disabled={index === liturgy.length - 1 || busy}
+                                  onClick={() => moveItem(index, 'down')}
+                                  className="flex h-7 w-7 items-center justify-center rounded-[7px] border border-[#E7E5E4] bg-[#FFFFFF] text-[#57534E] transition-colors hover:text-[#1C1917] disabled:opacity-40 cursor-pointer"
+                                >
+                                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_downward</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${entry.title}`}
+                                  disabled={busy}
+                                  onClick={() => removeItem(entry.id)}
+                                  className="flex h-7 w-7 items-center justify-center rounded-[7px] border border-[#E7E5E4] bg-[#FFFFFF] text-[#B91C1C] transition-colors hover:bg-[#FEF2F2] disabled:opacity-40 cursor-pointer"
+                                >
+                                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">delete</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* MODAL: Create New Service */}
-      {isCreatingService && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...creatingServiceDialog}>
-          <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-[8px] bg-[#C2410C]/10 text-[#C2410C]">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[20px]">church</span>
-                </span>
-                <h3 className="font-headline text-base font-bold text-[#1C1917]">Schedule New Worship Service</h3>
+      {isCreating && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...creatingDialog}>
+          <form onSubmit={handleCreate} className="w-full max-w-[520px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
+            <h3 className="font-headline text-base font-bold text-[#1C1917]">Schedule a service</h3>
+            <p className="mt-0.5 text-xs text-[#57534E]">
+              Four fields, and the rest can follow. The order of service is added beside the service once it exists.
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className={LABEL} htmlFor="svc-title">What is it called?</label>
+                <input id="svc-title" required value={draft.title} onChange={(e) => setDraft((previous) => ({ ...previous, title: e.target.value }))} placeholder="Lord's Day Morning Worship" className={FIELD} />
               </div>
-              <button
-                type="button"
-                onClick={() => setIsCreatingService(false)}
-                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              aria-label="Close">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
+              <div>
+                <label className={LABEL} htmlFor="svc-date">Date</label>
+                <input id="svc-date" type="date" required value={draft.heldAt} onChange={(e) => setDraft((previous) => ({ ...previous, heldAt: e.target.value }))} className={FIELD} />
+              </div>
+              <div>
+                <label className={LABEL} htmlFor="svc-time">Start time</label>
+                <input id="svc-time" type="time" value={draft.startTime} onChange={(e) => setDraft((previous) => ({ ...previous, startTime: e.target.value }))} className={FIELD} />
+              </div>
+              <div>
+                <label className={LABEL} htmlFor="svc-venue">Where</label>
+                <input id="svc-venue" value={draft.venue} onChange={(e) => setDraft((previous) => ({ ...previous, venue: e.target.value }))} placeholder="Main Sanctuary" className={FIELD} />
+              </div>
+              <div>
+                <label className={LABEL} htmlFor="svc-officiant">Officiant</label>
+                <select id="svc-officiant" value={draft.officiantId} onChange={(e) => setDraft((previous) => ({ ...previous, officiantId: e.target.value }))} className={FIELD}>
+                  <option value="">Not recorded</option>
+                  {members.members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {memberRefName(member)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className={LABEL} htmlFor="svc-theme">Theme</label>
+                <input id="svc-theme" value={draft.theme} onChange={(e) => setDraft((previous) => ({ ...previous, theme: e.target.value }))} placeholder="The Righteous Shall Live by Faith" className={FIELD} />
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setIsCreating(false)} className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" disabled={busy} className="rounded-[9px] bg-[#C2410C] px-4 py-2 text-xs font-bold text-white hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer">
+                {busy ? 'Scheduling…' : 'Schedule it'}
               </button>
             </div>
+          </form>
+        </div>
+      )}
 
-            <form onSubmit={handleCreateService} className="mt-4 space-y-4">
+      {isAddingItem && current && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...addingItemDialog}>
+          <form onSubmit={handleAddItem} className="w-full max-w-[480px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
+            <h3 className="font-headline text-base font-bold text-[#1C1917]">Add an element</h3>
+            <div className="mt-4 space-y-3">
               <div>
-                <label htmlFor="service-title" className="block text-xs font-bold text-[#1C1917] mb-1">Service Title *</label>
-                <input id="service-title" aria-label="Service Title"
-                  type="text"
-                  required
-                  placeholder="e.g. Lord’s Day Morning Worship & Holy Communion"
-                  value={newServiceTitle}
-                  onChange={(e) => setNewServiceTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
+                <label className={LABEL} htmlFor="item-title">What happens</label>
+                <input id="item-title" required value={item.title} onChange={(e) => setItem((previous) => ({ ...previous, title: e.target.value }))} placeholder="Hymn of Dedication: Be Thou My Vision" className={FIELD} />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="service-type" className="block text-xs font-bold text-[#1C1917] mb-1">Service Type</label>
-                  <select id="service-type" aria-label="Service Type"
-                    value={newServiceType}
-                    onChange={(e) => setNewServiceType(e.target.value as ServiceType)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  >
-                    <option value="sunday-morning">Sunday Morning</option>
-                    <option value="sunday-evening">Sunday Evening</option>
-                    <option value="midweek-service">Wednesday Midweek Service</option>
-                    <option value="communion-special">Communion Feast</option>
-                    <option value="youth-service">Youth Service</option>
-                    <option value="festival">Festival / Holy Week</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="service-date" className="block text-xs font-bold text-[#1C1917] mb-1">Date</label>
-                  <input id="service-date" aria-label="Date"
-                    type="date"
-                    value={newServiceDate}
-                    onChange={(e) => setNewServiceDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="service-time-window" className="block text-xs font-bold text-[#1C1917] mb-1">Time Window</label>
-                  <input id="service-time-window" aria-label="Time Window"
-                    type="text"
-                    placeholder={SUNDAY_WINDOW}
-                    value={newServiceTime}
-                    onChange={(e) => setNewServiceTime(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="service-campus" className="block text-xs font-bold text-[#1C1917] mb-1">Campus / Hall</label>
-                  <select id="service-campus" aria-label="Campus / Hall"
-                    value={newServiceCampus}
-                    onChange={(e) => setNewServiceCampus(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  >
-                    {LOCATIONS.map((location) => (
-                      <option key={location} value={location}>
-                        {location}
+                  <label className={LABEL} htmlFor="item-kind">Kind</label>
+                  <select id="item-kind" value={item.kind} onChange={(e) => setItem((previous) => ({ ...previous, kind: e.target.value as LiturgyKind }))} className={FIELD}>
+                    {KIND_ORDER.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {KIND_LABELS[kind]}
                       </option>
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className={LABEL} htmlFor="item-minutes">Minutes</label>
+                  <input id="item-minutes" type="number" min={1} max={240} value={item.durationMinutes} onChange={(e) => setItem((previous) => ({ ...previous, durationMinutes: Number(e.target.value) }))} className={FIELD} />
+                </div>
               </div>
+              <div>
+                <label className={LABEL} htmlFor="item-leader">Who leads it</label>
+                <input id="item-leader" value={item.responsible} onChange={(e) => setItem((previous) => ({ ...previous, responsible: e.target.value }))} placeholder="Caleb Mwangi" className={FIELD} />
+              </div>
+              <div>
+                <label className={LABEL} htmlFor="item-notes">Notes for the platform party</label>
+                <textarea id="item-notes" rows={2} value={item.notes} onChange={(e) => setItem((previous) => ({ ...previous, notes: e.target.value }))} placeholder="Congregation stands; band moves to acoustic." className={FIELD} />
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setIsAddingItem(false)} className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" disabled={busy} className="rounded-[9px] bg-[#C2410C] px-4 py-2 text-xs font-bold text-white hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer">
+                {busy ? 'Saving…' : 'Add to the order'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="service-theme" className="block text-xs font-bold text-[#1C1917] mb-1">Homily / Sermon Theme</label>
-                  <input id="service-theme" aria-label="Homily / Sermon Theme"
-                    type="text"
-                    placeholder="e.g. The Righteous Shall Live by Faith"
-                    value={newServiceTheme}
-                    onChange={(e) => setNewServiceTheme(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="service-scripture" className="block text-xs font-bold text-[#1C1917] mb-1">Scripture Text</label>
-                  <input id="service-scripture" aria-label="Scripture Text"
-                    type="text"
-                    placeholder="e.g. Romans 1:16-17; Psalm 103"
-                    value={newServiceScripture}
-                    onChange={(e) => setNewServiceScripture(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="service-preacher" className="block text-xs font-bold text-[#1C1917] mb-1">Preacher / Minister</label>
-                  <select id="service-preacher" aria-label="Preacher / Minister"
-                    value={newServicePreacher}
-                    onChange={(e) => setNewServicePreacher(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  >
-                    <option value="Bishop Sammy">Bishop Sammy</option>
-                    <option value="Rev. Alice">Rev. Alice (Co-Visionary Leader)</option>
-                    <option value="Guest Preacher">Guest Preacher</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="service-worship-leader" className="block text-xs font-bold text-[#1C1917] mb-1">Worship Leader</label>
-                  <select id="service-worship-leader" aria-label="Worship Leader"
-                    value={newServiceWorshipLead}
-                    onChange={(e) => setNewServiceWorshipLead(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  >
-                    <option value="Caleb Timothy Mwangi">Caleb Timothy Mwangi</option>
-                    <option value="Sarah Kamau">Sarah Kamau</option>
-                    <option value="Maya Kamau">Maya Kamau</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
-                <button
-                  type="button"
-                  onClick={() => setIsCreatingService(false)}
-                  className="px-4 py-2 text-xs font-bold text-[#57534E] hover:text-[#1C1917] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
-                >
-                  Create Service & Generate Order
-                </button>
-              </div>
-            </form>
+      {isRetiring && current && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...retiringDialog}>
+          <div className="w-full max-w-[440px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
+            <h3 className="font-headline text-base font-bold text-[#1C1917]">Retire this service?</h3>
+            <p className="mt-1.5 text-xs text-[#57534E]">
+              {current.title} · {whenOf(current.heldAt)}. Its order, its roster and its census go to the Trash
+              with it, where an administrator can put it back.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsRetiring(false)}
+                className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] transition-colors hover:bg-[#F5EDE4] cursor-pointer"
+              >
+                Keep it
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void retire()}
+                className="rounded-[9px] bg-[#B91C1C] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#991B1B] disabled:opacity-60 cursor-pointer"
+              >
+                {busy ? 'Retiring…' : 'Retire it'}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: Add Service Item */}
-      {isAddingLiturgyItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...addingLiturgyItemDialog}>
-          <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
-              <h3 className="font-headline text-base font-bold text-[#1C1917]">Add Service Element</h3>
-              <button
-                type="button"
-                onClick={() => setIsAddingLiturgyItem(false)}
-                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              aria-label="Close">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleAddLiturgyItem} className="mt-4 space-y-4">
+      {isPrinting && current && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...printingDialog}>
+          <div className="flex max-h-[85vh] w-full max-w-[600px] flex-col rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <label htmlFor="liturgy-type" className="block text-xs font-bold text-[#1C1917] mb-1">Service Element Type</label>
-                <select id="liturgy-type" aria-label="Service Element Type"
-                  value={newLiturgyType}
-                  onChange={(e) => setNewLiturgyType(e.target.value as LiturgyItem['type'])}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                >
-                  <option value="worship-praise">Hymn / Praise Song</option>
-                  <option value="scripture-reading">Scripture Reading</option>
-                  <option value="pastoral-prayer">Pastoral Prayer / Collect</option>
-                  <option value="call-to-worship">Call to Worship & Creed</option>
-                  <option value="sermon">Expository Sermon</option>
-                  <option value="communion">Holy Communion / Baptism & Communion</option>
-                  <option value="tithes-offering">Tithes & Offering</option>
-                  <option value="announcements">Announcements & Church Life</option>
-                  <option value="benediction">Closing Prayer & Dismissal</option>
-                  <option value="fellowship">Groups & Fellowship</option>
-                  <option value="prelude">Opening Prayer / Meditation</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="liturgy-title" className="block text-xs font-bold text-[#1C1917] mb-1">Title / Hymn Name *</label>
-                <input id="liturgy-title" aria-label="Title / Hymn Name"
-                  type="text"
-                  required
-                  placeholder="e.g. Hymn of Dedication: 'Be Thou My Vision'"
-                  value={newLiturgyTitle}
-                  onChange={(e) => setNewLiturgyTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="liturgy-duration" className="block text-xs font-bold text-[#1C1917] mb-1">Duration (Minutes)</label>
-                  <input id="liturgy-duration" aria-label="Duration (Minutes)"
-                    type="number"
-                    min={1}
-                    max={60}
-                    value={newLiturgyDuration}
-                    onChange={(e) => setNewLiturgyDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="liturgy-leader" className="block text-xs font-bold text-[#1C1917] mb-1">Presiding Leader</label>
-                  <input id="liturgy-leader" aria-label="Presiding Leader"
-                    type="text"
-                    value={newLiturgyLeader}
-                    onChange={(e) => setNewLiturgyLeader(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="liturgy-scripture" className="block text-xs font-bold text-[#1C1917] mb-1">Scripture Reference (Optional)</label>
-                <input id="liturgy-scripture" aria-label="Scripture Reference (Optional)"
-                  type="text"
-                  placeholder="e.g. 1 Peter 2:9-10"
-                  value={newLiturgyScripture}
-                  onChange={(e) => setNewLiturgyScripture(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="liturgy-notes" className="block text-xs font-bold text-[#1C1917] mb-1">Notes / Instructions</label>
-                <textarea id="liturgy-notes" aria-label="Notes / Instructions"
-                  rows={2}
-                  placeholder="e.g. Congregation stands; band transitions to acoustic chords"
-                  value={newLiturgyNotes}
-                  onChange={(e) => setNewLiturgyNotes(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
-                <button
-                  type="button"
-                  onClick={() => setIsAddingLiturgyItem(false)}
-                  className="px-4 py-2 text-xs font-bold text-[#57534E] hover:text-[#1C1917] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
-                >
-                  Insert Item
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Printable Service Bulletin Preview */}
-      {previewBulletinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...previewBulletinModalDialog}>
-          <div className="bg-[#FFFFFF] rounded-[14px] max-w-2xl w-full p-8 shadow-2xl border border-[#E7E5E4] max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in duration-150 font-serif">
-            <div className="flex items-center justify-between pb-4 border-b-2 border-[#1C1917]">
-              <div>
-                <span className="text-xs uppercase tracking-widest font-sans font-bold text-[#C2410C]">
-                  Destiny Sanctuary Int'L Nyahururu
-                </span>
-                <h2 className="text-2xl font-bold text-[#1C1917] mt-0.5">Order of Divine Service</h2>
-                <div className="text-xs font-sans text-[#57534E] mt-1">
-                  {currentService.date} · {currentService.campus}
-                </div>
+                <h3 className="font-headline text-base font-bold text-[#1C1917]">{current.title}</h3>
+                <p className="mt-0.5 text-xs text-[#57534E]">
+                  {whenOf(current.heldAt)} · {timeOf(current)} · {current.venue}
+                </p>
               </div>
               <button
                 type="button"
-                onClick={() => setPreviewBulletinModal(false)}
-                className="font-sans text-[#57534E] hover:text-[#1C1917] p-1.5 rounded-md border border-[#E7E5E4]"
-              aria-label="Close">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
+                aria-label="Close"
+                onClick={() => setIsPrinting(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-[7px] text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917] cursor-pointer"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[19px]">close</span>
               </button>
             </div>
-
-            <div className="py-6 space-y-4">
-              <div className="text-center py-2 bg-[#F8F1E9] rounded-lg border border-[#E7E5E4] font-sans">
-                <div className="text-xs font-bold text-[#1C1917] uppercase tracking-wider">
-                  Theme: "{currentService.theme}"
-                </div>
-                <div className="text-[11px] text-[#C2410C] font-semibold font-mono mt-0.5">
-                  Scripture Lesson: {currentService.scriptureFocus}
-                </div>
-              </div>
-
-              <div className="space-y-3 font-sans">
-                {currentService.liturgyOrder.map((item) => (
-                  <div key={item.id} className="flex items-baseline justify-between border-b border-[#E7E5E4]/60 pb-2">
-                    <div>
-                      <div className="font-bold text-sm text-[#1C1917]">{item.title}</div>
-                      <div className="text-xs text-[#57534E] italic">
-                        Leader: {item.leader} {item.scriptureRef && `(${item.scriptureRef})`}
-                      </div>
-                    </div>
-                    <div className="text-xs text-[#A8A29E] font-mono">{item.durationMinutes} min</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-[#E7E5E4] flex items-center justify-between font-sans">
-              <div className="text-xs text-[#57534E]">
-                Preacher: <span className="font-bold text-[#1C1917]">{currentService.preacher}</span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">print</span>
-                  Print to PDF
-                </button>
-              </div>
+            <ol className="mt-4 flex-1 overflow-y-auto space-y-2">
+              {liturgy.map((entry, index) => (
+                <li key={entry.id} className="flex items-start justify-between gap-3 border-b border-[#E7E5E4] pb-2">
+                  <span className="text-xs text-[#1C1917]">
+                    <strong className="mr-2 text-[#C2410C]">{index + 1}</strong>
+                    {entry.title}
+                    {entry.responsible && <span className="ml-2 text-[11px] text-[#57534E]">{entry.responsible}</span>}
+                  </span>
+                  <span className="shrink-0 text-[11px] text-[#57534E]">{entry.durationMinutes ? `${entry.durationMinutes} min` : ''}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#E7E5E4] pt-3">
+              <span className="text-[11px] text-[#57534E]">{totalMinutes(liturgy)} minutes in all.</span>
+              <button
+                type="button"
+                onClick={printBulletin}
+                className="inline-flex items-center gap-1.5 rounded-[9px] bg-[#C2410C] px-4 py-2 text-xs font-bold text-white hover:bg-[#EA580C] cursor-pointer"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">print</span>
+                Print the bulletin
+              </button>
             </div>
           </div>
         </div>

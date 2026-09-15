@@ -1,736 +1,458 @@
-import React, { useState } from 'react';
-import { useDialog } from '../../dialog';
-import {
-  AttendanceRecord,
-  FirstTimeVisitorLink,
-  WorshipService,
-  ParishMember,
-} from '../../../../types';
-import {
-  INITIAL_ATTENDANCE_RECORDS,
-  INITIAL_VISITOR_LINKS,
-  INITIAL_SERVICES,
-} from '../../../../data/churchMockData';
-import { useDemoData } from '../../../../data/demoStore';
-import { CHURCH, DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain';
+import React, { useEffect, useMemo, useState } from 'react';
+import { attendanceApi, memberRefName, servicesApi, type AttendanceSummaryDto } from '../../../../lib/api';
+import { errorMessage, useAttendance, useMemberOptions, useServices } from '../../../../hooks/useApi';
+import { usePermissions } from '../../../../lib/permissions';
+import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 
-/** The ministries a first-time visitor can ask about; the form defaults to the first. */
-const INTERESTED_MINISTRIES = [
-  'Young Couples & Choir',
-  'Kids & Nursery Ministry',
-  'Mercy & Outreach Services',
-  'Theology / First Timer Catechism',
-  'AV & Technical Team',
-];
+/**
+ * The census: how many came, and who came for the first time.
+ *
+ * Two things about this screen are shaped by what the API actually is. Attendance rows are
+ * **append-only** — there is no endpoint that edits or deletes one, because a census is a record of
+ * what was counted on the day rather than a field somebody keeps tidy. So the panel records; it does
+ * not offer an edit that would fail. A number that was typed wrong is corrected by recording the
+ * correction with a note saying so, which is the same thing an usher's tally sheet does.
+ *
+ * And first-time visitors are counted by **naming** them, not by typing a total. "23 visitors" in a
+ * note is a number nothing can act on; a visitor row with a name is somebody the church can follow up
+ * with, and it is what the church's own summary counts.
+ */
+
+const FIELD =
+  'w-full px-3.5 py-2.5 text-sm rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] text-[#1C1917] placeholder-[#A8A29E] transition-all focus:outline-none focus:border-[#C2410C] focus:ring-4 focus:ring-[#C2410C]/15';
+const LABEL = 'block text-xs font-bold text-[#1C1917] mb-1.5';
+
+const whenOf = (iso: string): string =>
+  new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
 export const AttendancePanel: React.FC = () => {
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(INITIAL_ATTENDANCE_RECORDS);
-  const [visitors, setVisitors] = useState<FirstTimeVisitorLink[]>(INITIAL_VISITOR_LINKS);
-  const [selectedServiceId, setSelectedServiceId] = useState<string>(INITIAL_SERVICES[0].id);
+  // Recent first: a census is almost always taken for the service that has just finished.
+  const services = useServices({ pageSize: 100, sort: 'recent' });
+  const members = useMemberOptions();
+  const { canEdit } = usePermissions();
 
-  // Quick Attendance Entry Form
-  const [sanctuaryCount, setSanctuaryCount] = useState<number>(280);
-  const [onlineStreams, setOnlineStreams] = useState<number>(65);
-  const [kidsNursery, setKidsNursery] = useState<number>(42);
-  const [firstTimeCount, setFirstTimeCount] = useState<number>(12);
-  const [notes, setNotes] = useState<string>('');
-  const [campusSelect, setCampusSelect] = useState<string>(DEFAULT_LOCATION);
-  const [loggedAlert, setLoggedAlert] = useState<boolean>(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  // Visitor Intake Form / Link to Member modal
-  const [isAddingVisitor, setIsAddingVisitor] = useState<boolean>(false);
-  const addingVisitorDialog = useDialog(() => setIsAddingVisitor(false), "Register New Guest / Visitor");
-  const [visitorName, setVisitorName] = useState<string>('');
-  const [visitorPhone, setVisitorPhone] = useState<string>('');
-  const [visitorEmail, setVisitorEmail] = useState<string>('');
-  const [visitorMinistry, setVisitorMinistry] = useState<string>(INTERESTED_MINISTRIES[0]);
-  const [visitorPastor, setVisitorPastor] = useState<string>(CHURCH.visionaryLeader);
+  const [census, setCensus] = useState({ adults: '', children: '', notes: '' });
+  const [visitor, setVisitor] = useState({ name: '', memberId: '', notes: '' });
+  const [summary, setSummary] = useState<AttendanceSummaryDto | null>(null);
 
-  // Link to Existing Member Modal
-  const [linkingVisitor, setLinkingVisitor] = useState<FirstTimeVisitorLink | null>(null);
-  const linkingVisitorDialog = useDialog(() => setLinkingVisitor(null), "Link Guest to Members Register");
-  // The picker offers whoever is on the roll right now, including anyone the visitor added.
-  const { members } = useDemoData();
-  const [selectedMemberId, setSelectedMemberId] = useState<string>(members[0]?.id ?? '');
+  const rows = useAttendance(selectedId ? { serviceId: selectedId } : {});
+  // Every row in the church, so the trend can be built from one request rather than one per service.
+  const allRows = useAttendance();
 
-  const selectedService = INITIAL_SERVICES.find((s) => s.id === selectedServiceId) || INITIAL_SERVICES[0];
+  const serviceRows = services.items;
+  const selected = serviceRows.find((service) => service.id === selectedId) ?? null;
 
-  // Quick logging of attendance
-  const handleLogAttendance = (e: React.FormEvent) => {
-    e.preventDefault();
-    const total = Number(sanctuaryCount) + Number(onlineStreams) + Number(kidsNursery);
+  useEffect(() => {
+    if (!selectedId && serviceRows.length > 0) setSelectedId(serviceRows[0].id);
+  }, [selectedId, serviceRows]);
 
-    const newRecord: AttendanceRecord = {
-      id: `att-${Date.now()}`,
-      serviceId: selectedService.id,
-      serviceTitle: selectedService.title,
-      date: selectedService.date,
-      campus: campusSelect,
-      sanctuaryHeadcount: Number(sanctuaryCount),
-      onlineStreams: Number(onlineStreams),
-      kidsNurseryCount: Number(kidsNursery),
-      firstTimeVisitors: Number(firstTimeCount),
-      totalAttendance: total,
-      notes: notes || 'Headcount recorded by diaconal stewards.',
-      loggedBy: 'Chief Usher & Census Steward',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    setAttendanceRecords([newRecord, ...attendanceRecords]);
-    setLoggedAlert(true);
-    setTimeout(() => setLoggedAlert(false), 4000);
-    setNotes('');
+  const reloadSummary = async (serviceId: string) => {
+    try {
+      const { data } = await servicesApi.attendanceSummary(serviceId);
+      setSummary(data);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   };
 
-  const handleCreateVisitor = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!visitorName.trim()) return;
+  useEffect(() => {
+    if (selectedId) void reloadSummary(selectedId);
+    else setSummary(null);
+  }, [selectedId]);
 
-    const newVis: FirstTimeVisitorLink = {
-      id: `vis-${Date.now()}`,
-      visitorName,
-      serviceDate: selectedService.date,
-      phone: visitorPhone || '+254 750 000 000',
-      email: visitorEmail || 'visitor@example.org',
-      interestedMinistry: visitorMinistry,
-      assignedFollowUpPastor: visitorPastor,
-      status: 'new-intake',
-      householdLinked: false,
-    };
+  const recordedHere = rows.items.filter((row) => row.serviceId === selectedId);
+  const namesHere = recordedHere.filter((row) => row.visitorName !== null);
 
-    setVisitors([newVis, ...visitors]);
-    setIsAddingVisitor(false);
-    setVisitorName('');
-    setVisitorPhone('');
-    setVisitorEmail('');
+  /** The last eight services, with what was counted at each — real figures, one request. */
+  const trend = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const row of allRows.items) {
+      if (!row.serviceId) continue;
+      totals.set(row.serviceId, (totals.get(row.serviceId) ?? 0) + row.count);
+    }
+    return serviceRows
+      .filter((service) => !service.isTemplate && totals.has(service.id))
+      .slice(0, 8)
+      .reverse()
+      .map((service) => ({ service, total: totals.get(service.id) ?? 0 }));
+  }, [allRows.items, serviceRows]);
+
+  const trendPeak = Math.max(1, ...trend.map((point) => point.total));
+
+  const record = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedId) return;
+    const counts = [
+      { count: Number(census.adults), label: 'Adults and youth' },
+      { count: Number(census.children), label: 'Children' },
+    ].filter((entry) => entry.count > 0);
+
+    if (counts.length === 0) {
+      setError('Enter at least one number — adults or children.');
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      await servicesApi.recordAttendance(selectedId, [
+        ...counts.map((entry) => ({ kind: 'service' as const, count: entry.count, notes: entry.label })),
+        ...(census.notes.trim() ? [{ kind: 'service' as const, count: 0, notes: census.notes.trim() }] : []),
+      ]);
+      setCensus({ adults: '', children: '', notes: '' });
+      setNotice('The census is recorded against this service.');
+      await Promise.all([rows.refetch(), allRows.refetch(), reloadSummary(selectedId)]);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleUpdateVisitorStatus = (id: string, status: FirstTimeVisitorLink['status']) => {
-    setVisitors(visitors.map((v) => (v.id === id ? { ...v, status } : v)));
+  const recordVisitor = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedId || !visitor.name.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await servicesApi.recordAttendance(selectedId, [
+        {
+          kind: 'service',
+          count: 1,
+          visitorName: visitor.name.trim(),
+          ...(visitor.memberId ? { memberId: visitor.memberId } : {}),
+          ...(visitor.notes.trim() ? { notes: visitor.notes.trim() } : {}),
+        },
+      ]);
+      setVisitor({ name: '', memberId: '', notes: '' });
+      setNotice(`${visitor.name.trim()} is on the visitors list for this service.`);
+      await Promise.all([rows.refetch(), allRows.refetch(), reloadSummary(selectedId)]);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
   };
-
-  const handleLinkToMember = () => {
-    if (!linkingVisitor) return;
-    setVisitors(
-      visitors.map((v) =>
-        v.id === linkingVisitor.id
-          ? { ...v, householdLinked: true, status: 'regular-attender' }
-          : v
-      )
-    );
-    setLinkingVisitor(null);
-  };
-
-  // Historical trend data for recharts
-  const trendData = [...attendanceRecords]
-    .reverse()
-    .map((record) => ({
-      date: record.date.replace(', 2025', ''),
-      Sanctuary: record.sanctuaryHeadcount,
-      Online: record.onlineStreams,
-      Kids: record.kidsNurseryCount,
-      Visitors: record.firstTimeVisitors,
-      Total: record.totalAttendance,
-    }));
-
-  const latestRecord = attendanceRecords[0];
 
   return (
-    <div className="flex flex-col space-y-6">
-      {/* Attendance KPI Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Latest Sanctuary Census</span>
-            <div className="text-2xl font-black text-[#1C1917] mt-0.5">{latestRecord.totalAttendance} Total</div>
-            <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">trending_up</span>
-              +7.4% vs. monthly average
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">groups</span>
-          </div>
+    <div className="space-y-5">
+      {error && (
+        <div role="alert" className="rounded-[9px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-xs font-semibold text-[#B91C1C]">
+          {error}
         </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">First-Time Guests</span>
-            <div className="text-2xl font-black text-[#C2410C] mt-0.5">{latestRecord.firstTimeVisitors} Recorded</div>
-            <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">person_pin_circle</span>
-              {visitors.filter((v) => v.status === 'new-intake').length} awaiting intake contact
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#D97706]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">person_add</span>
-          </div>
+      )}
+      {notice && (
+        <div role="status" className="rounded-[9px] border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-xs font-semibold text-[#047857]">
+          {notice}
         </div>
+      )}
 
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Online / Broadcast Streams</span>
-            <div className="text-2xl font-black text-[#1C1917] mt-0.5">{latestRecord.onlineStreams} Concurr.</div>
-            <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">sensors</span>
-              100% Stream Uptime
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#2563EB]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">podcasts</span>
-          </div>
-        </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Children & Nursery</span>
-            <div className="text-2xl font-black text-[#1C1917] mt-0.5">{latestRecord.kidsNurseryCount} Enrolled</div>
-            <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">child_care</span>
-              Full volunteer coverage
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">family_restroom</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Dual Grid: Quick Entry Form & Trend Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column (5 cols): Quick Entry Form for Selected Service */}
-        <div className="lg:col-span-5 bg-[#FFFFFF] rounded-[14px] p-5 border border-[#E7E5E4] shadow-warm-card">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4] mb-4">
-            <div>
-              <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">how_to_reg</span>
-                Record Service Headcount
-              </h3>
-              <p className="text-xs text-[#57534E] mt-0.5">
-                Input live census data taken by diaconal marshals.
-              </p>
-            </div>
-          </div>
-
-          {loggedAlert && (
-            <div className="mb-4 p-3 rounded-[10px] bg-[#059669]/10 border border-[#059669]/30 text-[#059669] text-xs font-bold flex items-center gap-2">
-              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">check_circle</span>
-              Headcount record successfully sealed in the church register!
-            </div>
-          )}
-
-          <form onSubmit={handleLogAttendance} className="space-y-4">
-            <div>
-              <label htmlFor="attendance-service" className="block text-xs font-bold text-[#1C1917] mb-1">Target Service</label>
-              <select id="attendance-service" aria-label="Target Service"
-                value={selectedServiceId}
-                onChange={(e) => setSelectedServiceId(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-medium"
-              >
-                {INITIAL_SERVICES.map((srv) => (
-                  <option key={srv.id} value={srv.id}>
-                    {srv.title} ({srv.date})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="attendance-sanctuary" className="block text-xs font-bold text-[#1C1917] mb-1">Sanctuary Headcount *</label>
-                <input id="attendance-sanctuary" aria-label="Sanctuary Headcount"
-                  type="number"
-                  min={0}
-                  required
-                  value={sanctuaryCount}
-                  onChange={(e) => setSanctuaryCount(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono font-bold"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="attendance-online" className="block text-xs font-bold text-[#1C1917] mb-1">Online Streams</label>
-                <input id="attendance-online" aria-label="Online Streams"
-                  type="number"
-                  min={0}
-                  value={onlineStreams}
-                  onChange={(e) => setOnlineStreams(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="attendance-kids" className="block text-xs font-bold text-[#1C1917] mb-1">Kids & Nursery</label>
-                <input id="attendance-kids" aria-label="Kids &amp; Nursery"
-                  type="number"
-                  min={0}
-                  value={kidsNursery}
-                  onChange={(e) => setKidsNursery(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono font-bold"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="attendance-visitors" className="block text-xs font-bold text-[#1C1917] mb-1">First-Time Visitors</label>
-                <input id="attendance-visitors" aria-label="First-Time Visitors"
-                  type="number"
-                  min={0}
-                  value={firstTimeCount}
-                  onChange={(e) => setFirstTimeCount(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono font-bold text-[#C2410C]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="attendance-campus" className="block text-xs font-bold text-[#1C1917] mb-1">Campus Location</label>
-              <select id="attendance-campus" aria-label="Campus Location"
-                value={campusSelect}
-                onChange={(e) => setCampusSelect(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-              >
-                {LOCATIONS.map((location) => (
-                  <option key={location} value={location}>
-                    {location}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="attendance-notes" className="block text-xs font-bold text-[#1C1917] mb-1">Field Observations / Notes</label>
-              <textarea id="attendance-notes" aria-label="Field Observations / Notes"
-                rows={2}
-                placeholder="e.g. Overflow seating used at the main entrance; extra seats dispatched."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-              />
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">save</span>
-                Commit Headcount to Official Register
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Right Column (7 cols): Attendance History Trend Chart & Breakdown */}
-        <div className="lg:col-span-7 bg-[#FFFFFF] rounded-[14px] p-5 border border-[#E7E5E4] shadow-warm-card flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4] mb-4">
-              <div>
-                <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">analytics</span>
-                  Historical Attendance Trends
-                </h3>
-                <p className="text-xs text-[#57534E] mt-0.5">
-                  Sanctuary in-person attendance, online viewers, and visitor counts.
-                </p>
-              </div>
-              <span className="text-[11px] font-bold px-2 py-1 rounded bg-[#F8F1E9] text-[#57534E] border border-[#E7E5E4]">
-                Past 5 Lord's Days
-              </span>
-            </div>
-
-            {/* Custom Interactive SVG Area Chart */}
-            <div className="h-64 w-full pt-2 flex flex-col justify-between">
-              <div className="flex items-center justify-end gap-4 text-xs mb-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-[#C2410C]" />
-                  <span className="text-[#1C1917] font-semibold text-[11px]">Total Attendance</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-[#059669]" />
-                  <span className="text-[#1C1917] font-semibold text-[11px]">Sanctuary In-Person</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-[#2563EB]" />
-                  <span className="text-[#1C1917] font-semibold text-[11px]">Online Streamers</span>
-                </div>
-              </div>
-
-              <div className="relative w-full h-48">
-                <svg
-                  role="img"
-                  aria-label="Attendance across the past five Lord's Days, 5 January to 2 February 2025. Total attendance rose from 345 to a high of 387, averaging 374 a week; sanctuary in-person attendance averaged 270."
-                  className="w-full h-full overflow-visible"
-                  viewBox="0 0 500 160"
-                  preserveAspectRatio="none"
-                >
-                  <defs>
-                    <linearGradient id="totalGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#C2410C" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#C2410C" stopOpacity="0.0" />
-                    </linearGradient>
-                    <linearGradient id="sanctuaryGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#059669" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="#059669" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Horizontal grid lines */}
-                  <line x1="0" y1="20" x2="500" y2="20" stroke="#F5EDE4" strokeDasharray="3 3" />
-                  <line x1="0" y1="60" x2="500" y2="60" stroke="#F5EDE4" strokeDasharray="3 3" />
-                  <line x1="0" y1="100" x2="500" y2="100" stroke="#F5EDE4" strokeDasharray="3 3" />
-                  <line x1="0" y1="140" x2="500" y2="140" stroke="#E7E5E4" />
-
-                  {/* Total Attendance Area & Line */}
-                  <polygon
-                    points="30,140 30,35 135,42 245,28 355,38 465,30 465,140"
-                    fill="url(#totalGrad)"
-                  />
-                  <polyline
-                    points="30,35 135,42 245,28 355,38 465,30"
-                    fill="none"
-                    stroke="#C2410C"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-
-                  {/* Sanctuary In-Person Area & Line */}
-                  <polygon
-                    points="30,140 30,65 135,70 245,58 355,68 465,60 465,140"
-                    fill="url(#sanctuaryGrad)"
-                  />
-                  <polyline
-                    points="30,65 135,70 245,58 355,68 465,60"
-                    fill="none"
-                    stroke="#059669"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-
-                  {/* Online Streams Line */}
-                  <polyline
-                    points="30,118 135,115 245,110 355,112 465,114"
-                    fill="none"
-                    stroke="#2563EB"
-                    strokeWidth="2"
-                    strokeDasharray="4 4"
-                    strokeLinecap="round"
-                  />
-
-                  {/* Circles & Labels on Points */}
-                  {[
-                    { x: 30, date: 'Jan 05', total: 345, sanc: 250 },
-                    { x: 135, date: 'Jan 12', total: 338, sanc: 242 },
-                    { x: 245, date: 'Jan 19', total: 362, sanc: 268 },
-                    { x: 355, date: 'Jan 26', total: 350, sanc: 255 },
-                    { x: 465, date: 'Feb 02', total: 387, sanc: 280 },
-                  ].map((pt, i) => (
-                    <g key={i}>
-                      <circle cx={pt.x} cy={i === 2 ? 28 : i === 4 ? 30 : 38} r="4.5" fill="#C2410C" stroke="#FFFFFF" strokeWidth="2" />
-                      <circle cx={pt.x} cy={i === 2 ? 58 : i === 4 ? 60 : 68} r="4" fill="#059669" stroke="#FFFFFF" strokeWidth="2" />
-                      <text x={pt.x} y="155" textAnchor="middle" fontSize="10" fill="#78716C" fontWeight="bold">
-                        {pt.date}
-                      </text>
-                      <text x={pt.x} y={i === 2 ? 20 : i === 4 ? 22 : 30} textAnchor="middle" fontSize="9" fill="#1C1917" fontWeight="bold">
-                        {pt.total}
-                      </text>
-                    </g>
-                  ))}
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Stats Grid under chart */}
-          <div className="grid grid-cols-3 gap-3 pt-4 mt-2 border-t border-[#E7E5E4]">
-            <div className="p-2.5 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4] text-center">
-              <div className="text-[10px] font-bold text-[#A8A29E] uppercase">5-Week Avg Total</div>
-              <div className="font-headline text-base font-extrabold text-[#1C1917] mt-0.5">374 / Wk</div>
-            </div>
-            <div className="p-2.5 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4] text-center">
-              <div className="text-[10px] font-bold text-[#A8A29E] uppercase">Avg In-Person</div>
-              <div className="font-headline text-base font-extrabold text-[#059669] mt-0.5">270 (72%)</div>
-            </div>
-            <div className="p-2.5 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4] text-center">
-              <div className="text-[10px] font-bold text-[#A8A29E] uppercase">Avg New Visitors</div>
-              <div className="font-headline text-base font-extrabold text-[#C2410C] mt-0.5">9.6 Guests</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* First-Time Visitors Intake & Link to Members Roll */}
-      <div className="bg-[#FFFFFF] rounded-[14px] p-5 border border-[#E7E5E4] shadow-warm-card">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4] mb-4">
-          <div>
-            <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">person_pin_circle</span>
-              First-Time Visitors & First Timer Integration
-            </h3>
-            <p className="text-xs text-[#57534E] mt-0.5">
-              Track new visitor cards, pastoral follow-up assignments, and link new guests to Church Member directories.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsAddingVisitor(true)}
-            className="px-3 py-2 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-          >
-            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
-            Intake New Visitor
-          </button>
-        </div>
-
-        {/* Visitors Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-[#F8F1E9] text-[#57534E] font-bold text-[11px] uppercase tracking-wider border-b border-[#E7E5E4]">
-                <th className="py-3 px-3 rounded-l-[8px]">Visitor Name</th>
-                <th className="py-3 px-3">First Visited</th>
-                <th className="py-3 px-3">Contact</th>
-                <th className="py-3 px-3">Ministry Interest</th>
-                <th className="py-3 px-3">Assigned Shepherd</th>
-                <th className="py-3 px-3">Integration Status</th>
-                <th className="py-3 px-3 rounded-r-[8px] text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E7E5E4]/80">
-              {visitors.map((visitor) => (
-                <tr key={visitor.id} className="hover:bg-[#FDF8F3] transition-colors">
-                  <td className="py-3 px-3">
-                    <div className="font-bold text-[#1C1917] flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-[#C2410C]/10 text-[#C2410C] font-bold text-[11px] flex items-center justify-center shrink-0">
-                        {visitor.visitorName.split(' ')[0][0]}
-                      </div>
-                      <div>
-                        <div>{visitor.visitorName}</div>
-                        {visitor.householdLinked && (
-                          <span className="text-[10px] text-[#059669] font-bold flex items-center gap-0.5">
-                            <span aria-hidden="true" className="material-symbols-outlined text-[12px]">link</span>
-                            Linked to Members Register
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 font-mono text-[#57534E]">{visitor.serviceDate}</td>
-                  <td className="py-3 px-3">
-                    <div className="text-[#1C1917]">{visitor.phone}</div>
-                    <div className="text-[11px] text-[#A8A29E]">{visitor.email}</div>
-                  </td>
-                  <td className="py-3 px-3 font-medium text-[#1C1917]">{visitor.interestedMinistry}</td>
-                  <td className="py-3 px-3">
-                    <span className="px-2 py-0.5 rounded-full bg-[#F8F1E9] text-[#57534E] font-medium text-[11px]">
-                      {visitor.assignedFollowUpPastor}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <select aria-label="Visitor follow-up status"
-                      value={visitor.status}
-                      onChange={(e) =>
-                        handleUpdateVisitorStatus(visitor.id, e.target.value as any)
-                      }
-                      className={`text-[11px] font-bold px-2 py-1 rounded-[6px] border ${
-                        visitor.status === 'new-intake'
-                          ? 'bg-[#DC2626]/10 text-[#DC2626] border-[#DC2626]/30'
-                          : visitor.status === 'contacted'
-                          ? 'bg-[#D97706]/10 text-[#D97706] border-[#D97706]/30'
-                          : visitor.status === 'first-timer-enrolled'
-                          ? 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/30'
-                          : 'bg-[#059669]/10 text-[#059669] border-[#059669]/30'
-                      }`}
-                    >
-                      <option value="new-intake">New Intake</option>
-                      <option value="contacted">Pastor Contacted</option>
-                      <option value="first-timer-enrolled">First Timer Cohort</option>
-                      <option value="regular-attender">Regular Attender</option>
-                    </select>
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    {!visitor.householdLinked ? (
-                      <button
-                        type="button"
-                        onClick={() => setLinkingVisitor(visitor)}
-                        className="px-2.5 py-1 rounded-[6px] bg-[#F8F1E9] hover:bg-[#C2410C] hover:text-white text-[#C2410C] text-[11px] font-bold border border-[#E7E5E4] transition-all cursor-pointer"
-                      >
-                        Link to Member
-                      </button>
-                    ) : (
-                      <span className="text-[11px] text-[#059669] font-bold">Enrolled</span>
-                    )}
-                  </td>
-                </tr>
+      {/* Which service, and what has been counted at it */}
+      <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <label className={LABEL} htmlFor="attendance-service">Which service</label>
+            <select
+              id="attendance-service"
+              value={selectedId ?? ''}
+              onChange={(event) => setSelectedId(event.target.value)}
+              className={`${FIELD} max-w-md`}
+            >
+              {serviceRows.length === 0 && <option value="">Nothing on the calendar yet</option>}
+              {serviceRows.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.title} · {whenOf(service.heldAt)} · {service.venue}
+                </option>
               ))}
-            </tbody>
-          </table>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Counted', value: summary?.totalCounted ?? 0 },
+              { label: 'Rows', value: summary?.attendanceRows ?? 0 },
+              { label: 'First-time visitors', value: summary?.namedVisitors ?? 0 },
+            ].map((card) => (
+              <div key={card.label} className="rounded-[12px] border border-[#E7E5E4] bg-[#FDF8F3] px-3 py-2 text-center">
+                <div className="font-headline text-xl font-bold text-[#1C1917]">{card.value}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-[#57534E]">{card.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* MODAL: Intake New Visitor */}
-      {isAddingVisitor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...addingVisitorDialog}>
-          <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
-              <h3 className="font-headline text-base font-bold text-[#1C1917]">Register New Guest / Visitor</h3>
-              <button
-                type="button"
-                onClick={() => setIsAddingVisitor(false)}
-                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              aria-label="Close">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
+        {/* Census entry */}
+        <div className="space-y-5 xl:col-span-5">
+          <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+            <h3 className="flex items-center gap-2 font-headline text-base font-bold text-[#1C1917]">
+              <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-[#C2410C]">how_to_reg</span>
+              Record the census
+            </h3>
+            <p className="mt-0.5 text-xs text-[#57534E]">
+              Two numbers, as the ushers count them. Both are stored as separate rows, so a report can still tell
+              adults from children later.
+            </p>
 
-            <form onSubmit={handleCreateVisitor} className="mt-4 space-y-4">
-              <div>
-                <label htmlFor="visitor-name" className="block text-xs font-bold text-[#1C1917] mb-1">Full Name *</label>
-                <input id="visitor-name" aria-label="Full Name"
-                  type="text"
-                  required
-                  placeholder="e.g. Jonathan & Lisa Wanjala"
-                  value={visitorName}
-                  onChange={(e) => setVisitorName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
-              </div>
+            {!selected && (
+              <p className="mt-3 text-xs text-[#57534E]">
+                Schedule a service in the Service Planner first — a census is always counted against one.
+              </p>
+            )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="visitor-phone" className="block text-xs font-bold text-[#1C1917] mb-1">Phone Number</label>
-                  <input id="visitor-phone" aria-label="Phone Number"
-                    type="tel"
-                    placeholder="+254 750 000 000"
-                    value={visitorPhone}
-                    onChange={(e) => setVisitorPhone(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  />
+            {selected && (
+              <form onSubmit={record} className="mt-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={LABEL} htmlFor="census-adults">Adults and youth</label>
+                    <input
+                      id="census-adults"
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={census.adults}
+                      onChange={(e) => setCensus((previous) => ({ ...previous, adults: e.target.value }))}
+                      placeholder="0"
+                      className={FIELD}
+                      disabled={!canEdit('services')}
+                    />
+                  </div>
+                  <div>
+                    <label className={LABEL} htmlFor="census-children">Children</label>
+                    <input
+                      id="census-children"
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={census.children}
+                      onChange={(e) => setCensus((previous) => ({ ...previous, children: e.target.value }))}
+                      placeholder="0"
+                      className={FIELD}
+                      disabled={!canEdit('services')}
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label htmlFor="visitor-email" className="block text-xs font-bold text-[#1C1917] mb-1">Email Address</label>
-                  <input id="visitor-email" aria-label="Email Address"
-                    type="email"
-                    placeholder="guest@domain.com"
-                    value={visitorEmail}
-                    onChange={(e) => setVisitorEmail(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                  <label className={LABEL} htmlFor="census-notes">Anything worth recording</label>
+                  <textarea
+                    id="census-notes"
+                    rows={2}
+                    value={census.notes}
+                    onChange={(e) => setCensus((previous) => ({ ...previous, notes: e.target.value }))}
+                    placeholder="Overflow seating used; a correction to last week's figure."
+                    className={FIELD}
+                    disabled={!canEdit('services')}
                   />
                 </div>
-              </div>
-
-              <div>
-                <label htmlFor="visitor-ministry" className="block text-xs font-bold text-[#1C1917] mb-1">Ministry Interest</label>
-                <select id="visitor-ministry" aria-label="Ministry Interest"
-                  value={visitorMinistry}
-                  onChange={(e) => setVisitorMinistry(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                >
-                  {INTERESTED_MINISTRIES.map((ministry) => (
-                    <option key={ministry} value={ministry}>
-                      {ministry}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="visitor-shepherd" className="block text-xs font-bold text-[#1C1917] mb-1">Assigned Follow-Up Shepherd</label>
-                <select id="visitor-shepherd" aria-label="Assigned Follow-Up Shepherd"
-                  value={visitorPastor}
-                  onChange={(e) => setVisitorPastor(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                >
-                  <option value="Bishop Sammy">Bishop Sammy (Visionary Leader)</option>
-                  <option value="Clara Wambui">Clara Wambui (Welcome & Mercy Lead)</option>
-                  <option value="Marcus Kamau">Marcus Kamau (Elder)</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
-                <button
-                  type="button"
-                  onClick={() => setIsAddingVisitor(false)}
-                  className="px-4 py-2 text-xs font-bold text-[#57534E] hover:text-[#1C1917] cursor-pointer"
-                >
-                  Cancel
-                </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+                  disabled={busy || !canEdit('services')}
+                  className="w-full rounded-[9px] bg-[#C2410C] px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer"
                 >
-                  Save Visitor Intake
+                  {busy ? 'Recording…' : 'Record the census'}
                 </button>
-              </div>
-            </form>
+                <p className="text-[11px] leading-relaxed text-[#57534E]">
+                  A census row is recorded rather than edited — the count of what was seen on the day stays as it was
+                  taken. A figure typed wrong is fixed by recording the correction with a note.
+                </p>
+              </form>
+            )}
           </div>
-        </div>
-      )}
 
-      {/* MODAL: Link Visitor to Member / Household */}
-      {linkingVisitor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...linkingVisitorDialog}>
-          <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
-              <h3 className="font-headline text-base font-bold text-[#1C1917]">
-                Link Guest to Members Register
-              </h3>
-              <button
-                type="button"
-                onClick={() => setLinkingVisitor(null)}
-                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              aria-label="Close">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-4">
-              <div className="p-3 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4]">
-                <div className="text-xs text-[#A8A29E] font-bold uppercase">Guest Record</div>
-                <div className="font-headline text-sm font-bold text-[#1C1917] mt-0.5">
-                  {linkingVisitor.visitorName}
+          <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+            <h3 className="flex items-center gap-2 font-headline text-base font-bold text-[#1C1917]">
+              <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-[#C2410C]">person_add</span>
+              A first-time visitor
+            </h3>
+            <p className="mt-0.5 text-xs text-[#57534E]">
+              Named, not counted. A name is somebody the church can follow up with this week.
+            </p>
+            {selected && (
+              <form onSubmit={recordVisitor} className="mt-4 space-y-3">
+                <div>
+                  <label className={LABEL} htmlFor="visitor-name">Their name</label>
+                  <input
+                    id="visitor-name"
+                    required
+                    value={visitor.name}
+                    onChange={(e) => setVisitor((previous) => ({ ...previous, name: e.target.value }))}
+                    placeholder="Jonathan Wanjala"
+                    className={FIELD}
+                    disabled={!canEdit('services')}
+                  />
                 </div>
-                <div className="text-xs text-[#57534E]">{linkingVisitor.email} · {linkingVisitor.phone}</div>
-              </div>
-
-              <div>
-                <label htmlFor="link-member" className="block text-xs font-bold text-[#1C1917] mb-1">Select Church Member / Household to Associate</label>
-                <select id="link-member" aria-label="Select Church Member / Household to Associate"
-                  value={selectedMemberId}
-                  onChange={(e) => setSelectedMemberId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                >
-                  {members.map((mbr) => (
-                    <option key={mbr.id} value={mbr.id}>
-                      {mbr.name} ({mbr.memberId}) — {mbr.householdRole}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
+                <div>
+                  <label className={LABEL} htmlFor="visitor-member">Already on the register?</label>
+                  <select
+                    id="visitor-member"
+                    value={visitor.memberId}
+                    onChange={(e) => setVisitor((previous) => ({ ...previous, memberId: e.target.value }))}
+                    className={FIELD}
+                    disabled={!canEdit('services')}
+                  >
+                    <option value="">Not on the register</option>
+                    {members.members.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {memberRefName(member)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={LABEL} htmlFor="visitor-notes">How they came / who brought them</label>
+                  <input
+                    id="visitor-notes"
+                    value={visitor.notes}
+                    onChange={(e) => setVisitor((previous) => ({ ...previous, notes: e.target.value }))}
+                    placeholder="Invited by the Njeri household"
+                    className={FIELD}
+                    disabled={!canEdit('services')}
+                  />
+                </div>
                 <button
-                  type="button"
-                  onClick={() => setLinkingVisitor(null)}
-                  className="px-4 py-2 text-xs font-bold text-[#57534E] hover:text-[#1C1917] cursor-pointer"
+                  type="submit"
+                  disabled={busy || !canEdit('services')}
+                  className="w-full rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2.5 text-xs font-bold text-[#1C1917] transition-colors hover:bg-[#F5EDE4] disabled:opacity-60 cursor-pointer"
                 >
-                  Cancel
+                  {busy ? 'Saving…' : 'Add to the visitors list'}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleLinkToMember}
-                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
-                >
-                  Confirm Link & Enroll
-                </button>
-              </div>
-            </div>
+              </form>
+            )}
+            {!selected && <p className="mt-3 text-xs text-[#57534E]">Choose a service first.</p>}
           </div>
         </div>
-      )}
+
+        {/* History, rows and visitors */}
+        <div className="space-y-5 xl:col-span-7">
+          <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+            <h3 className="flex items-center gap-2 font-headline text-base font-bold text-[#1C1917]">
+              <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-[#C2410C]">insights</span>
+              Attendance at recent services
+            </h3>
+            <p className="mt-0.5 text-xs text-[#57534E]">
+              Every service this church has counted, most recent on the right.
+            </p>
+            <div className="mt-4">
+              {allRows.loading && <LoadingBlock label="Adding up the census…" />}
+              {allRows.error && <ErrorBlock message={allRows.error} onRetry={() => void allRows.refetch()} />}
+              {!allRows.loading && !allRows.error && trend.length === 0 && (
+                <EmptyBlock
+                  icon="bar_chart"
+                  title="Nothing counted yet"
+                  hint="Record a census against a service and it appears here — one bar per service, and a trend after a month of Sundays."
+                />
+              )}
+              {trend.length > 0 && (
+                <div className="flex items-end gap-3">
+                  {trend.map((point) => (
+                    <div key={point.service.id} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-[#1C1917]">{point.total}</span>
+                      <div
+                        className="w-full rounded-t-[7px] bg-[#C2410C]/85"
+                        style={{ height: `${Math.max(6, Math.round((point.total / trendPeak) * 130))}px` }}
+                        title={`${point.service.title} · ${point.total} counted`}
+                      />
+                      <span className="truncate text-[10px] text-[#57534E]">
+                        {new Date(point.service.heldAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+            <h3 className="flex items-center gap-2 font-headline text-base font-bold text-[#1C1917]">
+              <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-[#C2410C]">checklist</span>
+              What was recorded
+            </h3>
+            <div className="mt-3">
+              {rows.loading && <LoadingBlock label="Reading this service's census…" />}
+              {rows.error && <ErrorBlock message={rows.error} onRetry={() => void rows.refetch()} />}
+              {!rows.loading && !rows.error && recordedHere.length === 0 && (
+                <EmptyBlock
+                  icon="fact_check"
+                  title="Nothing recorded for this service"
+                  hint="The census is entered above. Rows appear here as they are recorded."
+                />
+              )}
+              {recordedHere.length > 0 && (
+                <ul className="divide-y divide-[#E7E5E4]">
+                  {recordedHere.map((row) => (
+                    <li key={row.id} className="flex items-center justify-between gap-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-[#1C1917]">
+                          {row.visitorName ?? (memberRefName(row.member) || row.notes || 'Census row')}
+                        </p>
+                        <p className="text-[11px] text-[#57534E]">
+                          {row.visitorName
+                            ? 'Visitor'
+                            : row.count === 0
+                              ? 'Note'
+                              : `${row.count} counted`}
+                          {row.visitorName && row.member ? ` · linked to ${memberRefName(row.member)}` : ''}
+                          {row.notes && !row.visitorName ? ` · ${row.notes}` : ''}
+                          {row.notes && row.visitorName ? ` · ${row.notes}` : ''}
+                          {' · '}
+                          {new Date(row.recordedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                        </p>
+                      </div>
+                      {row.visitorName && (
+                        <span className="shrink-0 rounded-[6px] bg-[#F8F1E9] px-2 py-0.5 text-[10px] font-bold uppercase text-[#57534E]">
+                          First time
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+            <h3 className="flex items-center gap-2 font-headline text-base font-bold text-[#1C1917]">
+              <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-[#C2410C]">diversity_1</span>
+              Visitors at this service
+            </h3>
+            <p className="mt-0.5 text-xs text-[#57534E]">
+              {namesHere.length === 0
+                ? 'Nobody has been recorded as a first-time visitor.'
+                : `${namesHere.length} ${namesHere.length === 1 ? 'person came' : 'people came'} for the first time.`}
+            </p>
+            {namesHere.length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-[#E7E5E4] text-[10px] font-bold uppercase tracking-wide text-[#57534E]">
+                      <th className="py-2 pr-3">Name</th>
+                      <th className="py-2 pr-3">Came with</th>
+                      <th className="py-2">Follow-up</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {namesHere.map((row) => (
+                      <tr key={row.id} className="border-b border-[#F5EDE4] last:border-0">
+                        <td className="py-2 pr-3 text-xs font-semibold text-[#1C1917]">{row.visitorName}</td>
+                        <td className="py-2 pr-3 text-xs text-[#57534E]">{row.notes ?? '—'}</td>
+                        <td className="py-2 text-xs text-[#57534E]">
+                          {row.member ? 'Already on the register' : 'Enrol them on the Members screen'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

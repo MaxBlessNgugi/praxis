@@ -20,7 +20,7 @@ export type MinistriesSubTab = 'ministries-departmental' | 'ministries-leadershi
 
 export type FinancesSubTab = 'tithes' | 'offerings' | 'project-funding' | 'welfare' | 'charity';
 
-export type AdminSubTab = 'users-rights' | 'trash' | 'finance-audit';
+export type AdminSubTab = 'users-rights' | 'trash' | 'audit-log' | 'finance-audit' | 'churches';
 
 export type ReportsSubTab = 'finance-reports' | 'certificates' | 'agm-dossier';
 
@@ -30,122 +30,7 @@ export type ServicesSubTab = 'service-planner' | 'attendance' | 'volunteer-roste
 
 export type CommunicationsSubTab = 'announcements' | 'broadcasts' | 'events-calendar' | 'prayer-requests' | 'birthdays-anniversaries';
 
-export type SettingsSubTab = 'org-profile' | 'notifications' | 'integrations' | 'data-backup' | 'customization';
-
-// ==================== SERVICE & WORSHIP TYPES ====================
-
-export type ServiceType = 'sunday-morning' | 'sunday-evening' | 'midweek-service' | 'communion-special' | 'youth-service' | 'festival';
-
-export interface LiturgyItem {
-  id: string;
-  order: number;
-  type: 'prelude' | 'call-to-worship' | 'worship-praise' | 'pastoral-prayer' | 'scripture-reading' | 'tithes-offering' | 'sermon' | 'communion' | 'benediction' | 'announcements' | 'fellowship';
-  title: string;
-  durationMinutes: number;
-  leader: string;
-  notes?: string;
-  hymnOrSongTitle?: string;
-  scriptureRef?: string;
-}
-
-export interface ServiceRoleAssignment {
-  role: 'preacher' | 'worship-lead' | 'presiding-elder' | 'scripture-reader' | 'sound-av' | 'head-usher' | 'communion-steward';
-  roleName: string;
-  assignedMemberId: string;
-  assignedMemberName: string;
-  status: 'confirmed' | 'pending' | 'replacement';
-}
-
-export interface WorshipService {
-  id: string;
-  title: string;
-  serviceType: ServiceType;
-  date: string;
-  time: string;
-  campus: string;
-  theme: string;
-  scriptureFocus: string;
-  preacher: string;
-  worshipLeader: string;
-  status: 'upcoming' | 'in-progress' | 'completed' | 'draft';
-  liturgyOrder: LiturgyItem[];
-  keyRoles: ServiceRoleAssignment[];
-  expectedAttendance?: number;
-}
-
-export interface AttendanceRecord {
-  id: string;
-  serviceId: string;
-  serviceTitle: string;
-  date: string;
-  campus: string;
-  sanctuaryHeadcount: number;
-  onlineStreams: number;
-  kidsNurseryCount: number;
-  firstTimeVisitors: number;
-  totalAttendance: number;
-  notes?: string;
-  loggedBy: string;
-  timestamp: string;
-}
-
-export interface FirstTimeVisitorLink {
-  id: string;
-  visitorName: string;
-  serviceDate: string;
-  phone: string;
-  email: string;
-  interestedMinistry: string;
-  assignedFollowUpPastor: string;
-  status: 'new-intake' | 'contacted' | 'first-timer-enrolled' | 'regular-attender';
-  householdLinked?: boolean;
-}
-
-export interface VolunteerRosterDuty {
-  id: string;
-  serviceId: string;
-  serviceDate: string;
-  serviceTitle: string;
-  department: 'ushers' | 'greeters' | 'kids' | 'media-sound' | 'worship-band' | 'hospitality' | 'parking';
-  roleName: string;
-  assignedMemberId: string;
-  assignedMemberName: string;
-  callTime: string;
-  status: 'confirmed' | 'pending' | 'replacement' | 'swapped';
-  phone: string;
-  email: string;
-  notes?: string;
-}
-
-export interface SwapRequest {
-  id: string;
-  dutyId: string;
-  serviceDate: string;
-  roleName: string;
-  requestingVolunteer: string;
-  replacementVolunteer: string;
-  reason: string;
-  status: 'pending-approval' | 'approved' | 'rejected';
-  requestDate: string;
-}
-
-export interface ServiceReportItem {
-  id: string;
-  serviceId: string;
-  serviceTitle: string;
-  date: string;
-  preacher: string;
-  sermonTopic: string;
-  attendanceTotal: number;
-  firstTimeVisitors: number;
-  salvationsAndDecisions: number;
-  offeringCollected: number;
-  testimoniesHighlights: string[];
-  equipmentIncidents: string[];
-  pastoralFollowUpNotes: string[];
-  submittedBy: string;
-  submissionDate: string;
-}
+export type SettingsSubTab = 'org-profile' | 'subscription' | 'notifications' | 'integrations' | 'data-backup' | 'customization';
 
 // ==================== COMMUNICATIONS TYPES ====================
 
@@ -166,49 +51,18 @@ export interface AnnouncementItem {
   status: 'active' | 'scheduled' | 'expired' | 'draft';
 }
 
-export interface BroadcastTemplate {
-  id: string;
-  title: string;
-  channel: 'sms' | 'email' | 'both';
-  category: string;
-  subject?: string;
-  body: string;
-}
-
-export interface BroadcastItem {
-  id: string;
-  channel: 'sms' | 'email';
-  subject?: string;
-  messageBody: string;
-  targetAudience: string;
-  totalRecipients: number;
-  sentCount: number;
-  deliveredCount: number;
-  failedCount: number;
-  openRatePercent?: number;
-  clickRatePercent?: number;
-  sentAt: string;
-  senderName: string;
-  status: 'sent' | 'scheduled' | 'draft' | 'failed';
-}
-
 export interface ChurchEventItem {
   id: string;
   title: string;
   category: 'worship' | 'fellowship' | 'youth' | 'outreach' | 'governance' | 'training';
-  ministry: string;
+  /** `YYYY-MM-DD`, in the same local calendar the event was scheduled in. */
   date: string;
   /** Last day of a multi-day conference; the card renders the published range from the two. */
   endDate?: string;
   startTime: string;
   endTime: string;
   location: string;
-  campus: string;
   description: string;
-  rsvpRequired: boolean;
-  capacity?: number;
-  rsvpsCount: number;
-  contactPerson: string;
   colorTag: string;
 }
 
@@ -306,26 +160,6 @@ export interface NotificationSettings {
   categories?: NotificationCategoryPref[];
 }
 
-export interface ThirdPartyIntegration {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  icon: string;
-  status: 'connected' | 'disconnected' | 'error';
-  lastSync?: string;
-}
-
-export interface DataBackupSnapshot {
-  id: string;
-  snapshotDate: string;
-  fileSizeMb: number;
-  recordsCount: number;
-  backupType: 'automated-nightly' | 'manual';
-  status: 'verified' | 'pending';
-  description: string;
-}
-
 export interface CustomizationSettings {
   themeColor: string;
   memberTerminology: string;
@@ -410,6 +244,10 @@ export interface ParishMember {
   pastoralNotes?: string;
   tags?: string[];
   envelopeNumber?: string;
+  /// The member's photograph, held as a file id: uploaded once, served by the API behind the same
+  /// sign-in as the rest of the register. Optional, because a register that demands a picture of
+  /// somebody before it will save them is a register nobody fills in.
+  photoFileId?: string | null;
 }
 
 export interface HouseholdDependent {
@@ -486,4 +324,53 @@ export interface TitheTransaction {
   amount: number;
   date: string;
   status: 'Completed' | 'Cleared' | 'Pending';
+}
+
+export interface ProjectFunding {
+  id: string;
+  name: string;
+  description: string;
+  targetAmount: number;
+  currentAmount: number;
+  status: 'planned' | 'active' | 'completed' | 'paused';
+  startDate: string;
+  endDate: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  roleKey: 'super_admin' | 'admin' | 'staff' | 'viewer';
+  /** The role's own title as the church named it, for labelling the person on screen. */
+  roleName: string | null;
+  /** A Praxis employee, which is what shows the vendor screens. */
+  isPlatformAdmin: boolean;
+  memberId: string | null;
+  panels: Record<string, boolean>;
+  actions: Record<string, boolean>;
+}
+
+/**
+ * The church a session is acting for.
+ *
+ * Tenancy is the API's job — the token names the church and every query the service makes is scoped
+ * to it, so the console never sends one. It is held here for the one thing the API cannot do: let a
+ * screen say *which* church it is showing, instead of implying there is only one.
+ */
+export interface ActiveOrganization {
+  id: string;
+  name: string;
+  slug: string;
+  /** Null on a church that signed itself up and has not been through the welcome wizard. */
+  onboardedAt: string | null;
+}
+
+export interface AuthState {
+  user: User | null;
+  /** The church this session acts for. Null before sign-in. */
+  organization: ActiveOrganization | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
 }

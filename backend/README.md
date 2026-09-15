@@ -5,6 +5,13 @@ Express + TypeScript + Prisma + PostgreSQL. Built in the blueprint's order: **B1
 members and households, **B4** Services & Worship, **B5** Finances, **B6** Communications,
 Ministries, Governance, Reports, Settings and Admin.
 
+## Deploy it to the cloud
+
+The database (Neon), the API (Railway) and the console (Cloudflare Pages) each have a home and there
+is a step-by-step runbook in [`../docs/cloud-deploy.md`](../docs/cloud-deploy.md). Locally, the
+service talks to a Postgres on `localhost`; in the cloud the only differences are the two Neon
+connection strings and where `JWT_SECRET` and `CORS_ORIGIN` come from.
+
 ## Run it
 
 ```bash
@@ -61,17 +68,25 @@ npx prisma migrate diff --from-migrations prisma/migrations \
                                               # 0 = migrations and schema agree, 2 = they have drifted
 curl -s localhost:4000/health                 # {"status":"ok","database":"reachable",...}
 curl -s localhost:4000/api/services           # 401 — the route exists and is guarded
+npm run check:isolation                       # one church cannot reach another's records
 ```
 
 `$SHADOW_DATABASE_URL` is an empty database Prisma replays the migrations into to compare them with
 the schema. It has to exist first; `npx prisma db execute --url "$ADMIN_DATABASE_URL" --stdin` can
 create it without a Postgres client installed, which is how CI does it.
 
-Those four steps are what CI runs on every pull request: `.github/workflows/check.yml` starts a
-Postgres service container, applies `prisma/migrations/` to an empty database, seeds it, asserts the
-seed wrote rows, and fails the pull request if the migrations and `schema.prisma` have drifted apart.
-A fresh environment is therefore reproducible from this repository alone, and a schema change that
+Those steps are what CI runs on every pull request: `.github/workflows/check.yml` starts a Postgres
+service container, applies `prisma/migrations/` to an empty database, seeds it, asserts the seed
+wrote rows, and fails the pull request if the migrations and `schema.prisma` have drifted apart. A
+fresh environment is therefore reproducible from this repository alone, and a schema change that
 forgets its migration cannot merge.
+
+`npm run check:isolation` is the odd one out: it needs a **running** API and a seeded database, so it
+is a separate CI job step rather than part of the provisioning above. It creates a second church,
+signs in as that church's administrator, and tries — with the API's own endpoints — to read, change,
+retire and restore the first church's records, to list its Trash and its audit log, and to switch a
+session into it. Every list has to come back empty rather than filtered, and every attempt has to
+fail. It removes the church it provisioned even when a check fails.
 
 The module sweep is a separate, hand-run thing — 26 end-to-end checks this pass, against a database
 built by nothing but `migrate deploy` and `npm run seed`, each asserting the status and the body
@@ -83,9 +98,10 @@ documents plus a write to one, and the Trash — retire, list, restore, and an a
 create, delete and restore. It needs a live seeded database, so it is evidence for a revision rather
 than a gate; what CI re-proves every time is the provisioning above.
 
-**Nothing calls this API yet.** The console reads its own demo data: there is no HTTP client in
-`src/`, no `VITE_API_*` variable and no wiring, so every request in this document is a `curl` until
-that changes.
+**The console is on this API for the modules the root `README.md` lists as real** — authentication,
+home, members and households, announcements, events, prayer, celebrations, welfare, charity, project
+funding, the finance ledger and the church profile. The rest of the console still renders sample
+data, so a request in this document is still a `curl` for those.
 
 ## Endpoints
 
@@ -164,6 +180,27 @@ backend/
 ```
 
 ## Decisions worth knowing
+
+**One church's rows never appear in another church's answer, and the rule has one owner.** Every
+table that belongs to a church carries a non-null `organizationId` with no column default, so a write
+that forgets it fails loudly instead of landing in somebody else's church. No service says which
+church it is querying: `lib/prisma.ts` folds the current one into every `where` and stamps it onto
+every create, reading the church from `lib/tenant.ts` — one `AsyncLocalStorage` value, set once in
+`authenticate` for the whole request. Which tables are tenant-owned is read from Prisma's own model
+metadata rather than a hand-written list, because a list in a source file drifts the first time
+somebody adds a table. Exactly two reads are deliberately unscoped, and both are the thing that
+*resolves* the tenant: the membership lookup in `authenticate`, and signing in.
+
+**The church is a claim in the token, not a header.** `login` mints the token for a membership that
+exists, and `POST /api/auth/switch-organization` refuses a church the account does not serve, so a
+client cannot point itself at another parish by editing a request. Rights come from the **membership**
+rather than the account: the same person can administer one church and only read another, and the
+account's own role is the default a membership is created with.
+
+**Register numbers, envelope numbers, unit numbers and department names are unique *within* a
+church.** A global unique on any of them would refuse a second church its own `ENV-1001`, which is the
+kind of defect that only appears the day the second parish signs up. `organizationId` is part of every
+such key.
 
 **Money is `Decimal`, never `Float`.** `lib/prisma.ts` converts to a plain number at the JSON edge
 and nowhere else, because a float in a giving ledger drifts.
