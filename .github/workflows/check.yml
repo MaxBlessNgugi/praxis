@@ -225,7 +225,7 @@ jobs:
               // without a subscription the console opens on a church that has never been provisioned.
               const plans = await prisma.plan.count();
               const subscriptions = await prisma.subscription.count();
-              const church = await prisma.organization.findFirst({ where: { slug: 'destiny-sanctuary' } });
+              const church = await prisma.organization.findFirst({ where: { slug: "destiny-sanctuary" } });
               await prisma.$disconnect();
               console.log(`seed wrote ${members} members, ${ministries} departments, ${services} services, ${tithes} tithes, ${ledger} ledger entries, ${plans} plans and ${subscriptions} subscription(s)`);
               if (members < 10 || ministries !== 7 || services < 5 || tithes < 20 || ledger < 40) process.exit(1);

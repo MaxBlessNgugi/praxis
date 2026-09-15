@@ -51,7 +51,7 @@ const ALL_SECTIONS = [
   { title: 'Reports & Certs', screens: ['Baptism', 'Dedication'] },
   { title: 'Communications', screens: ['Announcements', 'Broadcasts', 'Events & Calendar', 'Prayer Requests', 'Birthdays & Milestones'] },
   { title: 'Settings & Profile', screens: ['Organization Profile', 'Subscription & Billing', 'Notifications & Alerts', 'Integrations & APIs', 'Data Sovereignty & Backup', 'Customization & Lexicon'] },
-  { title: 'Admin Portal', screens: ['Users & Rights', 'Trash', 'Finance Audit', 'Churches (Praxis)'] },
+  { title: 'Admin Portal', screens: ['Users & rights', 'Trash', 'Audit log', 'Finance audit', 'Churches'] },
 ];
 
 const chrome = launchChrome({ port: PORT, profile: 'praxis-dialogs', width: WIDTH, height: HEIGHT });
