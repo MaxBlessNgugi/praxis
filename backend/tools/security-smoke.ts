@@ -16,6 +16,11 @@ import { removeChurch } from './lib/provision';
  * never the seeded administrator's, because a check that locks the church out of its own console is a
  * check nobody runs twice.
  *
+ * The ceiling also means this suite cannot assume it is the first thing to sign in from its address.
+ * In CI four other suites and two browser audits share it, so the lockout section would read the
+ * address's 429 instead of the account's 423 — which is what happened, twice, before it learned to
+ * wait. It asks the limiter how much budget is left and waits out the window when there is not enough.
+ *
  *   API_URL=http://127.0.0.1:4000 npx tsx tools/security-smoke.ts
  */
 
@@ -89,6 +94,28 @@ function fieldReason(answer: Answer): string {
 const signIn = (email: string, password: string) =>
   call('POST', '/api/auth/login', { body: { email, password } });
 
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Waits until this address may sign in `needed` more times.
+ *
+ * Every response through the login route carries the limiter's own count — including the 429 — so the
+ * wait is read rather than guessed. The probe costs one attempt, which is why the budget asked for is
+ * on top of it. The loop is bounded: if four windows in a row do not free up room, something other
+ * than a spent window is wrong and the section below will say so in its own failure messages.
+ */
+async function waitForLoginBudget(needed: number): Promise<void> {
+  for (let round = 0; round < 4; round += 1) {
+    const probe = await signIn(`budget-check+${Date.now()}@praxis.test`, 'wrong-password');
+    const remaining = Number(probe.headers.get('ratelimit-remaining') ?? 0);
+    if (probe.status !== 429 && remaining >= needed) return;
+
+    const resetSeconds = Math.min(Number(probe.headers.get('ratelimit-reset') ?? 60) || 60, 70);
+    console.log(`  .. ${remaining} sign-in attempt(s) left on this address; waiting ${resetSeconds}s for the window`);
+    await sleep(resetSeconds * 1000 + 200);
+  }
+}
+
 /** A user with the given role in the seeded church, alongside the session they sign in with. */
 async function borrowAccount(email: string, roleKey: string, organizationId: string, passwordHash: string) {
   const role = await basePrisma.role.findFirst({ where: { key: roleKey } });
@@ -106,6 +133,10 @@ async function borrowAccount(email: string, roleKey: string, organizationId: str
 
 async function main(): Promise<void> {
   console.log(`Security posture → ${API}`);
+
+  // Eight: this sign-in, the viewer's in section 7, and the five wrong passwords plus the one that
+  // proves the lockout in section 8. Section 9 exhausts the ceiling on purpose and runs last.
+  await waitForLoginBudget(8);
 
   // Taken once, before any of the deliberate failures below, so nothing later needs a fresh sign-in
   // until the limiter is itself the thing being tested.
