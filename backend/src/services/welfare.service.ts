@@ -83,7 +83,7 @@ export async function listCases(query: ListWelfareQuery) {
 }
 
 export async function getCase(id: string) {
-  const welfareCase = await findLive({ where: { id }, include: caseInclude }, prisma.welfareDisbursement, 'That welfare case does not exist');
+  const welfareCase = await findLive(prisma.welfareDisbursement, id, 'That welfare case does not exist', { include: caseInclude });
   return toPublicCase(welfareCase);
 }
 
@@ -132,7 +132,7 @@ export async function openCase(input: OpenWelfareCaseInput, actorId: string) {
 }
 
 export async function decideCase(id: string, input: DecideWelfareInput, actorId: string) {
-  const existing = await findLive({ where: { id } }, prisma.welfareDisbursement, 'That welfare case does not exist');
+  const existing = await findLive(prisma.welfareDisbursement, id, 'That welfare case does not exist');
   if (existing.status !== 'requested') {
     throw new AppError(409, `That case was already ${existing.status}`, 'already_decided');
   }
@@ -165,7 +165,7 @@ export async function decideCase(id: string, input: DecideWelfareInput, actorId:
 
 /** The moment money actually leaves. Recorded separately from approval, with its own date. */
 export async function disburseCase(id: string, input: DisburseWelfareInput, actorId: string) {
-  const existing = await findLive({ where: { id } }, prisma.welfareDisbursement, 'That welfare case does not exist');
+  const existing = await findLive(prisma.welfareDisbursement, id, 'That welfare case does not exist');
   if (existing.status !== 'approved') {
     throw new AppError(
       409,

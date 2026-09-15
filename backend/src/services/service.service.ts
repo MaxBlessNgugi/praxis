@@ -46,7 +46,7 @@ export async function listServices(query: ListServicesQuery) {
 }
 
 export async function getService(id: string) {
-  const service = await findLive({ where: { id }, include: serviceInclude }, prisma.service, 'That service does not exist');
+  const service = await findLive(prisma.service, id, 'That service does not exist', { include: serviceInclude });
   return service;
 }
 
@@ -66,7 +66,7 @@ export async function createService(input: CreateServiceInput, actorId: string) 
 }
 
 export async function updateService(id: string, input: UpdateServiceInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.service, 'That service does not exist');
+  const before = await findLive(prisma.service, id, 'That service does not exist');
 
   return prisma.$transaction(async (tx) => {
     const service = await tx.service.update({ where: { id }, data: input, include: serviceInclude });
@@ -104,7 +104,7 @@ export async function retireService(id: string, input: RetireServiceInput, actor
  * same transaction, so the new arrangement can be written without a collision.
  */
 export async function replaceLiturgy(serviceId: string, items: LiturgyItemInput[], actorId: string) {
-  const service = await findLive({ where: { id: serviceId } }, prisma.service, 'That service does not exist');
+  const service = await findLive(prisma.service, serviceId, 'That service does not exist');
 
   return prisma.$transaction(async (tx) => {
     await tx.orderOfServiceItem.deleteMany({ where: { serviceId } });
@@ -192,7 +192,7 @@ export async function listAttendance(query: ListAttendanceQuery) {
  * "23 visitors" typed into a note is not a number the system can trust; naming them is.
  */
 export async function attendanceSummary(serviceId: string) {
-  await findLive({ where: { id: serviceId } }, prisma.service, 'That service does not exist');
+  await findLive(prisma.service, serviceId, 'That service does not exist');
 
   const rows = await prisma.attendance.findMany({ where: { serviceId, ...live } });
   const byKind: Record<string, number> = {};
@@ -219,7 +219,7 @@ export async function attendanceSummary(serviceId: string) {
  * later which of three drafts is true.
  */
 export async function upsertReport(serviceId: string, input: UpsertServiceReportInput, actorId: string) {
-  const service = await findLive({ where: { id: serviceId } }, prisma.service, 'That service does not exist');
+  const service = await findLive(prisma.service, serviceId, 'That service does not exist');
 
   const { offeringsTotal, ...rest } = input;
   const data = {

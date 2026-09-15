@@ -70,7 +70,7 @@ export async function listActivities(query: ListCharityQuery) {
 }
 
 export async function getActivity(id: string) {
-  const activity = await findLive({ where: { id }, include: activityInclude }, prisma.charityActivity, 'That charity record does not exist');
+  const activity = await findLive(prisma.charityActivity, id, 'That charity record does not exist', { include: activityInclude });
   return toPublicActivity(activity);
 }
 
@@ -123,7 +123,7 @@ export async function createActivity(input: CreateCharityActivityInput, actorId:
  * amount is one of the things that can be corrected, so the ledger shows both figures.
  */
 export async function updateActivity(id: string, input: UpdateCharityActivityInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.charityActivity, 'That charity record does not exist');
+  const before = await findLive(prisma.charityActivity, id, 'That charity record does not exist');
 
   return prisma.$transaction(async (tx) => {
     const activity = await tx.charityActivity.update({

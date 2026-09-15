@@ -144,7 +144,7 @@ export async function listTithes(query: ListGivingQuery) {
 }
 
 export async function getTithe(id: string) {
-  const tithe = await findLive({ where: { id }, include: titheInclude }, prisma.tithe, 'That tithe record does not exist');
+  const tithe = await findLive(prisma.tithe, id, 'That tithe record does not exist', { include: titheInclude });
   return toPublicTithe(tithe);
 }
 
@@ -241,7 +241,7 @@ export async function listOfferings(query: ListGivingQuery) {
 }
 
 export async function getOffering(id: string) {
-  const offering = await findLive({ where: { id }, include: offeringInclude }, prisma.offering, 'That offering record does not exist');
+  const offering = await findLive(prisma.offering, id, 'That offering record does not exist', { include: offeringInclude });
   return toPublicOffering(offering);
 }
 

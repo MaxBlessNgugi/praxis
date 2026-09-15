@@ -109,7 +109,7 @@ export async function listProjects(query: ListProjectsQuery) {
 }
 
 export async function getProject(id: string) {
-  const project = await findLive({ where: { id } }, prisma.project, 'That project does not exist');
+  const project = await findLive(prisma.project, id, 'That project does not exist');
 
   const totals = await totalsFor([project.id]);
   const contributorCount = await prisma.projectContribution.count({ where: { projectId: id, ...live } });
@@ -151,7 +151,7 @@ export async function createProject(input: CreateProjectInput, actorId: string) 
  * edited, only voided.
  */
 export async function updateProject(id: string, input: UpdateProjectInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.project, 'That project does not exist');
+  const before = await findLive(prisma.project, id, 'That project does not exist');
 
   return prisma.$transaction(async (tx) => {
     const project = await tx.project.update({
@@ -182,7 +182,7 @@ export async function updateProject(id: string, input: UpdateProjectInput, actor
 }
 
 export async function listContributions(projectId: string, query: ListContributionsQuery) {
-  await findLive({ where: { id: projectId }, select: { id: true } }, prisma.project, 'That project does not exist');
+  await findLive(prisma.project, projectId, 'That project does not exist', { select: { id: true } });
 
   const where: Prisma.ProjectContributionWhereInput = {
     projectId,
@@ -208,7 +208,7 @@ export async function listContributions(projectId: string, query: ListContributi
 }
 
 export async function recordContribution(projectId: string, input: RecordContributionInput, actorId: string) {
-  const project = await findLive({ where: { id: projectId } }, prisma.project, 'That project does not exist');
+  const project = await findLive(prisma.project, projectId, 'That project does not exist');
   if (project.status === 'completed') {
     throw new AppError(409, 'That project is closed; reopen it before recording against it', 'project_closed');
   }

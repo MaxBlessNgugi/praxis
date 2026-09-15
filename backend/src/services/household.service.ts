@@ -45,7 +45,7 @@ export async function listHouseholds(query: ListHouseholdsQuery) {
 }
 
 export async function getHousehold(id: string) {
-  const household = await findLive({ where: { id }, include: householdInclude }, prisma.household, 'That household does not exist');
+  const household = await findLive(prisma.household, id, 'That household does not exist', { include: householdInclude });
   return household;
 }
 
@@ -60,7 +60,7 @@ export async function createHousehold(input: CreateHouseholdInput, actorId: stri
 }
 
 export async function updateHousehold(id: string, input: UpdateHouseholdInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.household, 'That household does not exist');
+  const before = await findLive(prisma.household, id, 'That household does not exist');
 
   return prisma.$transaction(async (tx) => {
     const household = await tx.household.update({ where: { id }, data: input, include: householdInclude });
@@ -118,7 +118,7 @@ export async function linkMember(householdId: string, input: LinkMemberInput, ac
 
 /** Move headship to one of this household's members. Refuses anyone who is not in it. */
 export async function setHead(householdId: string, memberId: string, actorId: string) {
-  const household = await findLive({ where: { id: householdId } }, prisma.household, 'That household does not exist');
+  const household = await findLive(prisma.household, householdId, 'That household does not exist');
 
   const member = await prisma.member.findFirst({ where: { id: memberId, householdId, ...live } });
   if (!member) throw new AppError(400, 'That member is not part of this household', 'not_in_household');
@@ -137,7 +137,9 @@ export async function setHead(householdId: string, memberId: string, actorId: st
 }
 
 export async function unlinkMember(householdId: string, memberId: string, actorId: string) {
-  const member = await findLive({ where: { id: memberId, householdId } }, prisma.member, 'That member is not part of this household');
+  // Two keys rather than an id, so it is asked for explicitly.
+  const member = await prisma.member.findFirst({ where: { id: memberId, householdId, ...live } });
+  if (!member) throw new AppError(404, 'That member is not part of this household', 'not_found');
 
   await prisma.$transaction(async (tx) => {
     await tx.member.update({ where: { id: memberId }, data: { householdId: null, isHouseholdHead: false, householdRole: null } });
@@ -158,11 +160,9 @@ export async function retireHousehold(id: string, input: RetireReason, actorId: 
   // Read for the count, not for existence: a household with people still in it stays, and that is a
   // rule about households rather than about retiring. The archive module re-reads the row itself, so
   // a household emptied a moment ago is still handled correctly.
-  const household = await findLive(
-    { where: { id }, include: { _count: { select: { members: { where: live } } } } },
-    prisma.household,
-    'That household does not exist',
-  );
+  const household = await findLive(prisma.household, id, 'That household does not exist', {
+    include: { _count: { select: { members: { where: live } } } },
+  });
   if (household._count.members > 0) {
     throw new AppError(409, `Move the ${household._count.members} member(s) out of this household first`, 'household_not_empty');
   }

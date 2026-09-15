@@ -80,11 +80,9 @@ export async function listMembers(query: ListMembersQuery) {
 }
 
 export function getMember(id: string) {
-  return findLive(
-    { where: { id }, include: { ...memberInclude, ministries: { include: { ministry: { select: { id: true, name: true } } } } } },
-    prisma.member,
-    'That member is not on the register',
-  );
+  return findLive(prisma.member, id, 'That member is not on the register', {
+    include: { ...memberInclude, ministries: { include: { ministry: { select: { id: true, name: true } } } } },
+  });
 }
 
 export async function createMember(input: CreateMemberInput, actorId: string) {
@@ -133,7 +131,7 @@ export async function assertMemberOnRegister(memberId: string, what = 'That memb
 }
 
 export async function updateMember(id: string, input: UpdateMemberInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.member, 'That member is not on the register');
+  const before = await findLive(prisma.member, id, 'That member is not on the register');
 
   if (input.householdId) {
     const household = await prisma.household.findFirst({ where: { id: input.householdId, ...live } });

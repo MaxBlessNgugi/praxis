@@ -57,21 +57,16 @@ export async function listMinistries(query: ListMinistriesQuery) {
 }
 
 export function getMinistry(id: string) {
-  return findLive(
-    {
-      where: { id },
-      include: {
-        leader: { select: memberSelect },
-        members: {
-          where: live,
-          include: { member: { select: memberSelect } },
-          orderBy: [{ roleTitle: 'asc' }, { joinedAt: 'asc' }],
-        },
+  return findLive(prisma.ministry, id, 'That ministry does not exist', {
+    include: {
+      leader: { select: memberSelect },
+      members: {
+        where: live,
+        include: { member: { select: memberSelect } },
+        orderBy: [{ roleTitle: 'asc' }, { joinedAt: 'asc' }],
       },
     },
-    prisma.ministry,
-    'That ministry does not exist',
-  );
+  });
 }
 
 export async function createMinistry(input: CreateMinistryInput, actorId: string) {
@@ -96,7 +91,7 @@ export async function createMinistry(input: CreateMinistryInput, actorId: string
 }
 
 export async function updateMinistry(id: string, input: UpdateMinistryInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.ministry, 'That ministry does not exist');
+  const before = await findLive(prisma.ministry, id, 'That ministry does not exist');
   if (input.leaderId) await assertMemberOnRegister(input.leaderId, 'That leader');
 
   return prisma.$transaction(async (tx) => {
@@ -129,7 +124,7 @@ export async function updateMinistry(id: string, input: UpdateMinistryInput, act
 export async function retireMinistry(id: string, input: RetireReason, actorId: string) {
   // A ministry disappears only once nobody serves on it; the alternative is living people pointing at
   // a department the screen no longer lists. Read for the count, not for existence.
-  const ministry = await findLive({ where: { id } }, prisma.ministry, 'That ministry does not exist');
+  const ministry = await findLive(prisma.ministry, id, 'That ministry does not exist');
 
   const serving = await prisma.ministryMember.count({ where: { ministryId: id, ...live } });
   if (serving > 0) {
@@ -149,7 +144,7 @@ export async function retireMinistry(id: string, input: RetireReason, actorId: s
 // -------------------------------------------------------------------------------------------
 
 export async function addMinistryMember(ministryId: string, input: AddMinistryMemberInput, actorId: string) {
-  const ministry = await findLive({ where: { id: ministryId } }, prisma.ministry, 'That ministry does not exist');
+  const ministry = await findLive(prisma.ministry, ministryId, 'That ministry does not exist');
   await assertMemberOnRegister(input.memberId);
 
   // Retired rows too: the unique key still holds their row, so a second insert would collide.
@@ -183,7 +178,7 @@ export async function addMinistryMember(ministryId: string, input: AddMinistryMe
 }
 
 export async function updateMinistryMember(id: string, input: UpdateMinistryMemberInput, actorId: string) {
-  const before = await findLive({ where: { id }, include: rosterInclude }, prisma.ministryMember, 'That member is not on this ministry roll');
+  const before = await findLive(prisma.ministryMember, id, 'That member is not on this ministry roll', { include: rosterInclude });
 
   return prisma.$transaction(async (tx) => {
     const row = await tx.ministryMember.update({ where: { id }, data: { roleTitle: input.roleTitle }, include: rosterInclude });
@@ -203,7 +198,7 @@ export async function updateMinistryMember(id: string, input: UpdateMinistryMemb
 }
 
 export async function removeMinistryMember(id: string, actorId: string) {
-  const row = await findLive({ where: { id }, include: rosterInclude }, prisma.ministryMember, 'That member is not on this ministry roll');
+  const row = await findLive(prisma.ministryMember, id, 'That member is not on this ministry roll', { include: rosterInclude });
 
   return prisma.$transaction(async (tx) => {
     await tx.ministryMember.update({ where: { id }, data: { deletedAt: new Date() } });

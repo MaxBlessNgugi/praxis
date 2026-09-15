@@ -11,9 +11,10 @@ import { AppError } from '../middleware/errorHandler';
  * on a live screen without anything failing.
  *
  * Two things own it now. `live` is the filter every query is built from, and `findLive` is the lookup
- * that goes with it — one live row by id, or the 404 the screen that asked for it shows. A read that
- * is meant to span retired rows has to say so with `includingRetired`, so the exceptions are named
- * and countable rather than being the places somebody happened not to filter.
+ * that goes with it. A read that is meant to span retired rows has to say so with `includingRetired`,
+ * so the exceptions are named and countable rather than being the places somebody happened not to
+ * filter. The Trash needs neither: it reads `SoftDeletedRecord`, which is the retired records' own
+ * table rather than a table with retired rows in it.
  */
 export const live = { deletedAt: null } as const;
 
@@ -33,24 +34,31 @@ export const includingRetired = { deletedAt: undefined } as const;
 /** The same rule for the two reports that group in SQL rather than through Prisma. */
 export const liveSql = Prisma.sql`"deletedAt" IS NULL`;
 
+/** The guard `findLive` puts on the read it is given, and the type of what comes back for it. */
+type LiveWhere = { where: { id: string; deletedAt: null } };
+type LiveRow<Delegate, Args> = NonNullable<Prisma.Result<Delegate, Args & LiveWhere, 'findFirst'>>;
+
 /**
  * One live row by id, or the 404.
  *
- * `missing` is the sentence the screen that asked would put on the error — the same words its own
- * hand-written lookup used — so the message travels with the caller and not with the helper.
+ * `missing` is the 404 in the words of the screen that asked, so the message travels with the
+ * caller and not with the helper. `args` is whatever else the read needs (`include`, `select`),
+ * kept a parameter of its own because Prisma's result type — and so the row returned — is a
+ * function of it.
  *
- * `args` is the read itself, minus the guard: `{ where: { id } }` for the plain case, plus whatever
- * else the read needs (`include`, `select`). It is passed whole rather than assembled here because
- * Prisma's result type depends on it — an `include` typed through this helper is what keeps a caller
- * like the roster from reading `row.member` off a row that was never asked for one.
+ * A lookup keyed on anything else — a `role.key`, a `serviceId`, a member *within* a household — is
+ * asked for explicitly with `...live`, because those are not the one lookup that repeated.
  */
-export async function findLive<Delegate, Args extends Prisma.Args<Delegate, 'findFirst'> & { where: { id: string } }>(
-  args: Args,
+export async function findLive<Delegate, Args extends Omit<Prisma.Args<Delegate, 'findFirst'>, 'where'>>(
   delegate: Delegate,
+  id: string,
   missing: string,
-): Promise<NonNullable<Prisma.Result<Delegate, Args, 'findFirst'>>> {
-  const query = { ...args, where: { ...args.where, ...live } } as Args;
-  const row = await (delegate as { findFirst(args: Args): Promise<unknown> }).findFirst(query);
+  args?: Args,
+): Promise<LiveRow<Delegate, Args>> {
+  const query = { ...args, where: { id, ...live } } as Args & LiveWhere;
+  const row = (await (delegate as { findFirst(args: typeof query): Promise<unknown> }).findFirst(query)) as
+    | LiveRow<Delegate, Args>
+    | null;
   if (!row) throw new AppError(404, missing, 'not_found');
-  return row as NonNullable<Prisma.Result<Delegate, Args, 'findFirst'>>;
+  return row;
 }

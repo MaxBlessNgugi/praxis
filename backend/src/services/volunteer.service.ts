@@ -60,7 +60,7 @@ export async function createDuty(serviceId: string, input: CreateDutyInput, acto
 }
 
 export async function updateDuty(id: string, input: UpdateDutyInput, actorId: string) {
-  const before = await findLive({ where: { id } }, prisma.rosterDuty, 'That duty is not on the roster');
+  const before = await findLive(prisma.rosterDuty, id, 'That duty is not on the roster');
 
   return prisma.$transaction(async (tx) => {
     const duty = await tx.rosterDuty.update({ where: { id }, data: input, include: dutyInclude });
@@ -80,7 +80,7 @@ export async function updateDuty(id: string, input: UpdateDutyInput, actorId: st
 }
 
 export async function removeDuty(id: string, actorId: string) {
-  const duty = await findLive({ where: { id } }, prisma.rosterDuty, 'That duty is not on the roster');
+  const duty = await findLive(prisma.rosterDuty, id, 'That duty is not on the roster');
 
   return prisma.$transaction(async (tx) => {
     await tx.rosterDuty.update({ where: { id }, data: { deletedAt: new Date(), status: 'cancelled' } });
@@ -98,7 +98,7 @@ export async function removeDuty(id: string, actorId: string) {
  * roster never holds two competing claims on the same slot.
  */
 export async function requestSwap(dutyId: string, input: RequestSwapInput, actorId: string, requesterMemberId: string) {
-  const duty = await findLive({ where: { id: dutyId }, include: { swapRequests: true } }, prisma.rosterDuty, 'That duty is not on the roster');
+  const duty = await findLive(prisma.rosterDuty, dutyId, 'That duty is not on the roster', { include: { swapRequests: true } });
   if (duty.memberId !== requesterMemberId) throw new AppError(403, 'Only the volunteer holding this duty can ask for cover', 'not_duty_holder');
   if (duty.status === 'completed' || duty.status === 'missed') throw new AppError(409, 'That duty has already happened', 'duty_closed');
   if (duty.swapRequests.some((request) => request.status === 'requested')) {
