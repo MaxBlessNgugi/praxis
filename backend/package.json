@@ -15,6 +15,11 @@
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
+    "check:isolation": "tsx tools/tenant-isolation.ts",
+    "check:vendor": "tsx tools/vendor-smoke.ts",
+    "check:import": "tsx tools/member-import.ts",
+    "check:launch": "tsx tools/launch-check.ts",
+    "check:security": "tsx tools/security-smoke.ts",
     "studio": "prisma studio"
   },
   "prisma": {

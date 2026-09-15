@@ -80,6 +80,17 @@ export function toAnnouncementItem(dto: AnnouncementDto): AnnouncementItem {
 
 // ==================== Events ====================
 
+/** The console's categories are finer than the four kinds the events table stores, so scheduling a
+ *  fellowship or a youth class has to land on one of them. */
+export const EVENT_KIND: Record<ChurchEventItem['category'], EventDto['kind']> = {
+  worship: 'service',
+  fellowship: 'service',
+  youth: 'service',
+  outreach: 'outreach',
+  governance: 'meeting',
+  training: 'conference',
+};
+
 const EVENT_CATEGORY: Record<EventDto['kind'], ChurchEventItem['category']> = {
   service: 'worship',
   conference: 'training',
@@ -88,33 +99,34 @@ const EVENT_CATEGORY: Record<EventDto['kind'], ChurchEventItem['category']> = {
 };
 
 const EVENT_COLOR: Record<EventDto['kind'], string> = {
-  service: 'warm',
-  conference: 'amber',
-  meeting: 'stone',
-  outreach: 'sage',
+  service: '#C2410C',
+  conference: '#0891B2',
+  meeting: '#059669',
+  outreach: '#2563EB',
 };
 
+/** The card composes its own day range, so an event carries a plain `YYYY-MM-DD` day, in the same
+ *  local calendar the event was scheduled in. */
+function formatDay(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso.slice(0, 10);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 export function toChurchEventItem(dto: EventDto): ChurchEventItem {
-  const start = new Date(dto.startsAt);
-  const end = new Date(dto.endsAt);
-  const spansDays = start.toDateString() !== end.toDateString();
+  const spansDays = new Date(dto.startsAt).toDateString() !== new Date(dto.endsAt).toDateString();
   return {
     id: dto.id,
     title: dto.title,
     category: EVENT_CATEGORY[dto.kind] ?? 'worship',
-    ministry: 'Church Council',
-    date: formatDate(dto.startsAt),
-    ...(spansDays ? { endDate: formatDate(dto.endsAt) } : {}),
+    date: formatDay(dto.startsAt),
+    ...(spansDays ? { endDate: formatDay(dto.endsAt) } : {}),
     startTime: formatClock(dto.startsAt),
     endTime: formatClock(dto.endsAt),
     location: dto.venue,
-    campus: DEFAULT_LOCATION,
     description: dto.description ?? '',
-    // RSVP, capacity, contacts and colour are console-only affordances with no backend column.
-    rsvpRequired: false,
-    rsvpsCount: 0,
-    contactPerson: 'Church Office',
-    colorTag: EVENT_COLOR[dto.kind] ?? 'warm',
+    colorTag: EVENT_COLOR[dto.kind] ?? EVENT_COLOR.service,
   };
 }
 

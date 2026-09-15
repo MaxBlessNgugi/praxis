@@ -3,6 +3,8 @@ import logoMark from '../../assets/brand/praxis-icon.webp';
 import logoWordmark from '../../assets/brand/praxis-wordmark.webp';
 import { useAuth } from '../../lib/auth';
 import { ApiError } from '../../lib/api';
+import { SignupForm } from './SignupForm';
+import { LegalDialog } from '../legal/LegalDialog';
 
 /**
  * Praxis sign-in screen — the app's entry gate (`App.tsx` renders it until it
@@ -29,6 +31,8 @@ interface AuthScreenProps {
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
+  /** Sign in, or start a church that has no account yet. One gate, two doors. */
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -36,6 +40,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const submitTimer = useRef<number | null>(null);
+  /** Which document the visitor asked for, or nothing. Owned here so both cards open the same one. */
+  const [legal, setLegal] = useState<'privacy' | 'terms' | 'data' | null>(null);
   const { login } = useAuth();
 
   useEffect(() => {
@@ -104,13 +110,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
 
       {/* RIGHT PANEL — Authentication Card (58%) */}
       <main className="relative w-full md:w-[58%] flex-1 min-h-0 bg-[#FDF8F3] flex overflow-y-auto px-6 py-8 md:px-12 md:py-0">
+        {mode === 'signup' ? (
+          <SignupForm onCancel={() => setMode('signin')} onShowLegal={setLegal} />
+        ) : (
         <div className="m-auto w-full max-w-[420px] bg-[#FFFFFF] rounded-[14px] border border-[#E7E5E4] shadow-warm-card p-8">
           <div className="mb-7">
             <h2 className="font-headline text-[20px] font-bold text-[#1C1917] tracking-tight">
               Welcome back
             </h2>
+            {/* No church is named here: an unauthenticated visitor has not said which one they serve,
+                and the console learns it from the sign-in, not before. */}
             <p className="text-[13px] text-[#57534E] mt-1">
-              Sign in to your Destiny Sanctuary Int'L console.
+              Sign in to continue to your church's console.
             </p>
           </div>
 
@@ -189,6 +200,37 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
               {isSubmitting ? 'Signing in…' : 'Sign In to Praxis'}
             </button>
           </form>
+          {/* The other door. A church that does not exist yet cannot sign in, so the way to get one
+              lives here rather than behind a sales address nobody writes down. */}
+          <button
+            type="button"
+            onClick={() => setMode('signup')}
+            className="mt-5 w-full text-center text-xs font-semibold text-[#57534E] hover:text-[#C2410C] transition-colors cursor-pointer"
+          >
+            New to Praxis? Start your church's fourteen-day trial
+          </button>
+
+          {/* What a church is agreeing to, on the screen where it decides. Both documents are in one
+              dialog, opened from either card. */}
+          <p className="mt-3 text-center text-[11px] leading-relaxed text-[#57534E]">
+            Your church's records stay your church's records.{' '}
+            <button
+              type="button"
+              onClick={() => setLegal('privacy')}
+              className="font-semibold text-[#C2410C] hover:underline cursor-pointer"
+            >
+              Privacy
+            </button>
+            {' · '}
+            <button
+              type="button"
+              onClick={() => setLegal('terms')}
+              className="font-semibold text-[#C2410C] hover:underline cursor-pointer"
+            >
+              Terms
+            </button>
+          </p>
+
           {error && (
             <div
               className="mt-4 p-3 rounded-[7px] bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] text-xs"
@@ -198,7 +240,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn }) => {
             </div>
           )}
         </div>
+        )}
       </main>
+
+      {legal && <LegalDialog initialSection={legal} onClose={() => setLegal(null)} />}
     </div>
   );
 };

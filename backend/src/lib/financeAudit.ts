@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { prisma } from './prisma';
+import { prisma, type Db } from './prisma';
 
 /**
  * The finance ledger's tamper-evidence.
@@ -38,7 +38,7 @@ export interface FinanceEntryInput {
   after?: Prisma.InputJsonValue;
 }
 
-export async function lockFinanceLedger(tx: Prisma.TransactionClient): Promise<void> {
+export async function lockFinanceLedger(tx: Db): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LEDGER_LOCK})`;
 }
 
@@ -82,7 +82,7 @@ function hashOf(entry: HashableEntry, previousHash: string): string {
  * Append one entry. Must be called inside the same transaction as the change it records, so a payment
  * can never be written without its ledger line — if the append fails, the payment rolls back with it.
  */
-export async function appendFinanceEntry(tx: Prisma.TransactionClient, input: FinanceEntryInput) {
+export async function appendFinanceEntry(tx: Db, input: FinanceEntryInput) {
   await lockFinanceLedger(tx);
 
   const previous = await tx.financeAuditEntry.findFirst({

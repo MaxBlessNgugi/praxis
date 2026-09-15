@@ -108,6 +108,86 @@ that have not been applied, and does nothing once the database is current.
 
 ---
 
+## 6. Anywhere else: Docker
+
+`backend/Dockerfile` builds the same service for any host that runs containers — Fly, Render, a VPS,
+or the church's own machine. It runs `npm run build`, then starts with `prisma migrate deploy` before
+the server, exactly as the Railway release step does.
+
+```bash
+cd backend
+docker build -t praxis-api .
+docker run --rm -p 4000:4000 --env-file .env praxis-api
+```
+
+Three variables the container needs that a local run does not: `NODE_ENV=production`, the two
+database URLs, and `TRUST_PROXY_HOPS` set to the number of proxies in front of it (`1` for a single
+load balancer). That last one is not optional behind a proxy: the client address decides every
+rate-limit bucket, and an unset hop count means every request looks like it came from the balancer.
+
+The image carries the Prisma CLI, because the boot command is a migration. That is deliberate — see
+the note at the top of the Dockerfile — and it is why `--omit=dev` is *not* used. The container
+reports its own health through a `HEALTHCHECK` against `/health`, so a host that understands
+docker health will restart a container whose database has gone away.
+
+On Fly the same three files matter: `fly.toml` with `internal_port = 4000` and a health check on
+`/health`, `fly secrets set` for the variables, and `fly deploy`. Nothing in the app needs changing.
+
+---
+
+## 7. Watching it
+
+### Health
+
+`GET /health` is the one endpoint with no authentication and no rate limit. It runs `SELECT 1` against
+Postgres and answers:
+
+```json
+{ "status": "ok", "database": "reachable", "environment": "production" }
+```
+
+A process that is up but cannot reach its database answers **503** with `"database": "unreachable"`,
+which is the answer that matters: an API that is listening but cannot read the register is down as far
+as a church is concerned. Both Railway's health check and the Docker `HEALTHCHECK` point at this.
+
+### Uptime
+
+Point any uptime monitor — UptimeRobot, Better Stack, Pingdom, a `curl` in a cron — at
+`https://<your-api-domain>/health` from outside the network, every minute, alerting on **any non-200**
+across two consecutive checks. Watching from outside matters: the point of the monitor is to notice
+the day the host, the domain or the database is gone, and a check from inside the same network often
+survives exactly the failure you are trying to hear about.
+
+Worth adding alongside it, once a church is live: a second monitor on the console's URL. A console
+that loads but cannot reach the API is a broken console too.
+
+### Logs
+
+The API writes **one JSON line per request** and one per failure, on stdout, where the host collects
+them:
+
+```json
+{"at":"2026-09-15T17:04:12.884Z","level":"info","event":"request","requestId":"…","method":"GET","path":"/api/members","status":200,"ms":18,"actorId":"…","organizationId":"…"}
+```
+
+Every response also carries `X-Request-Id`. When somebody reports a screen that failed, that header —
+visible in the browser's network tab — names the exact line in the log, which is usually faster than
+searching by timestamp. `/health` is not logged: a monitor polling it every minute would drown the
+lines worth reading.
+
+### Error tracking
+
+Nothing is reported anywhere until you set `SENTRY_DSN`. With it set, every **5xx** is posted to the
+tracker with the route, the church and the account that hit it — and never the request body, which can
+hold a member's pastoral notes. 4xx responses are not reported at all: those are the client being told
+no, and sending them to a tracker is how a tracker becomes noise nobody reads.
+
+The DSN is a Sentry-compatible one (`https://<key>@<host>/<project>`); the API speaks the ingestion
+protocol directly, so GlitchTip and anything else that implements it work too. Without a DSN the
+behaviour is unchanged apart from the absence of the outbound call: failures are still logged.
+
+---
+
 ## Notes and gotchas
 
 - **Secrets never live in the repo.** `.env*` is git-ignored except `.env.example`. Set them as

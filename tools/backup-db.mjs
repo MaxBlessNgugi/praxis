@@ -8,6 +8,7 @@
  *
  *   node tools/backup-db.mjs                     # → backups/praxis-2026-09-15-1430.dump
  *   node tools/backup-db.mjs --out /mnt/usb      # somewhere that is not this machine
+ *   node tools/backup-db.mjs --keep 8            # …and delete all but the newest eight there
  *   PG_DUMP="C:/Program Files/PostgreSQL/18/bin/pg_dump.exe" node tools/backup-db.mjs
  *
  * Three details are deliberate:
@@ -25,9 +26,14 @@
  *
  * It reads `backend/.env` when no URL is given, so the common case needs no arguments and no shell
  * history full of credentials.
+ *
+ * **Pruning happens only when asked for.** `--keep` is what deletes an old dump, and its absence is
+ * what leaves every file alone — a backup script that quietly removes files is a backup script that
+ * can delete the wrong ones. The date in the filename is what it sorts by, so the newest dump is the
+ * one it protects.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, openSync, readSync, readdirSync, closeSync, statSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readSync, readdirSync, rmSync, closeSync, statSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -132,6 +138,28 @@ if (magic.toString('utf8') !== 'PGDMP') {
 const { size } = statSync(file);
 const kb = (size / 1024).toFixed(0);
 console.log(`backup: wrote ${file} (${kb} KB) from ${url.hostname}:${url.port || '5432'}${url.pathname}`);
+
+// Retention. `praxis-2026-09-15-1430.dump` sorts by name exactly as it sorts by time, so the newest
+// files are the ones at the end and nothing has to be stat-ed or parsed.
+const keep = arg('keep');
+if (keep !== null) {
+  const limit = Number.parseInt(keep, 10);
+  if (!Number.isFinite(limit) || limit < 1) fail('--keep takes a number of dumps to keep, e.g. --keep 8');
+
+  const dumps = readdirSync(outDir)
+    .filter((name) => /^praxis-.*\.dump$/.test(name))
+    .sort();
+  const stale = dumps.slice(0, Math.max(0, dumps.length - limit));
+  for (const name of stale) rmSync(join(outDir, name));
+  console.log(
+    stale.length
+      ? `backup: kept the newest ${limit} of ${dumps.length} in ${outDir}, removed ${stale.length} older`
+      : `backup: ${dumps.length} dump(s) in ${outDir}, all inside the retention of ${limit}`,
+  );
+} else {
+  console.log('backup: nothing was pruned. Pass --keep <n> to keep only the newest n dumps in this directory.');
+}
+
 console.log('');
 console.log('Rehearse the restore into a scratch database before you need it:');
 console.log(`  pg_restore --dbname "postgresql://…/praxis_restore_check" --no-owner --clean "${file}"`);

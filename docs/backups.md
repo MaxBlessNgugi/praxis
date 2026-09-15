@@ -56,9 +56,15 @@ up in your shell history, and it hands the password to `pg_dump` through the env
 <url>` puts the password in the process list, where anything else on the machine can read it.
 
 ```bash
-npm run backup                      # → backups/praxis-2026-09-15-1430.dump, git-ignored
-npm run backup -- --out /mnt/usb    # straight onto the drive that leaves the building
+npm run backup                        # → backups/praxis-2026-09-15-1430.dump, git-ignored
+npm run backup -- --out /mnt/usb      # straight onto the drive that leaves the building
+npm run backup -- --keep 8            # …and delete all but the newest eight there
 ```
+
+**Retention.** `--keep` is the only thing that deletes a dump, and it deletes from the *end* of the
+list by date, keeping the newest. Leaving it off is the safe default: the script writes a file and
+touches nothing else. Eight weekly dumps is two months, which is the point at which a giving
+discrepancy is usually noticed — see the cadence below.
 
 ```bash
 # A complete dump, schema and data, in a form that restores cleanly.
@@ -80,6 +86,37 @@ Two details that matter:
 
 Before every risky migration, take one. It costs seconds and it is the only thing that makes the
 migration reversible.
+
+### Putting it on a schedule
+
+The habit is easy to start and easy to lose, so the command belongs in a scheduler rather than in
+somebody's memory. Both of these write to a directory that leaves the machine — a synced folder, an
+attached drive, or a bucket-mounted path — and prune to the newest eight.
+
+```bash
+# Linux / macOS — every Sunday at 02:00, from the repository root.
+0 2 * * 0  cd /srv/praxis && /usr/bin/node tools/backup-db.mjs --out /mnt/backups --keep 8 >> /var/log/praxis-backup.log 2>&1
+```
+
+```powershell
+# Windows — Task Scheduler, Weekly, Sunday 02:00, running:
+C:\Program Files\nodejs\node.exe C:\praxis\tools\backup-db.mjs --out D:\praxis-backups --keep 8
+```
+
+Two things to check the first time it runs: the log line says **`wrote … .dump (… KB)`** rather than
+an error from `pg_dump`, and the file dated today is in the output directory. A scheduled job that
+silently produces nothing is the failure this whole document exists to prevent, and the only way to
+know is to look once.
+
+### The copy a church can take itself
+
+`Settings → Data & backup` offers an administrator a JSON file of the church's own registers, ledgers,
+minutes, notices and staff list — with retired rows included, no credentials, and the file contents
+listed but not embedded. It is written into the audit log when taken.
+
+That file is for the church, not for recovery: it cannot be restored into Praxis. Its purpose is
+sovereignty — a church can hold its own data, read it, and take it elsewhere — and it is deliberately
+*not* a substitute for the dump above.
 
 **Suggested cadence for a single congregation:** the provider's automatic backups continuously; a
 `pg_dump` kept in the church's Drive or S3 bucket weekly; and one more taken by hand immediately before
@@ -142,8 +179,10 @@ recovery. Put a note in the calendar for it once a quarter.
 
 ## What is not covered yet
 
-- **No automated off-site dump.** The weekly `pg_dump` is a manual step. It belongs in a scheduled job
-  once someone owns it; until then it is a habit, and habits lapse.
+- **No automated off-site dump in the product.** The scheduled job above is an instruction, not
+  something Praxis runs: a container that dumps its own database has to hold credentials for the
+  place it dumps to, and the provider's own backups already cover the machine. If an off-site copy is
+  wanted, the cron line above is how it is taken, on a host somebody owns.
 - **No restore drill has been run against a real church database** — Praxis has not yet held live data.
   Do the rehearsal above before the first real Sunday, not after the first incident.
 - **`STORAGE_DRIVER=s3` is reserved, not implemented.** If you enable it later, the bucket needs its own

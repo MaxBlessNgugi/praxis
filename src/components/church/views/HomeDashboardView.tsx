@@ -4,6 +4,8 @@ import { DEFAULT_LOCATION, formatKes } from '../../../data/churchDomain';
 import { useDialog } from '../dialog';
 import { interactiveCard } from '../interactiveCard';
 import { useOverviewReport } from '../../../lib/hooks/useReports';
+import { useAuth } from '../../../lib/auth';
+import { GettingStartedCard } from '../GettingStartedCard';
 import {
   ApiError,
   api,
@@ -26,6 +28,14 @@ const TITHE_METHODS: Record<string, PaymentMethod> = {
 };
 
 /** `YYYY-MM-DDTHH:mm` in local time, which is exactly what `<input type="datetime-local">` reads. */
+/** The salutation for the local clock. A fixed one greets nobody correctly past noon. */
+function salutation(date: Date): string {
+  const hour = date.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 function localDateTimeValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -91,6 +101,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
   // Fetch real data from backend
   const { data: overview, isLoading: overviewLoading, error: overviewError, refetch } = useOverviewReport();
+  // Who is signed in, and which church they are looking at. Both used to be literals here.
+  const { user, organization } = useAuth();
 
   // Operational metrics from real API
   const activeMembersCount = overview?.cards.activeMembers ?? 0;
@@ -303,6 +315,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   });
 
   const progressPercent = Math.min(100, Math.round((monthlyTithesCurrent / monthlyTithesTarget) * 100));
+  // A church with nobody on the roll yet: the figures below are all zeros, and zeros teach nobody
+  // anything. What belongs at the top of the screen on day one is what to do next.
+  const isFirstRun = !overviewLoading && membersTotal === 0;
 
   return (
     <div className="flex flex-col w-full min-h-full pb-28 text-[#1C1917] font-['Inter',sans-serif] bg-[#FDF8F3]">
@@ -346,14 +361,16 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             </div>
             <div className="flex items-baseline gap-2.5">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1C1917]">
-                Good morning, Bishop Sammy
+                {salutation(new Date())}, {user?.name ?? 'friend'}
               </h1>
-              <span className="hidden sm:inline-block text-xs font-medium px-2.5 py-0.5 rounded-[9px] bg-[#F8F1E9] text-[#57534E] border border-[#E7E5E4]">
-                Destiny Sanctuary Int'L
-              </span>
+              {organization && (
+                <span className="hidden sm:inline-block text-xs font-medium px-2.5 py-0.5 rounded-[9px] bg-[#F8F1E9] text-[#57534E] border border-[#E7E5E4]">
+                  {organization.name}
+                </span>
+              )}
             </div>
             <p className="text-xs text-[#57534E]">
-              Nyahururu Main Church • {membersTotal} souls on the roll across {householdsCount} households.
+              {membersTotal} souls on the roll across {householdsCount} households.
               {overviewLoading && <span className="ml-1 text-[#A8A29E]">• Refreshing…</span>}
             </p>
           </div>
@@ -403,6 +420,17 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* FIRST-RUN GUIDANCE — a new church has nothing to read in figures yet */}
+      {/* ========================================================================= */}
+      {isFirstRun && (
+        <div className="w-full px-6 sm:px-8 pt-6">
+          <div className="max-w-7xl mx-auto">
+            <GettingStartedCard onNavigate={onNavigateTab} />
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 4 CORE METRIC CARDS */}

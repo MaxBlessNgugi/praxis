@@ -23,6 +23,19 @@ settingsRouter.use(requireAuth);
 settingsRouter.get('/profile', asyncHandler(settingsController.getProfile));
 settingsRouter.patch('/profile', ADMINS, asyncHandler(settingsController.updateProfile));
 
+// The welcome wizard, which a church that signed itself up runs once. Not behind the subscription
+// gate: a brand-new trial church has nothing to write yet, and a church that lapsed mid-wizard must be
+// able to finish saying where it meets.
+settingsRouter.post('/onboarding', ADMINS, asyncHandler(settingsController.completeOnboarding));
+
+/**
+ * The church's own data, as a file.
+ *
+ * `admin`, not `staff`: a copy of every member's record — pastoral notes included — is the same class
+ * of act as retiring one, and it is written into the church's audit log so the copy leaves a trace.
+ */
+settingsRouter.get('/export', ADMINS, asyncHandler(settingsController.exportData));
+
 settingsRouter.get('/preferences', asyncHandler(settingsController.listSettings));
 settingsRouter.get('/preferences/backup', ADMINS, asyncHandler(settingsController.backup));
 settingsRouter.get('/preferences/:key', asyncHandler(settingsController.getSetting));

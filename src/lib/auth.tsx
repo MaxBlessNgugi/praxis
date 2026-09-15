@@ -1,8 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { User, AuthState } from '../types';
+import type { ActiveOrganization, User, AuthState } from '../types';
 import {
   api,
+  authApi,
+  billingApi,
+  vendorApi,
   setAuthToken,
+  setEphemeralToken,
   clearToken,
   getStoredToken,
   setUnauthorizedHandler,
@@ -10,6 +14,9 @@ import {
   type AuthUserDto,
   type LoginResponse,
   type MeResponse,
+  type SignupBody,
+  type SubscriptionDto,
+  type SupportSessionDto,
 } from './api';
 
 /**
@@ -30,6 +37,8 @@ function toUser(dto: AuthUserDto, rights: AuthRights): User {
     name: dto.name,
     email: dto.email,
     roleKey: isRoleKey(dto.roleKey) ? dto.roleKey : 'viewer',
+    roleName: dto.roleName,
+    isPlatformAdmin: dto.isPlatformAdmin,
     memberId: dto.memberId,
     panels: rights.panels ?? {},
     actions: rights.actions ?? {},
@@ -37,17 +46,48 @@ function toUser(dto: AuthUserDto, rights: AuthRights): User {
 }
 
 interface AuthContextValue extends AuthState {
+  /**
+   * What this church is on, and what it owes.
+   *
+   * Held with the session rather than fetched by each screen that cares, because two of them — the
+   * billing screen and the gate that decides whether the console opens at all — need it on the same
+   * first paint. `restoreSession` is also the refresh: it re-reads `/me`, subscription included.
+   */
+  subscription: SubscriptionDto | null;
   /** `remember` picks the storage the token is kept in; see `setAuthToken` in `api.ts`. */
   login: (email: string, password: string, remember?: boolean) => Promise<void>;
+  /** A church signing itself up. Answers the same session shape as `login`, so neither is special. */
+  signup: (body: SignupBody) => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
+  /**
+   * Re-reads the church's standing after something changed it. Kept apart from `restoreSession` on
+   * purpose: that one is the boot-time "is there a session?" and flashes the splash screen, which is
+   * the wrong thing to do to a treasurer who has just asked for a different plan.
+   */
+  refreshSubscription: () => Promise<void>;
+  /**
+   * The church a Praxis operator is currently looking inside, or null in an ordinary session.
+   *
+   * Held here because it describes the *session* rather than any one screen: the strip that says
+   * whose access this is renders above every panel, and the moment it stopped being true the operator
+   * would need to be told everywhere at once.
+   */
+  supportSession: SupportSessionDto | null;
+  /** Swap the operator's own session for the visit's, keeping the original to hand back. */
+  enterSupportSession: (session: SupportSessionDto) => Promise<void>;
+  /** Close the visit — from inside it, so the church's log records the end as well as the start. */
+  exitSupportSession: (reason: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [organization, setOrganization] = useState<ActiveOrganization | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionDto | null>(null);
   const [token, setTokenState] = useState<string | null>(null);
+  const [supportSession, setSupportSession] = useState<SupportSessionDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const isAuthenticated = !!user && !!token;
@@ -61,9 +101,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const response = await api.get<MeResponse>('/api/auth/me');
         setUser(toUser(response.data.user, response.data.rights));
+        setOrganization(response.data.organization);
+        setSubscription(response.data.subscription);
       } catch {
         clearToken();
         setUser(null);
+        setOrganization(null);
+        setSubscription(null);
         setTokenState(null);
       }
     }
@@ -75,6 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setUnauthorizedHandler(() => {
       setUser(null);
+      setOrganization(null);
+      setSubscription(null);
+      setSupportSession(null);
       setTokenState(null);
     });
     return () => setUnauthorizedHandler(null);
@@ -92,6 +139,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthToken(data.token, remember);
     setTokenState(data.token);
     setUser(toUser(data.user, data.rights));
+    setOrganization(data.organization);
+    setSubscription(data.subscription);
+  };
+
+  /**
+   * A church signing itself up: the same session a sign-in would have produced, so from here on there
+   * is one kind of session and nothing downstream asks how it was made.
+   */
+  const signup = async (body: SignupBody) => {
+    const { data } = await authApi.signup(body);
+    setAuthToken(data.token);
+    setTokenState(data.token);
+    setUser(toUser(data.user, data.rights));
+    setOrganization(data.organization);
+    setSubscription(data.subscription);
+  };
+
+  const refreshSubscription = async () => {
+    const envelope = await billingApi.subscription();
+    setSubscription(envelope.data);
+  };
+
+  /**
+   * Step inside a church as an operator.
+   *
+   * The visit's token goes into memory and the operator's own stays in storage, so closing the tab
+   * ends the visit rather than resuming it. The whole session is then re-read — `/me` answers for the
+   * *visited* church, with the support role's rights — which is what makes every panel below behave
+   * exactly as it would for that church's own administrator, with nothing for a screen to special-case.
+   */
+  const enterSupportSession = async (session: SupportSessionDto) => {
+    setEphemeralToken(session.token);
+    try {
+      const response = await api.get<MeResponse>('/api/auth/me');
+      setUser(toUser(response.data.user, response.data.rights));
+      setOrganization(response.data.organization);
+      setSubscription(response.data.subscription);
+      setSupportSession(session);
+      setTokenState(session.token);
+    } catch (error) {
+      setEphemeralToken(null);
+      setSupportSession(null);
+      throw error;
+    }
+  };
+
+  /**
+   * Close the visit and hand the operator their own session back.
+   *
+   * The closing line is written from inside the session, so a failure to write it must not strand the
+   * operator inside another church: the local session is restored either way, and the visit is over
+   * when the token expires at the latest.
+   */
+  const exitSupportSession = async (reason: string) => {
+    try {
+      await vendorApi.endSupportSession({ reason });
+    } catch {
+    } finally {
+      setEphemeralToken(null);
+      setSupportSession(null);
+      await restoreSession();
+    }
   };
 
   const logout = async () => {
@@ -101,18 +210,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       clearToken();
       setUser(null);
+      setOrganization(null);
+      setSubscription(null);
+      setSupportSession(null);
       setTokenState(null);
     }
   };
 
   const value: AuthContextValue = {
     user,
+    organization,
+    subscription,
     token,
     isAuthenticated,
     isLoading,
     login,
+    signup,
     logout,
     restoreSession,
+    refreshSubscription,
+    supportSession,
+    enterSupportSession,
+    exitSupportSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

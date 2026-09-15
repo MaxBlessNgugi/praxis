@@ -310,7 +310,15 @@ export async function sendBroadcast(id: string, input: SendBroadcastInput, actor
   const broadcast = await prisma.$transaction(async (tx) => {
     const updated = await tx.broadcast.update({
       where: { id },
-      data: { status: 'sent', sentAt, recipients: delivery.delivered },
+      // The provider's own verdict is stored beside the campaign rather than described once in a
+      // toast: the office asks "did the funeral notice reach people?" a week later, and this is the
+      // row that answers it — how many went out, how many did not, and the first reasons why.
+      data: {
+        status: 'sent',
+        sentAt,
+        recipients: delivery.delivered,
+        lastReport: delivery as unknown as Prisma.InputJsonValue,
+      },
     });
     await tx.auditLog.create({
       data: {

@@ -69,7 +69,11 @@ export const AnnouncementsPanel: React.FC = () => {
 
   const handleDeleteAnnouncement = async (id: string) => {
     try {
-      await retireAnnouncement.run(id);
+      // Every retirement in this system carries a reason into the Trash and the audit trail.
+      await retireAnnouncement.run(id, {
+        reason: 'other',
+        reasonLabel: 'Taken off the noticeboard by the church office',
+      });
       await refetch();
     } catch {
       // retireAnnouncement.error is rendered below the list.

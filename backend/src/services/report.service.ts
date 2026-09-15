@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { money, prisma } from '../lib/prisma';
 import { live, liveSql } from '../lib/live';
+import { requireTenantId } from '../lib/tenant';
 
 /**
  * Reports: the aggregate questions a council asks.
@@ -28,16 +29,20 @@ const since = (column: string, range: Range) => {
  *
  * Grouping in SQL rather than in JavaScript means a year of giving is one row per month instead of
  * every payment, which is the difference between a report that scales and one that does not.
+ *
+ * The church is filtered here by hand, and has to be: raw SQL is the one place the tenant-scoped
+ * client cannot reach, so a query written here is a query that scopes itself or leaks.
  */
 async function givingByMonth(range: Range) {
+  const organizationId = requireTenantId();
   const [tithes, offerings] = await Promise.all([
     prisma.$queryRaw<Array<{ month: Date; total: Prisma.Decimal }>>`
       SELECT date_trunc('month', "receivedAt") AS month, SUM("amount") AS total
-      FROM "Tithe" WHERE ${liveSql} ${since('"receivedAt"', range)}
+      FROM "Tithe" WHERE ${liveSql} AND "organizationId" = ${organizationId} ${since('"receivedAt"', range)}
       GROUP BY 1 ORDER BY 1`,
     prisma.$queryRaw<Array<{ month: Date; total: Prisma.Decimal }>>`
       SELECT date_trunc('month', "receivedAt") AS month, SUM("amount") AS total
-      FROM "Offering" WHERE ${liveSql} ${since('"receivedAt"', range)}
+      FROM "Offering" WHERE ${liveSql} AND "organizationId" = ${organizationId} ${since('"receivedAt"', range)}
       GROUP BY 1 ORDER BY 1`,
   ]);
 
@@ -136,6 +141,19 @@ export async function memberReport() {
     }),
   ]);
 
+  // The census the console draws counts baptism records, envelopes issued and the under-19 roll, so
+  // those travel with the rest of the register's totals. Nursery to Grade 12 is the under-19 band,
+  // and a member with no date of birth on file is left out of it rather than guessed into an age.
+  const today = new Date();
+  const youthCutoff = new Date(today.getFullYear() - 19, today.getMonth(), today.getDate());
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const [byBaptismType, envelopesIssued, baptismsThisYear, youth] = await Promise.all([
+    prisma.member.groupBy({ by: ['baptismType'], where: live, _count: true }),
+    prisma.member.count({ where: { ...live, envelopeNumber: { not: null } } }),
+    prisma.member.count({ where: { ...live, baptismDate: { gte: startOfYear } } }),
+    prisma.member.count({ where: { ...live, dateOfBirth: { gte: youthCutoff } } }),
+  ]);
+
   // Joining dates are few enough to fold in memory, and doing it here keeps the query portable.
   const byYear = new Map<string, number>();
   for (const row of recent) {
@@ -150,9 +168,17 @@ export async function memberReport() {
     else sizes.household += 1;
   }
 
+  const total = byStatus.reduce((sum, row) => sum + row._count, 0);
+
   return {
-    total: byStatus.reduce((sum, row) => sum + row._count, 0),
+    total,
     byStatus: Object.fromEntries(byStatus.map((row) => [row.status, row._count])),
+    byBaptismType: Object.fromEntries(byBaptismType.map((row) => [row.baptismType, row._count])),
+    // 'Baptized or dedicated': the two kinds a certificate can be printed from, as opposed to 'none'.
+    withBaptismRecord: total - (byBaptismType.find((row) => row.baptismType === 'none')?._count ?? 0),
+    envelopesIssued,
+    baptismsThisYear,
+    youth,
     byLocation: byLocation.map((row) => ({ location: row.location, members: row._count })).sort((a, b) => b.members - a.members),
     households: { total: households, ...sizes },
     joinedByYear: [...byYear.entries()].map(([year, members]) => ({ year, members })).sort((a, b) => a.year.localeCompare(b.year)),

@@ -20,6 +20,27 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
 /** What the token carries. Rights are read from the database on every request, not trusted here. */
 export interface TokenPayload {
   sub: string;
+  /**
+   * The church this token is acting for.
+   *
+   * A claim rather than a header, so a client cannot point itself at another parish by editing a
+   * request: the token has to have been minted for a membership that exists. Absent means "whichever
+   * church this account belongs to by default", which is what a token minted before this feature
+   * existed already means.
+   */
+  org?: string;
+  /**
+   * A **support session**: a Praxis operator acting inside a church that is not their own.
+   *
+   * It is a separate claim rather than "an operator may name any church", because the two have very
+   * different consequences. This one is minted by one endpoint, expires in an hour, and is written into
+   * the target church's own audit log — so it is a period of access with a start and an end that the
+   * church can read, not a standing permission.
+   *
+   * `sub` is still the operator's own account, which is the point: every row they touch names *them*,
+   * and a support session cannot be handed to somebody else because it was never that person's token.
+   */
+  imp?: boolean;
 }
 
 /**
@@ -28,13 +49,20 @@ export interface TokenPayload {
  * The honest limitation: a token issued for a week cannot be withdrawn before it expires. Adding
  * revocation means a denylist or a shorter lifetime with a refresh flow — a decision to make
  * deliberately, not by drift.
+ *
+ * A support-session token is the exception, and deliberately so: it is minted with an explicit
+ * lifetime measured in minutes, because an operator looking at a parish's records has no business
+ * holding an eight-hour key to it.
  */
-export function signAccessToken(payload: TokenPayload): string {
+export function signAccessToken(payload: TokenPayload, expiresIn?: string): string {
   return jwt.sign(payload, env.JWT_SECRET, {
     algorithm: 'HS256',
-    expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
+    expiresIn: (expiresIn ?? env.JWT_EXPIRES_IN) as jwt.SignOptions['expiresIn'],
   });
 }
+
+/** How long a support session lasts. Short on purpose: it is a visit, not a key. */
+export const SUPPORT_SESSION_MINUTES = 60;
 
 /**
  * A token that cannot be verified is a `401`, never a `500`.
@@ -57,5 +85,9 @@ export function verifyAccessToken(token: string): TokenPayload {
   if (typeof decoded === 'string' || typeof decoded.sub !== 'string') {
     throw new AppError(401, 'That access token is not valid', 'invalid_token');
   }
-  return { sub: decoded.sub };
+  return {
+    sub: decoded.sub,
+    org: typeof decoded.org === 'string' ? decoded.org : undefined,
+    imp: decoded.imp === true,
+  };
 }

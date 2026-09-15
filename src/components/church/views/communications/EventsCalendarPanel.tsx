@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ChurchEventItem } from '../../../../types';
-import { INITIAL_CHURCH_EVENTS } from '../../../../data/churchMockData';
 import { useDialog } from '../../dialog';
-import { DEFAULT_LOCATION, LOCATIONS } from '../../../../data/churchDomain';
+import { DEFAULT_LOCATION } from '../../../../data/churchDomain';
+import { eventsApi } from '../../../../lib/api';
+import { EVENT_KIND, toChurchEventItem } from '../../../../lib/adapters';
+import { useEvents, useMutation } from '../../../../hooks/useApi';
+import { usePermissions } from '../../../../lib/permissions';
+import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 
 /** The published dates, e.g. "April 16 – 19, 2025"; a single-day event reads "November 24, 2025".
  *  `en-US` because that is the month-first order the rest of the mockup and the church's own
@@ -17,76 +21,71 @@ const formatEventDate = (date: string, endDate?: string) => {
   return `${first} – ${part(endDate, sameMonth ? { day: 'numeric' } : { month: 'long', day: 'numeric' })}, ${year}`;
 };
 
+/** `<input type="date">` and the "this month" filter both want a `YYYY-MM-DD` day. */
+const today = () => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
+/** The time fields are free text, so `18:00`, `6:00 PM` and a blank all have to land on an instant. */
+const toInstant = (day: string, time: string) => {
+  const match = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i.exec(time.trim());
+  const hour = match ? (Number(match[1]) % 12) + (match[3]?.toLowerCase() === 'pm' ? 12 : 0) : 9;
+  const minute = match?.[2] ? Number(match[2]) : 0;
+  const clock = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+  return new Date(`${day}T${clock}`).toISOString();
+};
+
 export const EventsCalendarPanel: React.FC = () => {
-  const [events, setEvents] = useState<ChurchEventItem[]>(INITIAL_CHURCH_EVENTS);
+  const { items, loading, error, refetch } = useEvents({ upcoming: true });
+  const createEvent = useMutation(eventsApi.create);
+  const { canEdit } = usePermissions();
+
+  const events = useMemo(() => items.map(toChurchEventItem), [items]);
+
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isCreatingEvent, setIsCreatingEvent] = useState<boolean>(false);
   const creatingEventDialog = useDialog(() => setIsCreatingEvent(false), "Schedule New Church Event");
-  const [rsvpSuccessId, setRsvpSuccessId] = useState<string | null>(null);
 
-  // New Event Form State
+  // New Event Form State. The events table stores a title, a kind, a venue, a time window and a
+  // description, so the form asks for exactly that and nothing it would have to discard.
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<ChurchEventItem['category']>('fellowship');
-  const [ministry, setMinistry] = useState('Groups & Fellowships');
-  const [date, setDate] = useState('2025-03-09');
-  const [startTime, setStartTime] = useState('06:00 PM');
-  const [endTime, setEndTime] = useState('08:00 PM');
+  const [date, setDate] = useState(today());
+  const [startTime, setStartTime] = useState('18:00');
+  const [endTime, setEndTime] = useState('20:00');
   const [location, setLocation] = useState('Fellowship Hall · Nyahururu');
-  const [campus, setCampus] = useState<string>(DEFAULT_LOCATION);
   const [description, setDescription] = useState('');
-  const [rsvpRequired, setRsvpRequired] = useState(true);
-  const [capacity, setCapacity] = useState<number>(60);
-  const [contactPerson, setContactPerson] = useState('Arthur Wanjala');
 
   const filteredEvents = events.filter((evt) => {
     if (selectedCategory !== 'all' && evt.category !== selectedCategory) return false;
     return true;
   });
 
-  const handleCreateEvent = (e: React.FormEvent) => {
+  const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    const colors: Record<ChurchEventItem['category'], string> = {
-      worship: '#C2410C',
-      fellowship: '#7C3AED',
-      youth: '#D97706',
-      outreach: '#2563EB',
-      governance: '#059669',
-      training: '#0891B2',
-    };
-
-    const newEvent: ChurchEventItem = {
-      id: `evt-${Date.now()}`,
-      title,
-      category,
-      ministry,
-      date,
-      startTime,
-      endTime,
-      location,
-      campus,
-      description,
-      rsvpRequired,
-      capacity: rsvpRequired ? Number(capacity) : undefined,
-      rsvpsCount: 1,
-      contactPerson,
-      colorTag: colors[category] || '#C2410C',
-    };
-
-    setEvents([...events, newEvent]);
-    setIsCreatingEvent(false);
-    setTitle('');
-    setDescription('');
+    try {
+      await createEvent.run({
+        title: title.trim(),
+        kind: EVENT_KIND[category],
+        venue: location.trim() || DEFAULT_LOCATION,
+        startsAt: toInstant(date, startTime),
+        endsAt: toInstant(date, endTime),
+        description: description.trim(),
+      });
+      await refetch();
+      setIsCreatingEvent(false);
+      setTitle('');
+      setDescription('');
+    } catch {
+      // createEvent.error is rendered inside the modal.
+    }
   };
 
-  const handleRsvp = (eventId: string) => {
-    setEvents(
-      events.map((e) => (e.id === eventId ? { ...e, rsvpsCount: e.rsvpsCount + 1 } : e))
-    );
-    setRsvpSuccessId(eventId);
-    setTimeout(() => setRsvpSuccessId(null), 3000);
-  };
+  const writeError = createEvent.error;
 
   return (
     <div className="flex flex-col space-y-6">
@@ -108,13 +107,13 @@ export const EventsCalendarPanel: React.FC = () => {
 
         <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Total RSVPs Logged</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Scheduled This Month</span>
             <div className="text-2xl font-black text-[#059669] mt-0.5">
-              {events.reduce((acc, e) => acc + e.rsvpsCount, 0)} Registrations
+              {events.filter((e) => e.date.slice(0, 7) === today().slice(0, 7)).length} This Month
             </div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
               <span aria-hidden="true" className="material-symbols-outlined text-[14px]">how_to_reg</span>
-              Community Engagement High
+              Live Calendar Feed
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
@@ -126,7 +125,7 @@ export const EventsCalendarPanel: React.FC = () => {
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">National Conferences</span>
             <div className="text-2xl font-black text-[#2563EB] mt-0.5">
-              {events.filter((e) => e.title.includes('Conference')).length} Conventions
+              {events.filter((e) => e.category === 'training').length} Conventions
             </div>
             <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
               <span aria-hidden="true" className="material-symbols-outlined text-[14px]">public</span>
@@ -165,7 +164,7 @@ export const EventsCalendarPanel: React.FC = () => {
               Church Events & Facilities Calendar
             </h3>
             <p className="text-xs text-[#57534E] mt-0.5">
-              Schedule church gatherings, track RSVP headcounts, and coordinate campus hall reservations.
+              Schedule church gatherings and coordinate campus hall reservations.
             </p>
           </div>
 
@@ -184,23 +183,35 @@ export const EventsCalendarPanel: React.FC = () => {
               <option value="training">Training / Seminars</option>
             </select>
 
-            <button
-              type="button"
-              onClick={() => setIsCreatingEvent(true)}
-              className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
-              Schedule Event
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => setIsCreatingEvent(true)}
+                className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
+                Schedule Event
+              </button>
+            )}
           </div>
         </div>
 
+        {writeError && <ErrorBlock message={writeError} onRetry={() => void refetch()} className="mb-4" />}
+
         {/* Events Cards Grid */}
+        {loading && items.length === 0 ? (
+          <LoadingBlock label="Loading church events…" />
+        ) : error ? (
+          <ErrorBlock message={error} onRetry={() => void refetch()} />
+        ) : filteredEvents.length === 0 ? (
+          <EmptyBlock
+            icon="event"
+            title="No events on the calendar"
+            hint="Add the next gathering and it appears here for the whole church."
+          />
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredEvents.map((evt) => {
-            const isRsvpd = rsvpSuccessId === evt.id;
-            const percentFilled = evt.capacity ? Math.round((evt.rsvpsCount / evt.capacity) * 100) : null;
-
             return (
               <div
                 key={evt.id}
@@ -237,42 +248,11 @@ export const EventsCalendarPanel: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="pt-3 border-t border-[#E7E5E4]/80 flex items-center justify-between text-xs">
-                  <div>
-                    {evt.rsvpRequired ? (
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-[#1C1917]">{evt.rsvpsCount} RSVPs</span>
-                        {evt.capacity && (
-                          <span className="text-[11px] text-[#A8A29E]">
-                            / {evt.capacity} Max ({percentFilled}%)
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-[#059669] font-bold">Open Admission</span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {evt.rsvpRequired && (
-                      <button
-                        type="button"
-                        onClick={() => handleRsvp(evt.id)}
-                        className={`px-2.5 py-1 rounded-[6px] text-xs font-bold transition-all cursor-pointer ${
-                          isRsvpd
-                            ? 'bg-[#059669] text-white'
-                            : 'bg-[#C2410C] hover:bg-[#EA580C] text-white shadow-xs'
-                        }`}
-                      >
-                        {isRsvpd ? 'RSVP Confirmed!' : '+ RSVP'}
-                      </button>
-                    )}
-                  </div>
-                </div>
               </div>
             );
           })}
         </div>
+        )}
       </div>
 
       {/* MODAL: Schedule Event */}
@@ -303,31 +283,20 @@ export const EventsCalendarPanel: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="event-category" className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
-                  <select id="event-category" aria-label="Category"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as any)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  >
-                    <option value="worship">Worship & Service</option>
-                    <option value="fellowship">Groups & Fellowships</option>
-                    <option value="youth">Youth & Discipleship Class</option>
-                    <option value="outreach">Outreach & Mercy</option>
-                    <option value="governance">Church Council</option>
-                    <option value="training">Training / Catechism</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="event-ministry" className="block text-xs font-bold text-[#1C1917] mb-1">Hosting Ministry</label>
-                  <input id="event-ministry" aria-label="Hosting Ministry"
-                    type="text"
-                    value={ministry}
-                    onChange={(e) => setMinistry(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  />
-                </div>
+              <div>
+                <label htmlFor="event-category" className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
+                <select id="event-category" aria-label="Category"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as ChurchEventItem['category'])}
+                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                >
+                  <option value="worship">Worship & Service</option>
+                  <option value="fellowship">Groups & Fellowships</option>
+                  <option value="youth">Youth & Discipleship Class</option>
+                  <option value="outreach">Outreach & Mercy</option>
+                  <option value="governance">Church Council</option>
+                  <option value="training">Training / Catechism</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
@@ -344,7 +313,7 @@ export const EventsCalendarPanel: React.FC = () => {
                   <label htmlFor="event-start" className="block text-xs font-bold text-[#1C1917] mb-1">Start Time</label>
                   <input id="event-start" aria-label="Start Time"
                     type="text"
-                    placeholder="06:00 PM"
+                    placeholder="18:00"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -354,7 +323,7 @@ export const EventsCalendarPanel: React.FC = () => {
                   <label htmlFor="event-end" className="block text-xs font-bold text-[#1C1917] mb-1">End Time</label>
                   <input id="event-end" aria-label="End Time"
                     type="text"
-                    placeholder="08:00 PM"
+                    placeholder="20:00"
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
@@ -362,31 +331,15 @@ export const EventsCalendarPanel: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="event-location" className="block text-xs font-bold text-[#1C1917] mb-1">Location / Room</label>
-                  <input id="event-location" aria-label="Location / Room"
-                    type="text"
-                    placeholder="e.g. Fellowship Hall"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="event-campus" className="block text-xs font-bold text-[#1C1917] mb-1">Campus</label>
-                  <select id="event-campus" aria-label="Campus"
-                    value={campus}
-                    onChange={(e) => setCampus(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  >
-                    {LOCATIONS.map((location) => (
-                      <option key={location} value={location}>
-                        {location}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label htmlFor="event-location" className="block text-xs font-bold text-[#1C1917] mb-1">Location / Room</label>
+                <input id="event-location" aria-label="Location / Room"
+                  type="text"
+                  placeholder="e.g. Fellowship Hall"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                />
               </div>
 
               <div>
@@ -400,33 +353,7 @@ export const EventsCalendarPanel: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3 items-center">
-                <div className="flex items-center gap-2 pt-4">
-                  <input
-                    type="checkbox"
-                    id="rsvpReq"
-                    checked={rsvpRequired}
-                    onChange={(e) => setRsvpRequired(e.target.checked)}
-                    className="rounded text-[#C2410C] focus:ring-[#C2410C]"
-                  />
-                  <label htmlFor="rsvpReq" className="text-xs font-bold text-[#1C1917] cursor-pointer">
-                    RSVP Required
-                  </label>
-                </div>
-
-                {rsvpRequired && (
-                  <div>
-                    <label htmlFor="event-capacity" className="block text-xs font-bold text-[#1C1917] mb-1">Capacity Limit</label>
-                    <input id="event-capacity" aria-label="Capacity Limit"
-                      type="number"
-                      min={1}
-                      value={capacity}
-                      onChange={(e) => setCapacity(Number(e.target.value))}
-                      className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono"
-                    />
-                  </div>
-                )}
-              </div>
+              {createEvent.error && <ErrorBlock message={createEvent.error} />}
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
                 <button
@@ -438,9 +365,10 @@ export const EventsCalendarPanel: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+                  disabled={createEvent.pending}
+                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-60"
                 >
-                  Publish Event
+                  {createEvent.pending ? 'Publishing…' : 'Publish Event'}
                 </button>
               </div>
             </form>

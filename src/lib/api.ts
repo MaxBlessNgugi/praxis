@@ -1,3 +1,5 @@
+import type { ActiveOrganization } from '../types';
+
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 /**
@@ -39,6 +41,18 @@ export function setAuthToken(newToken: string | null, remember = true): void {
 
 export function clearToken(): void {
   setAuthToken(null);
+}
+
+/**
+ * A token for this tab only, never written to storage.
+ *
+ * A support session's token is the one token that must *not* survive a reload: it is a Praxis
+ * operator looking inside somebody else's church for an hour, and a browser restart that silently
+ * reopened that visit would be a visit nobody chose. So it lives in memory, and the operator's own
+ * token stays in storage untouched underneath, ready to be handed back.
+ */
+export function setEphemeralToken(newToken: string | null): void {
+  token = newToken;
 }
 
 /**
@@ -114,6 +128,9 @@ async function request<T>(
     'Content-Type': 'application/json',
   };
 
+  // The church is never sent: it is a claim inside the token, and the service scopes every query to
+  // it. So there is no header to get wrong, and no way for the console to ask for another church's
+  // rows — only to act for the one this token was minted for.
   const authHeader = getAuthHeader();
   if (authHeader) {
     headers.Authorization = authHeader;
@@ -175,10 +192,13 @@ export interface AuthUserDto {
   name: string;
   email: string;
   roleKey: string;
+  roleName: string | null;
   memberId: string | null;
   isActive: boolean;
   lastLoginAt: string | null;
   createdAt: string;
+  /** A Praxis employee. It is what shows the vendor screens, and nothing else does. */
+  isPlatformAdmin: boolean;
 }
 
 /** Panel + action rights resolved from the account's role. The full panel map, or the permitted subset. */
@@ -192,15 +212,33 @@ export interface LoginResponse {
     token: string;
     expiresIn: string;
     user: AuthUserDto;
+    /** The church the session landed in. The token carries it; nothing else is sent. */
+    organization: ActiveOrganization;
     rights: AuthRights;
+    /** What the church is on. Null for a church an operator created without putting on a plan. */
+    subscription: SubscriptionDto | null;
   };
 }
 
 export interface MeResponse {
   data: {
     user: AuthUserDto;
+    organization: ActiveOrganization;
     rights: AuthRights;
+    /** Every church this account may act for. One today; the switcher's list when there are more. */
+    organizations: Array<ActiveOrganization & { roleKey: string | null; isDefault: boolean }>;
+    subscription: SubscriptionDto | null;
   };
+}
+
+/** What a new church tells Praxis about itself. The wizard collects the rest afterwards. */
+export interface SignupBody {
+  churchName: string;
+  adminName: string;
+  email: string;
+  password: string;
+  phone: string;
+  country: string;
 }
 
 // ==================== SHARED ENVELOPES ====================
@@ -236,6 +274,15 @@ export interface MemberRef {
 export interface MemberRefWithPhone extends MemberRef {
   phone: string | null;
 }
+
+/**
+ * A member's name, from the reference other records carry.
+ *
+ * A `MemberRef` arrives as two fields because that is what the database holds, and every screen that
+ * shows a name has to join them the same way — so the joining lives here rather than in each screen.
+ */
+export const memberRefName = (member: Pick<MemberRef, 'firstName' | 'lastName'> | null | undefined): string =>
+  member ? `${member.firstName} ${member.lastName}`.trim() : '';
 
 // ==================== SERVICES & WORSHIP ====================
 export type LiturgyKind =
@@ -667,7 +714,10 @@ export const announcementsApi = {
   create: (body: AnnouncementBody) => api.post<ItemEnvelope<AnnouncementDto>>('/api/communications/announcements', body),
   update: (id: string, body: Partial<AnnouncementBody>) =>
     api.patch<ItemEnvelope<AnnouncementDto>>(`/api/communications/announcements/${id}`, body),
-  retire: (id: string) => api.delete<void>(`/api/communications/announcements/${id}`),
+  retire: (id: string, body: RetireBody) =>
+    api.delete<ItemEnvelope<unknown>>(
+      `/api/communications/announcements/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`,
+    ),
 };
 
 export const eventsApi = {
@@ -675,7 +725,10 @@ export const eventsApi = {
     api.get<ListEnvelope<EventDto>>(`/api/communications/events${qs(params)}`),
   create: (body: EventBody) => api.post<ItemEnvelope<EventDto>>('/api/communications/events', body),
   update: (id: string, body: Partial<EventBody>) => api.patch<ItemEnvelope<EventDto>>(`/api/communications/events/${id}`, body),
-  retire: (id: string) => api.delete<void>(`/api/communications/events/${id}`),
+  retire: (id: string, body: RetireBody) =>
+    api.delete<ItemEnvelope<unknown>>(
+      `/api/communications/events/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`,
+    ),
 };
 
 export const prayerApi = {
@@ -688,7 +741,10 @@ export const prayerApi = {
   /** Stamps `answeredAt` for us, so "how long did we pray for that?" stays answerable. */
   answer: (id: string, body: { note?: string } = {}) =>
     api.post<ItemEnvelope<PrayerRequestDto>>(`/api/communications/prayer-requests/${id}/answer`, body),
-  retire: (id: string) => api.delete<void>(`/api/communications/prayer-requests/${id}`),
+  retire: (id: string, body: RetireBody) =>
+    api.delete<ItemEnvelope<unknown>>(
+      `/api/communications/prayer-requests/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`,
+    ),
 };
 
 export const celebrationsApi = {
@@ -1135,6 +1191,14 @@ export interface ReportOverviewDto {
 export interface MemberReportDto {
   total: number;
   byStatus: Record<string, number>;
+  /** `baptized` / `dedicated` / `none`, counted by the server. */
+  byBaptismType: Record<string, number>;
+  /** Baptized or dedicated — the two kinds a certificate can be printed from. */
+  withBaptismRecord: number;
+  envelopesIssued: number;
+  baptismsThisYear: number;
+  /** The under-19 roll: Nursery to Grade 12. */
+  youth: number;
   byLocation: Array<{ location: string; members: number }>;
   households: { total: number; household: number; single: number; large: number };
   joinedByYear: Array<{ year: string; members: number }>;
@@ -1257,18 +1321,45 @@ export interface BackupManifestDto {
   archivedAwaitingRestore: number;
   lastWrite: { at: string; summary: string | null } | null;
   ledger: { entries: number; at: string | null };
-  /** Stated rather than implied: this endpoint reports, it does not export. */
+  /** Whether this church may take its own data out through Settings → Data & backup. */
   exportAvailable: boolean;
+}
+
+/**
+ * A church's records as one file.
+ *
+ * Typed as the envelope a reader can rely on — the format, the moment, the church, the counts, and
+ * what the file says it does not contain. The tables inside are deliberately `unknown`: this is a
+ * copy of whatever the server holds, and inventing a type here would be a second, drifting
+ * description of the schema.
+ */
+export interface ChurchExportDto {
+  format: string;
+  exportedAt: string;
+  church: { id: string; name: string | null; location: string | null };
+  records: Record<string, number>;
+  totalRecords: number;
+  excluded: Record<string, string>;
+  [section: string]: unknown;
 }
 
 export const settingsApi = {
   getProfile: () => api.get<ItemEnvelope<OrganizationProfileDto>>('/api/settings/profile'),
   updateProfile: (body: ProfileBody) => api.patch<ItemEnvelope<OrganizationProfileDto>>('/api/settings/profile', body),
+  /** The welcome wizard's last step: the profile, plus the fact that this church has been shown it. */
+  completeOnboarding: (body: ProfileBody) =>
+    api.post<ItemEnvelope<OrganizationProfileDto>>('/api/settings/onboarding', body),
   listPreferences: () => api.get<ItemEnvelope<AppSettingDto[]>>('/api/settings/preferences'),
   getPreference: (key: SettingKey) => api.get<ItemEnvelope<AppSettingDto>>(`/api/settings/preferences/${key}`),
   updatePreference: (key: SettingKey, value: Record<string, unknown>) =>
     api.put<ItemEnvelope<AppSettingDto>>(`/api/settings/preferences/${key}`, { value }),
   backup: () => api.get<ItemEnvelope<BackupManifestDto>>('/api/settings/preferences/backup'),
+  /**
+   * A copy of this church's records. Whatever the server put in the bundle is what is downloaded:
+   * the console's only job is to name the file and offer it, so nothing can be quietly left out on
+   * the way out.
+   */
+  exportData: () => api.get<ItemEnvelope<ChurchExportDto>>('/api/settings/export'),
 };
 
 // ==================== ADMIN: TRASH, AUDIT, RIGHTS ====================
@@ -1355,6 +1446,12 @@ export const usersApi = {
     api.patch<ItemEnvelope<AdminUserDto>>(`/api/admin/users/${id}`, body),
   assignRole: (id: string, roleKey: string) =>
     api.post<ItemEnvelope<AdminUserDto>>(`/api/admin/users/${id}/role`, { roleKey }),
+  /**
+   * An administrator setting somebody else's password — the office's "I have forgotten mine" case.
+   * The API answers 204: the administrator typed the new password and already knows it.
+   */
+  setPassword: (id: string, password: string) =>
+    api.post<void>(`/api/admin/users/${id}/password`, { password }),
   remove: (id: string, body: { reason: string; reasonLabel: string }) =>
     api.delete<ItemEnvelope<unknown>>(`/api/admin/users/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`),
 };
@@ -1408,7 +1505,7 @@ export interface ChannelStatusDto {
 
 export interface ChannelsDto {
   email: ChannelStatusDto;
-  sms: { driver: string; configured: boolean };
+  sms: { driver: string; configured: boolean; from: string | null };
 }
 
 export interface BroadcastDto {
@@ -1421,6 +1518,8 @@ export interface BroadcastDto {
   scheduledFor: string | null;
   sentAt: string | null;
   recipients: number;
+  /** What the provider said about the last send, kept with the campaign it describes. */
+  lastReport: BroadcastDeliveryDto | null;
   createdById: string | null;
   createdAt: string;
   updatedAt: string;
@@ -1458,9 +1557,160 @@ export const broadcastsApi = {
   /** `recipients` is only sent for a notice sheet, which has no gateway to count for it. */
   send: (id: string, body: { recipients?: number } = {}) =>
     api.post<ItemEnvelope<BroadcastSendResultDto>>(`/api/communications/broadcasts/${id}/send`, body),
-  retire: (id: string) => api.delete<void>(`/api/communications/broadcasts/${id}`),
+  retire: (id: string, body: RetireBody) =>
+    api.delete<ItemEnvelope<unknown>>(
+      `/api/communications/broadcasts/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`,
+    ),
 };
 
 export const communicationsApi = {
   channels: () => api.get<ItemEnvelope<ChannelsDto>>('/api/communications/channels'),
+};
+
+// ==================== BILLING ====================
+/**
+ * What a church is on, what it owes, and what it has asked for.
+ *
+ * `headline` is written by the server rather than composed here, and that is deliberate: whether a
+ * church is late, in grace or lapsed depends on dates, and a client that re-derives the sentence from
+ * the status string will eventually say something the server does not agree with.
+ */
+export interface SubscriptionDto {
+  status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+  plan: PlanDto;
+  trialEndsAt: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  cancelledAt: string | null;
+  requestedPlan: { key: string; name: string } | null;
+  requestedAt: string | null;
+  notes: string | null;
+  daysLeft: number | null;
+  graceEndsAt: string | null;
+  usage: { members: number; users: number };
+  limits: { maxMembers?: number; maxUsers?: number };
+  headline: string;
+}
+
+export interface PlanDto {
+  key: string;
+  name: string;
+  tagline: string | null;
+  price: number;
+  currency: string;
+  interval: 'monthly' | 'yearly';
+  trialDays: number;
+  limits: { maxMembers?: number; maxUsers?: number };
+  features: string[];
+  isPublic: boolean;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface SubscriptionPaymentDto {
+  id: string;
+  amount: number;
+  currency: string;
+  method: 'cash' | 'mpesa' | 'cheque' | 'bank_transfer' | 'card';
+  reference: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  receivedAt: string;
+  note: string | null;
+  recordedBy: { id: string; name: string } | null;
+}
+
+export const billingApi = {
+  subscription: () => api.get<ItemEnvelope<SubscriptionDto | null>>('/api/billing/subscription'),
+  plans: () => api.get<ItemEnvelope<PlanDto[]>>('/api/billing/plans'),
+  payments: () => api.get<ItemEnvelope<SubscriptionPaymentDto[]>>('/api/billing/payments'),
+  /** Asking is the church's only move; only Praxis changes the plan. */
+  requestUpgrade: (body: { planKey: string; note?: string }) =>
+    api.post<ItemEnvelope<SubscriptionDto>>('/api/billing/request-upgrade', body),
+};
+
+/** One church as the vendor list sees it: its standing, its usage, and what it is waiting for. */
+export interface VendorOrganizationDto {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  onboardedAt: string | null;
+  createdAt: string;
+  status: SubscriptionDto['status'] | 'none';
+  plan: { key: string; name: string } | null;
+  requestedPlan: { key: string; name: string } | null;
+  requestedAt: string | null;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  graceEndsAt: string | null;
+  usage: { members: number; users: number };
+  limits: { maxMembers?: number; maxUsers?: number };
+  price: number;
+  currency: string;
+}
+
+export const vendorApi = {
+  organizations: (params?: { q?: string; status?: VendorOrganizationDto['status']; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<VendorOrganizationDto>>(`/api/vendor/organizations${qs(params)}`),
+  organization: (id: string) => api.get<ItemEnvelope<VendorOrganizationDto>>(`/api/vendor/organizations/${id}`),
+  plans: () => api.get<ItemEnvelope<PlanDto[]>>('/api/vendor/plans'),
+  assignPlan: (
+    id: string,
+    body: { planKey: string; status?: SubscriptionDto['status']; trialDays?: number; periodMonths?: number; note?: string },
+  ) => api.post<ItemEnvelope<VendorOrganizationDto>>(`/api/vendor/organizations/${id}/plan`, body),
+  recordPayment: (
+    id: string,
+    body: { amount: number; method: SubscriptionPaymentDto['method']; reference?: string; months?: number; note?: string },
+  ) => api.post<ItemEnvelope<SubscriptionPaymentDto>>(`/api/vendor/organizations/${id}/payments`, body),
+  /** How big this church is and when anything last happened in it. */
+  stats: (id: string) => api.get<ItemEnvelope<VendorOrganizationStatsDto>>(`/api/vendor/organizations/${id}/stats`),
+  setSuspension: (id: string, body: { suspended: boolean; reason: string }) =>
+    api.post<ItemEnvelope<{ id: string; name: string; isActive: boolean }>>(`/api/vendor/organizations/${id}/suspension`, body),
+  startSupportSession: (id: string, body: { reason: string }) =>
+    api.post<ItemEnvelope<SupportSessionDto>>(`/api/vendor/organizations/${id}/support-sessions`, body),
+  endSupportSession: (body: { reason: string }) =>
+    api.post<ItemEnvelope<{ ended: boolean }>>('/api/vendor/support-sessions/end', body),
+};
+
+/** What an operator reads before picking up the telephone. */
+export interface VendorOrganizationStatsDto {
+  members: number;
+  activeMembers: number;
+  households: number;
+  ministries: number;
+  services: number;
+  staffAccounts: number;
+  files: number;
+  giving: { tithes: number; offerings: number; currency: string };
+  lastActivity: { summary: string; at: string; actor: string | null } | null;
+}
+
+/**
+ * A visit to a church, as a token.
+ *
+ * The token carries the operator's own id — so every row they touch names them — and this church. It
+ * is short-lived and the console shows a strip for as long as it is in use, because access somebody
+ * cannot see is access somebody will forget they have.
+ */
+export interface SupportSessionDto {
+  token: string;
+  expiresAt: string;
+  minutes: number;
+  organization: ActiveOrganization;
+}
+
+export const authApi = {
+  /**
+   * A church signing itself up. Answers the sign-in shape, so the console drops the new administrator
+   * straight into their own console instead of asking them to type the password again.
+   */
+  signup: (body: SignupBody) => api.post<LoginResponse>('/api/auth/signup', body),
+  /**
+   * Changing your own password. The current one is required even though the console already holds a
+   * token — a token can be copied off a shared office machine, and this is what stops the copy from
+   * locking its owner out.
+   */
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    api.post<void>('/api/auth/password', body),
 };

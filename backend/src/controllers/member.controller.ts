@@ -1,6 +1,13 @@
 import type { Request, Response } from 'express';
-import { createMemberSchema, listMembersQuerySchema, retireMemberSchema, updateMemberSchema } from '../schemas/member.schema';
+import {
+  createMemberSchema,
+  listMembersQuerySchema,
+  memberImportSchema,
+  retireMemberSchema,
+  updateMemberSchema,
+} from '../schemas/member.schema';
 import * as memberService from '../services/member.service';
+import * as memberImport from '../services/memberImport.service';
 import { created, ok } from '../lib/respond';
 import { actor, id } from '../lib/request';
 
@@ -15,6 +22,17 @@ export async function getMember(req: Request, res: Response): Promise<void> {
 
 export async function createMember(req: Request, res: Response): Promise<void> {
   created(res, await memberService.createMember(createMemberSchema.parse(req.body), actor(req)));
+}
+
+/**
+ * Importing a register from a spreadsheet.
+ *
+ * A POST that usually writes nothing, which is the point: with no mapping it reports the file's
+ * columns, with `dryRun` it reports what each row would do, and only a third request that repeats
+ * the file writes. Nothing is committed by a request a person has not read the answer to.
+ */
+export async function importMembers(req: Request, res: Response): Promise<void> {
+  ok(res, await memberImport.importMembers(memberImportSchema.parse(req.body), actor(req)));
 }
 
 export async function updateMember(req: Request, res: Response): Promise<void> {

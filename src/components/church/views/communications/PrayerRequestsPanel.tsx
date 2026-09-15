@@ -1,10 +1,20 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PrayerRequestItem, PrayerPrivacyLevel } from '../../../../types';
 import { useDialog } from '../../dialog';
-import { INITIAL_PRAYER_REQUESTS } from '../../../../data/churchMockData';
+import { prayerApi } from '../../../../lib/api';
+import { toPrayerRequestItem } from '../../../../lib/adapters';
+import { usePrayerRequests, useMutation } from '../../../../hooks/useApi';
+import { usePermissions } from '../../../../lib/permissions';
+import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 
 export const PrayerRequestsPanel: React.FC = () => {
-  const [prayers, setPrayers] = useState<PrayerRequestItem[]>(INITIAL_PRAYER_REQUESTS);
+  const { items, loading, error, refetch } = usePrayerRequests();
+  const createPrayer = useMutation(prayerApi.create);
+  const answerPrayer = useMutation(prayerApi.answer);
+  const { canEdit } = usePermissions();
+
+  const prayers = useMemo(() => items.map(toPrayerRequestItem), [items]);
+
   const [selectedPrivacy, setSelectedPrivacy] = useState<string>('all');
   const [isSubmittingPrayer, setIsSubmittingPrayer] = useState<boolean>(false);
   const submittingPrayerDialog = useDialog(() => setIsSubmittingPrayer(false), "Submit Prayer Petition");
@@ -12,71 +22,52 @@ export const PrayerRequestsPanel: React.FC = () => {
   const answeringPrayerDialog = useDialog(() => setAnsweringPrayer(null), "Record Answered Prayer");
   const [praiseText, setPraiseText] = useState<string>('');
 
-  // New Prayer Form State
-  const [title, setTitle] = useState('');
+  // New Prayer Form State. The prayer_requests table stores the request itself, who asked and
+  // whether it is private — so the form asks for that and nothing it would have to discard.
+  const [details, setDetails] = useState('');
   const [requestedBy, setRequestedBy] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
-  const [privacyLevel, setPrivacyLevel] = useState<PrayerPrivacyLevel>('public-chain');
-  const [category, setCategory] = useState<PrayerRequestItem['category']>('health-healing');
-  const [details, setDetails] = useState('');
+  const [privacyLevel, setPrivacyLevel] = useState<PrayerPrivacyLevel>('public');
 
   const filteredPrayers = prayers.filter((p) => {
     if (selectedPrivacy !== 'all' && p.privacyLevel !== selectedPrivacy) return false;
     return true;
   });
 
-  const handlePrayClick = (prayerId: string) => {
-    setPrayers(
-      prayers.map((p) =>
-        p.id === prayerId ? { ...p, intercessorCount: p.intercessorCount + 1 } : p
-      )
-    );
-  };
-
-  const handleCreatePrayer = (e: React.FormEvent) => {
+  const handleCreatePrayer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !details.trim()) return;
+    if (!details.trim()) return;
 
-    const newPrayer: PrayerRequestItem = {
-      id: `pr-${Date.now()}`,
-      title,
-      requestedBy: isAnonymous ? 'Anonymous Member' : requestedBy || 'Member',
-      isAnonymous,
-      privacyLevel,
-      category,
-      details,
-      dateSubmitted: 'Just now',
-      intercessorCount: 1,
-      isAnswered: false,
-      status: 'active-chain',
-    };
-
-    setPrayers([newPrayer, ...prayers]);
-    setIsSubmittingPrayer(false);
-    setTitle('');
-    setDetails('');
-    setRequestedBy('');
+    try {
+      await createPrayer.run({
+        request: details.trim(),
+        ...(isAnonymous ? {} : { requesterName: requestedBy.trim() || undefined }),
+        isPrivate: privacyLevel !== 'public',
+      });
+      await refetch();
+      setIsSubmittingPrayer(false);
+      setDetails('');
+      setRequestedBy('');
+    } catch {
+      // createPrayer.error is rendered inside the modal.
+    }
   };
 
-  const handleMarkAnswered = (e: React.FormEvent) => {
+  const handleMarkAnswered = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!answeringPrayer) return;
 
-    setPrayers(
-      prayers.map((p) =>
-        p.id === answeringPrayer.id
-          ? {
-              ...p,
-              isAnswered: true,
-              status: 'answered-praise',
-              praiseReport: praiseText || 'Answered with thanksgiving and glory to God.',
-            }
-          : p
-      )
-    );
-    setAnsweringPrayer(null);
-    setPraiseText('');
+    try {
+      await answerPrayer.run(answeringPrayer.id, { note: praiseText.trim() || undefined });
+      await refetch();
+      setAnsweringPrayer(null);
+      setPraiseText('');
+    } catch {
+      // answerPrayer.error is rendered inside the modal.
+    }
   };
+
+  const writeError = createPrayer.error ?? answerPrayer.error;
 
   return (
     <div className="flex flex-col space-y-6">
@@ -100,13 +91,13 @@ export const PrayerRequestsPanel: React.FC = () => {
 
         <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Intercessions Logged</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Public Prayer Chain</span>
             <div className="text-2xl font-black text-[#059669] mt-0.5">
-              {prayers.reduce((acc, p) => acc + p.intercessorCount, 0)} Prayers
+              {prayers.filter((p) => p.privacyLevel === 'public').length} Shared
             </div>
             <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
               <span aria-hidden="true" className="material-symbols-outlined text-[14px]">volunteer_activism</span>
-              Church prayer chain lifted
+              Visible to the whole church
             </span>
           </div>
           <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
@@ -132,9 +123,9 @@ export const PrayerRequestsPanel: React.FC = () => {
 
         <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Pastoral Confidential</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Pastoral & Leaders</span>
             <div className="text-2xl font-black text-[#D97706] mt-0.5">
-              {prayers.filter((p) => p.privacyLevel === 'pastoral-confidential').length} Shepherding
+              {prayers.filter((p) => p.privacyLevel !== 'public').length} Held Privately
             </div>
             <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
               <span aria-hidden="true" className="material-symbols-outlined text-[14px]">lock</span>
@@ -168,23 +159,38 @@ export const PrayerRequestsPanel: React.FC = () => {
               className="px-3 py-1.5 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
             >
               <option value="all">All Privacy Levels</option>
-              <option value="public-chain">Public Prayer Chain</option>
-              <option value="ministry-leaders">Ministry Leaders Only</option>
-              <option value="pastoral-confidential">Pastoral Confidential</option>
+              <option value="public">Public Prayer Chain</option>
+              <option value="leaders-only">Ministry Leaders Only</option>
+              <option value="pastoral-private">Pastoral Confidential</option>
             </select>
 
-            <button
-              type="button"
-              onClick={() => setIsSubmittingPrayer(true)}
-              className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
-              Submit Petition
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => setIsSubmittingPrayer(true)}
+                className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
+                Submit Petition
+              </button>
+            )}
           </div>
         </div>
 
+        {writeError && <ErrorBlock message={writeError} onRetry={() => void refetch()} className="mb-4" />}
+
         {/* Prayer Requests Cards */}
+        {loading && items.length === 0 ? (
+          <LoadingBlock label="Loading prayer requests…" />
+        ) : error ? (
+          <ErrorBlock message={error} onRetry={() => void refetch()} />
+        ) : filteredPrayers.length === 0 ? (
+          <EmptyBlock
+            icon="volunteer_activism"
+            title="No prayer requests here"
+            hint="Submit a petition and the prayer chain can stand with you."
+          />
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredPrayers.map((pr) => (
             <div
@@ -200,18 +206,14 @@ export const PrayerRequestsPanel: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span
                       className={`px-2 py-0.2 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        pr.privacyLevel === 'public-chain'
+                        pr.privacyLevel === 'public'
                           ? 'bg-[#059669]/10 text-[#059669]'
-                          : pr.privacyLevel === 'ministry-leaders'
+                          : pr.privacyLevel === 'leaders-only'
                           ? 'bg-[#2563EB]/10 text-[#2563EB]'
                           : 'bg-[#DC2626]/10 text-[#DC2626]'
                       }`}
                     >
                       {pr.privacyLevel.replace('-', ' ')}
-                    </span>
-
-                    <span className="px-2 py-0.2 rounded-full bg-[#E7E5E4] text-[#1C1917] text-[10px] font-bold uppercase tracking-wider">
-                      {pr.category.replace('-', ' ')}
                     </span>
                   </div>
 
@@ -230,53 +232,31 @@ export const PrayerRequestsPanel: React.FC = () => {
                   {pr.details}
                 </p>
 
-                {pr.praiseReport && (
+                {pr.isAnswered && pr.answerDate && (
                   <div className="p-2.5 rounded-[8px] bg-[#059669]/10 border border-[#059669]/30 text-xs text-[#059669] mb-3">
                     <div className="font-bold flex items-center gap-1">
                       <span aria-hidden="true" className="material-symbols-outlined text-[15px]">celebration</span>
-                      Praise Report:
+                      Answered on {pr.answerDate}
                     </div>
-                    <div className="mt-0.5">{pr.praiseReport}</div>
                   </div>
                 )}
               </div>
 
-              <div className="pt-3 border-t border-[#E7E5E4]/80 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1 text-[#C2410C] font-bold">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">volunteer_activism</span>
-                  <span>{pr.intercessorCount} Standing in Prayer</span>
+              {!pr.isAnswered && canEdit && (
+                <div className="pt-3 border-t border-[#E7E5E4]/80 flex items-center justify-end text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setAnsweringPrayer(pr)}
+                    className="px-2.5 py-1 rounded-[6px] bg-[#059669]/10 hover:bg-[#059669] hover:text-white text-[#059669] text-xs font-bold border border-[#059669]/30 transition-all cursor-pointer"
+                  >
+                    Answered!
+                  </button>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  {!pr.isAnswered ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handlePrayClick(pr.id)}
-                        className="px-2.5 py-1 rounded-[6px] bg-[#F8F1E9] hover:bg-[#C2410C] hover:text-white text-[#C2410C] text-xs font-bold border border-[#E7E5E4] transition-all cursor-pointer"
-                      >
-                        Pray For This
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setAnsweringPrayer(pr)}
-                        className="px-2.5 py-1 rounded-[6px] bg-[#059669]/10 hover:bg-[#059669] hover:text-white text-[#059669] text-xs font-bold border border-[#059669]/30 transition-all cursor-pointer"
-                      >
-                        Answered!
-                      </button>
-                    </>
-                  ) : (
-                    <span className="text-[11px] text-[#059669] font-bold flex items-center gap-1">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[15px]">check_circle</span>
-                      Praise Recorded
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+              )}
+            </div>          ))}
         </div>
+        )}
+
       </div>
 
       {/* MODAL: Submit Prayer Petition */}
@@ -295,18 +275,6 @@ export const PrayerRequestsPanel: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreatePrayer} className="mt-4 space-y-4">
-              <div>
-                <label htmlFor="prayer-title" className="block text-xs font-bold text-[#1C1917] mb-1">Petition Title / Focus *</label>
-                <input id="prayer-title" aria-label="Petition Title / Focus"
-                  type="text"
-                  required
-                  placeholder="e.g. Healing & Comfort for Brother Thomas"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="prayer-requested-by" className="block text-xs font-bold text-[#1C1917] mb-1">Requested By</label>
@@ -323,12 +291,12 @@ export const PrayerRequestsPanel: React.FC = () => {
                   <label htmlFor="prayer-privacy" className="block text-xs font-bold text-[#1C1917] mb-1">Privacy Level</label>
                   <select id="prayer-privacy" aria-label="Privacy Level"
                     value={privacyLevel}
-                    onChange={(e) => setPrivacyLevel(e.target.value as any)}
+                    onChange={(e) => setPrivacyLevel(e.target.value as PrayerPrivacyLevel)}
                     className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                   >
-                    <option value="public-chain">Public Prayer Chain</option>
-                    <option value="ministry-leaders">Ministry Leaders Only</option>
-                    <option value="pastoral-confidential">Pastoral Confidential (Elders/Pastors)</option>
+                    <option value="public">Public Prayer Chain</option>
+                    <option value="leaders-only">Ministry Leaders Only</option>
+                    <option value="pastoral-private">Pastoral Confidential (Elders/Pastors)</option>
                   </select>
                 </div>
               </div>
@@ -347,23 +315,7 @@ export const PrayerRequestsPanel: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="prayer-category" className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
-                <select id="prayer-category" aria-label="Category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as any)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                >
-                  <option value="health-healing">Health & Healing</option>
-                  <option value="bereavement">Bereavement & Comfort</option>
-                  <option value="missions-calling">Missions & Calling</option>
-                  <option value="family-youth">Family & Youth</option>
-                  <option value="thanksgiving">Thanksgiving & Praise</option>
-                  <option value="spiritual-growth">Spiritual Growth</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="prayer-details" className="block text-xs font-bold text-[#1C1917] mb-1">Prayer Details *</label>
+                <label htmlFor="prayer-details" className="block text-xs font-bold text-[#1C1917] mb-1">Prayer Request *</label>
                 <textarea id="prayer-details" aria-label="Prayer Details"
                   rows={3}
                   required
@@ -373,6 +325,8 @@ export const PrayerRequestsPanel: React.FC = () => {
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                 />
               </div>
+
+              {createPrayer.error && <ErrorBlock message={createPrayer.error} />}
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
                 <button
@@ -384,9 +338,10 @@ export const PrayerRequestsPanel: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+                  disabled={createPrayer.pending}
+                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-60"
                 >
-                  Submit Prayer
+                  {createPrayer.pending ? 'Submitting…' : 'Submit Prayer'}
                 </button>
               </div>
             </form>
@@ -417,17 +372,18 @@ export const PrayerRequestsPanel: React.FC = () => {
 
               <div>
                 <label htmlFor="praise-testimony" className="block text-xs font-bold text-[#1C1917] mb-1">
-                  Praise Testimony / Answer Description
+                  Note for the record
                 </label>
-                <textarea id="praise-testimony" aria-label="Praise Testimony / Answer Description"
+                <textarea id="praise-testimony" aria-label="Note for the record"
                   rows={3}
-                  required
-                  placeholder="Share how God answered this prayer..."
+                  placeholder="How was this prayer answered? Kept in the audit trail beside the date."
                   value={praiseText}
                   onChange={(e) => setPraiseText(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
                 />
               </div>
+
+              {answerPrayer.error && <ErrorBlock message={answerPrayer.error} />}
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
                 <button
@@ -439,9 +395,10 @@ export const PrayerRequestsPanel: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-[8px] bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+                  disabled={answerPrayer.pending}
+                  className="px-4 py-2 rounded-[8px] bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-60"
                 >
-                  Publish Praise Report
+                  {answerPrayer.pending ? 'Saving…' : 'Mark as Answered'}
                 </button>
               </div>
             </form>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useMutation, useOrgProfile } from '../../../../hooks/useApi';
 import { settingsApi, type ProfileBody } from '../../../../lib/api';
 import { usePermissions } from '../../../../lib/permissions';
+import { useAuth } from '../../../../lib/auth';
 import { ErrorBlock, LoadingBlock } from '../../DataState';
 import { FileUpload } from '../../FileUpload';
 
@@ -36,6 +37,7 @@ export const ChurchIdentityPanel: React.FC = () => {
   const saveProfile = useMutation(settingsApi.updateProfile);
   const attachLogo = useMutation(settingsApi.updateProfile);
   const { canEdit } = usePermissions();
+  const { organization } = useAuth();
   const canWrite = canEdit('settings');
 
   const record = profile.data?.data ?? null;
@@ -147,7 +149,9 @@ export const ChurchIdentityPanel: React.FC = () => {
             Church Identity &amp; Logo
           </h3>
           <p className="text-xs text-[#57534E] mt-0.5">
-            The name, address and mark every screen and every printed certificate reads from.
+            The name, address and mark every screen and every printed certificate reads from — for{' '}
+            <span className="font-semibold text-[#1C1917]">{organization?.name ?? 'this church'}</span> only. A
+            second church on the same system keeps its own.
           </p>
         </div>
         {saved && (

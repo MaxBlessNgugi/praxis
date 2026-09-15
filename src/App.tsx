@@ -6,6 +6,8 @@
 import React from 'react';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { ChurchSystemApp } from './components/church/ChurchSystemApp';
+import { OnboardingWizard } from './components/church/OnboardingWizard';
+import { SubscriptionLapsed } from './components/church/SubscriptionLapsed';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DemoDataProvider, useDemoData } from './data/demoStore';
 import { PermissionsProvider } from './lib/permissions';
@@ -44,9 +46,20 @@ function RestoringSession() {
  * The gate and the console are mutually exclusive: `AuthScreen` renders while there is no
  * session, and the church console renders once `login()` has stored a token and a user. Both
  * read the same session, so a successful sign-in flips this branch without a reload.
+ *
+ * Two doors sit between the session and the console, and both are read from the session rather than
+ * from anything this file decides.
+ *
+ * A **lapsed** subscription comes first, and it is a screen rather than an error: writes are already
+ * refused with a reason, so showing the console would offer a set of buttons the server rejects. The
+ * panel says what happened, that nothing is deleted, and how to get it back.
+ *
+ * The **welcome wizard** comes second. A church that signed itself up has a name and a country and
+ * nothing else, so it is asked for the few facts the console displays everywhere. The flag lives on
+ * the church, not the browser, so the second administrator is not asked the same questions.
  */
 function ConsoleRoot() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, organization, subscription } = useAuth();
 
   if (isLoading) {
     return <RestoringSession />;
@@ -54,6 +67,14 @@ function ConsoleRoot() {
 
   if (!isAuthenticated || !user) {
     return <AuthScreen />;
+  }
+
+  if (subscription?.status === 'expired') {
+    return <SubscriptionLapsed />;
+  }
+
+  if (organization && !organization.onboardedAt) {
+    return <OnboardingWizard />;
   }
 
   return (

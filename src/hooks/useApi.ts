@@ -3,6 +3,11 @@ import type React from 'react';
 import {
   adminApi,
   announcementsApi,
+  api,
+  attendanceApi,
+  billingApi,
+  broadcastsApi,
+  communicationsApi,
   ApiError,
   celebrationsApi,
   charityApi,
@@ -19,11 +24,18 @@ import {
   settingsApi,
   tithesApi,
   usersApi,
+  vendorApi,
   welfareApi,
   type AdminUserDto,
   type AnnouncementDto,
+  type AttendanceDto,
+  type PlanDto,
+  type SubscriptionDto,
+  type SubscriptionPaymentDto,
+  type VendorOrganizationDto,
   type AppSettingDto,
   type AuditLogDto,
+  type BroadcastDto,
   type CelebrationDto,
   type CelebrationsMeta,
   type CharityActivityDto,
@@ -35,6 +47,7 @@ import {
   type FinanceAuditAction,
   type GovernanceDocumentDto,
   type ListEnvelope,
+  type MemberRefWithPhone,
   type MeetingDto,
   type MeetingKind,
   type MeetingStatus,
@@ -59,9 +72,15 @@ import {
   type WelfareStatus,
 } from '../lib/api';
 
-/** The one place an API failure becomes a sentence a screen can show. */
+/**
+ * The one place an API failure becomes a sentence a screen can show.
+ *
+ * A validation refusal arrives as a heading — "The request failed validation" — plus the fields that
+ * failed. The heading is what belongs in a log line and not what belongs on a form: someone told
+ * their password is too short can fix it, and someone told their request failed validation cannot.
+ */
 export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.body.error;
+  if (error instanceof ApiError) return error.body.fields?.[0]?.message ?? error.body.error;
   if (error instanceof TypeError) return 'Cannot reach the Praxis server. Check that the backend is running.';
   if (error instanceof Error) return error.message;
   return 'Something went wrong';
@@ -197,6 +216,47 @@ export function useSwaps(status?: SwapDto['status']) {
   return { ...resource, items: resource.data?.data ?? [] };
 }
 
+/** The census rows recorded against a service — the numbers themselves, not just their total. */
+export function useAttendance(params?: { serviceId?: string; kind?: AttendanceDto['kind'] }) {
+  return useList<AttendanceDto>(() => attendanceApi.list({ ...params, pageSize: 200 }), [params?.serviceId, params?.kind]);
+}
+
+/**
+ * The one report a service has, or nothing.
+ *
+ * The API answers 404 rather than an empty report when none has been filed, which is the right answer
+ * for an API and an awkward one for a screen: "no report yet" is an ordinary state of the world, not
+ * a failure, so the 404 is turned into `null` here rather than rendered as an error.
+ */
+export function useServiceReport(serviceId: string | null) {
+  const resource = useResource(async () => {
+    if (!serviceId) return null;
+    try {
+      return await servicesApi.getReport(serviceId);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  }, [serviceId]);
+  return { report: resource.data?.data ?? null, loading: resource.loading, error: resource.error, refetch: resource.refetch };
+}
+
+/**
+ * The register, for the pickers that have to name a person: an officiant, a duty holder, a
+ * replacement. One page of a hundred is as much as the list endpoint returns in a single request, and
+ * more names than anyone scrolls a dropdown past.
+ *
+ * The rows are what the endpoint sends — two name fields, not the register's own view model — so a
+ * picker reads them with `memberRefName`, the way every other screen names a person.
+ */
+export function useMemberOptions() {
+  const resource = useResource(
+    () => api.get<ListEnvelope<MemberRefWithPhone>>('/api/members?pageSize=100&sort=name'),
+    [],
+  );
+  return { members: resource.data?.data ?? [], loading: resource.loading, error: resource.error };
+}
+
 // ==================== FINANCES ====================
 export function useTithes(params?: { q?: string; method?: TitheDto['method']; sort?: 'amount' | 'recent' | 'oldest' }) {
   const resource = useResource(() => tithesApi.list(params), [params?.q, params?.method, params?.sort]);
@@ -247,6 +307,16 @@ export function useAnnouncements(params?: { audience?: string; live?: boolean })
     () => announcementsApi.list(params),
     [params?.audience, params?.live],
   );
+}
+
+export function useBroadcasts(params?: { channel?: BroadcastDto['channel']; status?: BroadcastDto['status'] }) {
+  return useList<BroadcastDto>(() => broadcastsApi.list(params), [params?.channel, params?.status]);
+}
+
+/** Whether each channel can actually send, read by the screen before it offers a "Send" button. */
+export function useChannels() {
+  const resource = useResource(() => communicationsApi.channels(), []);
+  return { channels: resource.data?.data ?? null, loading: resource.loading, error: resource.error, refetch: resource.refetch };
 }
 
 export function useEvents(params?: { kind?: EventDto['kind']; upcoming?: boolean }) {
@@ -391,6 +461,39 @@ export function usePreference(key: SettingKey) {
   const resource = useResource(() => settingsApi.getPreference(key), [key]);
   const setting: AppSettingDto | null = resource.data?.data ?? null;
   return { setting, value: setting?.value ?? ({} as Record<string, unknown>), loading: resource.loading, error: resource.error, refetch: resource.refetch };
+}
+
+// ==================== BILLING ====================
+/** The church's own standing. Null for a church an operator created without putting on a plan. */
+export function useSubscription() {
+  const resource = useResource(() => billingApi.subscription(), []);
+  const subscription: SubscriptionDto | null = resource.data?.data ?? null;
+  return { subscription, loading: resource.loading, error: resource.error, refetch: resource.refetch };
+}
+
+/** The plans a church may move to. Hidden ones are offered in a conversation, not on the screen. */
+export function usePlanCatalogue() {
+  const resource = useResource(() => billingApi.plans(), []);
+  const plans: PlanDto[] = resource.data?.data ?? [];
+  return { plans, loading: resource.loading, error: resource.error, refetch: resource.refetch };
+}
+
+export function usePayments() {
+  const resource = useResource(() => billingApi.payments(), []);
+  const payments: SubscriptionPaymentDto[] = resource.data?.data ?? [];
+  return { payments, loading: resource.loading, error: resource.error, refetch: resource.refetch };
+}
+
+/** The vendor's list of churches. Only a platform administrator can ask for it. */
+export function useVendorOrganizations(params?: { q?: string; status?: VendorOrganizationDto['status'] }) {
+  return useList<VendorOrganizationDto>(() => vendorApi.organizations(params), [params?.q, params?.status]);
+}
+
+/** Every plan, including the ones Praxis offers only in a conversation. */
+export function useVendorPlans() {
+  const resource = useResource(() => vendorApi.plans(), []);
+  const plans: PlanDto[] = resource.data?.data ?? [];
+  return { plans, loading: resource.loading, error: resource.error, refetch: resource.refetch };
 }
 
 // ==================== ADMIN ====================

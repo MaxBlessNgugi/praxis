@@ -1,7 +1,8 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { hashPassword } from '../src/lib/auth';
-import { money } from '../src/lib/prisma';
+import { basePrisma, money, prisma } from '../src/lib/prisma';
 import { appendFinanceEntry } from '../src/lib/financeAudit';
+import { enterTenant, requireTenantId } from '../src/lib/tenant';
 
 /**
  * Loads the church this system was built for: Destiny Sanctuary Int'L, Nyahururu.
@@ -12,8 +13,39 @@ import { appendFinanceEntry } from '../src/lib/financeAudit';
  *
  * Column names follow the schema; where the console and the schema disagree the schema wins, because
  * the API is what other clients will read.
+ *
+ * It seeds **one church**, and only that church's rows: the organisation it attaches everything to is
+ * the tenant, so a second parish on the same database keeps its data when this runs. The one
+ * exception is the role table, which is platform-wide — roles are ensured rather than re-created.
  */
-const prisma = new PrismaClient();
+const CHURCH_SLUG = 'destiny-sanctuary';
+
+/**
+ * The church the seed writes into: created once, then reused.
+ *
+ * Read through the unscoped client on purpose — there is no context to scope by until this row
+ * exists, which is the same reason `authenticate` reads memberships unscoped.
+ */
+async function ensureOrganization(): Promise<{ id: string; name: string }> {
+  const existing = await basePrisma.organization.findFirst({ where: { slug: CHURCH_SLUG } });
+  if (existing) {
+    // A church Praxis provisioned has been through setup by definition, which is what the welcome
+    // wizard switches on: it is for the churches that sign themselves up. This one's profile is
+    // written by this very file, so leaving the flag unset would ask the office to describe a church
+    // that is already described.
+    if (!existing.onboardedAt) {
+      await basePrisma.organization.update({
+        where: { id: existing.id },
+        data: { onboardedAt: new Date() },
+      });
+    }
+    return existing;
+  }
+  return basePrisma.organization.create({
+    data: { name: "Destiny Sanctuary Int'L", slug: CHURCH_SLUG, onboardedAt: new Date() },
+    select: { id: true, name: true },
+  });
+}
 
 const NYAHURURU = 'Nyahururu Main Church';
 /**
@@ -52,16 +84,120 @@ async function clearDomain(): Promise<void> {
   await prisma.event.deleteMany();
   await prisma.announcement.deleteMany();
   await prisma.broadcast.deleteMany();
+  await prisma.subscriptionPayment.deleteMany();
+  await prisma.subscription.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.softDeletedRecord.deleteMany();
   await prisma.project.deleteMany();
   await prisma.organizationProfile.deleteMany();
   await prisma.appSetting.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.role.deleteMany();
+  // Accounts and roles are platform rows, not this church's, so they are cleared by membership and
+  // never wholesale: `user.deleteMany()` would take a second parish's logins with it.
+  await prisma.user.deleteMany({
+    where: { memberships: { some: { organizationId: requireTenantId() } } },
+  });
+}
+
+/**
+ * The plans Praxis sells, and what each one covers.
+ *
+ * Ensured, not re-created, for the same reason the roles are: a plan is a platform row that churches
+ * point at, so re-seeding must update it rather than replace it — a delete would take every parish's
+ * subscription with it. Prices are in shillings a month, which is what a Kenyan parish office budgets
+ * in; the limits are generous on members and tight on accounts, because that is the shape of the
+ * thing being sold: a big congregation, administered by a handful of people.
+ *
+ * `limits` is where the member and account ceilings live, and the console renders them as the first
+ * two lines of every plan card — so the `features` lists say what a plan *does* and never repeat a
+ * number, which would otherwise read as two different promises on the same card.
+ */
+async function seedPlans(): Promise<Record<string, string>> {
+  const plans = [
+    {
+      key: 'mustard-seed',
+      name: 'Mustard Seed',
+      tagline: 'For a congregation finding its feet',
+      price: new Prisma.Decimal('1500'),
+      limits: { maxMembers: 150, maxUsers: 3 },
+      features: [
+        'Members, households and pastoral care',
+        'Services, order of worship and attendance',
+        'Tithes, offerings and the giving ledger',
+        'Announcements and the Sunday order',
+      ],
+      sortOrder: 1,
+    },
+    {
+      key: 'harvest',
+      name: 'Harvest',
+      tagline: 'The whole office, for a growing parish',
+      price: new Prisma.Decimal('3500'),
+      limits: { maxMembers: 600, maxUsers: 8 },
+      features: [
+        'Everything in Mustard Seed',
+        'Departments, rosters and volunteer cover',
+        'Welfare, charity and project funding',
+        'Governance: meetings, resolutions and documents',
+        'Reports, certificates and the audit trail',
+      ],
+      sortOrder: 2,
+    },
+    {
+      key: 'sanctuary',
+      name: 'Sanctuary',
+      tagline: 'For a cathedral or a multi-campus church',
+      price: new Prisma.Decimal('7500'),
+      limits: { maxMembers: 3000, maxUsers: 20 },
+      features: [
+        'Everything in Harvest',
+        'Multiple campuses and congregations',
+        'Room for 20 staff accounts',
+        'Priority support and data export',
+      ],
+      sortOrder: 3,
+      isPublic: false,
+    },
+  ];
+
+  const ids: Record<string, string> = {};
+  for (const plan of plans) {
+    const saved = await basePrisma.plan.upsert({
+      where: { key: plan.key },
+      update: {
+        name: plan.name,
+        tagline: plan.tagline,
+        price: plan.price,
+        limits: plan.limits as Prisma.InputJsonValue,
+        features: plan.features as Prisma.InputJsonValue,
+        sortOrder: plan.sortOrder,
+        // Sanctuary is quoted in a conversation rather than listed on the upgrade screen, which is
+        // how the largest parishes are handled; the other two are offered self-service.
+        isPublic: plan.isPublic ?? true,
+      },
+      create: {
+        key: plan.key,
+        name: plan.name,
+        tagline: plan.tagline,
+        price: plan.price,
+        limits: plan.limits as Prisma.InputJsonValue,
+        features: plan.features as Prisma.InputJsonValue,
+        sortOrder: plan.sortOrder,
+        trialDays: 14,
+        isPublic: plan.isPublic ?? true,
+      },
+    });
+    ids[plan.key] = saved.id;
+  }
+  return ids;
 }
 
 async function main(): Promise<void> {
+  const organization = await ensureOrganization();
+  // The seed serves exactly one church for its whole life, so the context is entered once rather
+  // than wrapped around every statement. `enterWith` is legitimate here and nowhere in the request
+  // path: in a server it would outlive the request that set it.
+  enterTenant({ organizationId: organization.id });
+
   await clearDomain();
 
   // -------------------------------------------------------------------------------------------
@@ -136,11 +272,16 @@ async function main(): Promise<void> {
   // send**, so listing them is not decoration — an omitted key would otherwise read as a grant.
   const viewerPanels = { home: true, members: true, giving: true, reports: true };
 
+  // Ensured, not re-created: a role is a template the platform ships, and a membership in another
+  // church may already point at it.
+  const role = (key: string, name: string, panels: Record<string, boolean>, actions: Record<string, boolean>) =>
+    prisma.role.upsert({ where: { key }, update: { name, panels, actions }, create: { key, name, panels, actions } });
+
   const [superAdmin, admin] = await Promise.all([
-    prisma.role.create({ data: { key: 'super_admin', name: 'Super Administrator', panels: fullPanels, actions: { view: true, edit: true, delete: true } } }),
-    prisma.role.create({ data: { key: 'admin', name: 'Administrator', panels: fullPanels, actions: { view: true, edit: true, delete: true } } }),
-    prisma.role.create({ data: { key: 'staff', name: 'Church Staff', panels: staffPanels, actions: { view: true, edit: true, delete: false } } }),
-    prisma.role.create({ data: { key: 'viewer', name: 'Viewer', panels: viewerPanels, actions: { view: true, edit: false, delete: false } } }),
+    role('super_admin', 'Super Administrator', fullPanels, { view: true, edit: true, delete: true }),
+    role('admin', 'Administrator', fullPanels, { view: true, edit: true, delete: true }),
+    role('staff', 'Church Staff', staffPanels, { view: true, edit: true, delete: false }),
+    role('viewer', 'Viewer', viewerPanels, { view: true, edit: false, delete: false }),
   ]);
 
   // -------------------------------------------------------------------------------------------
@@ -153,6 +294,12 @@ async function main(): Promise<void> {
       passwordHash: await hashPassword('praxis-demo-2025'),
       roleId: superAdmin.id,
       lastLoginAt: new Date(),
+      // The operator's flag, and the only account in the fixture that carries it: it is what opens the
+      // vendor screens, which list every church on the platform. A church's own staff must never hold
+      // it, which is why it is not a role — every parish has a `super_admin` of its own.
+      isPlatformAdmin: true,
+      // An account is a login; the membership is what puts it in this church, in this role.
+      memberships: { create: { roleId: superAdmin.id, isDefault: true } },
     },
   });
 
@@ -162,6 +309,7 @@ async function main(): Promise<void> {
       email: 'alice@destinysanctuary.co.ke',
       passwordHash: await hashPassword('praxis-demo-2025'),
       roleId: admin.id,
+      memberships: { create: { roleId: admin.id, isDefault: true } },
     },
   });
 
@@ -934,6 +1082,43 @@ async function main(): Promise<void> {
     data: { actorId: bishop.id, action: 'create', entityName: 'Member', entityId: bishopRecord.id, summary: 'Seeded the parish register' },
   });
 
+  // -------------------------------------------------------------------------------------------
+  // The commercial layer: the plans, and the parish's own standing with Praxis
+  // -------------------------------------------------------------------------------------------
+  // Plans are platform rows, so they are ensured rather than cleared; the church's subscription is
+  // this church's row, so it was deleted with the rest of the domain and is written fresh here.
+  const planIds = await seedPlans();
+  const subscribedAt = new Date();
+  const periodEnd = new Date(subscribedAt);
+  periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+
+  const subscription = await prisma.subscription.create({
+    data: {
+      organizationId: organization.id,
+      planId: planIds['sanctuary'] as string,
+      status: 'active',
+      currentPeriodStart: subscribedAt,
+      currentPeriodEnd: periodEnd,
+    },
+  });
+
+  // The money behind the period, recorded the way the office would record it: a bank transfer, with
+  // the reference a treasurer can look up. Development and vendor screens read this row rather than
+  // computing a period out of thin air.
+  await prisma.subscriptionPayment.create({
+    data: {
+      organizationId: organization.id,
+      subscriptionId: subscription.id,
+      amount: new Prisma.Decimal('7500'),
+      method: 'bank_transfer',
+      reference: 'PRAXIS-2026-0001',
+      periodStart: subscribedAt,
+      periodEnd,
+      note: 'Annual subscription, paid by bank transfer',
+      recordedById: bishop.id,
+    },
+  });
+
   // A summary worth reading, because it is also what a provisioning check asserts on. "Seeded 5
   // members" on a database that is meant to hold a congregation is exactly the shape of failure this
   // line exists to expose, so it prints the whole fixture rather than a token of it.
@@ -955,6 +1140,10 @@ async function main(): Promise<void> {
       `${counts.services} services, ${counts.attendance} attendance rows, ${counts.tithes} tithes, ` +
       `${counts.offerings} offerings, ${counts.ledgerEntries} ledger entries, ${counts.meetings} meetings, ` +
       `${counts.resolutions} resolutions and ${counts.documents} documents.`,
+  );
+  console.log(
+    `Plans: ${Object.keys(planIds).length} on the platform; ${organization.name} is on Sanctuary, paid to ` +
+      `${periodEnd.toDateString()}.`,
   );
 }
 

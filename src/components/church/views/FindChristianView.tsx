@@ -3,7 +3,7 @@ import { ParishMember } from '../../../types';
 import { LOCATIONS } from '../../../data/churchDomain';
 import { useDialog } from '../dialog';
 import { interactiveCard } from '../interactiveCard';
-import { useDemoData } from '../../../data/demoStore';
+import { useMemberReport } from '../../../lib/hooks/useReports';
 import { usePermissions } from '../../../lib/permissions';
 import { exportCsv } from '../../../lib/export';
 import { EmptyState } from '../../ui';
@@ -12,6 +12,8 @@ import { ApiError } from '../../../lib/api';
 import { errorMessage } from '../../../hooks/useApi';
 import { useChurchIdentity } from '../../../hooks/useChurchIdentity';
 import { buildBaptismCertificate, buildDedicationCertificate, printDocument } from '../../../lib/documents';
+import { FileUpload } from '../FileUpload';
+import { ImportMembersDialog } from './ImportMembersDialog';
 
 /** The columns the register leaves the app as, matching ECCLESIA's export panels. */
 const MEMBER_COLUMNS = [
@@ -36,7 +38,21 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
   onNavigateToFamilyUnit,
   onSelectMemberForArchive,
 }) => {
-  const { memberStats } = useDemoData();
+  // The census cards report the whole register, so they read the register report rather than the page
+  // of rows below them: that list is filtered by the search box and paged, and a filtered page is not
+  // a census.
+  const { data: register } = useMemberReport();
+  const roll = {
+    total: register?.total ?? 0,
+    active: register?.byStatus.active ?? 0,
+    households: register?.households.total ?? 0,
+    withBaptismRecord: register?.withBaptismRecord ?? 0,
+    awaitingRecord: register?.byBaptismType.none ?? 0,
+    envelopesIssued: register?.envelopesIssued ?? 0,
+    youth: register?.youth ?? 0,
+  };
+  /** Every card shows a count and its share of the roll, so the division lives in one place. */
+  const shareOfRoll = (count: number) => (roll.total === 0 ? 0 : Math.round((count / roll.total) * 100));
   const { canEdit } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState('');
@@ -46,6 +62,9 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeCareModalMember, setActiveCareModalMember] = useState<ParishMember | null>(null);
   const activeCareModalMemberDialog = useDialog(() => setActiveCareModalMember(null), "Member Care Record");
+  // A photograph is uploaded first and attached second, because the upload is what can fail.
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoSaved, setPhotoSaved] = useState(false);
 
   // Certificates are printed from the care record, using the same identity every screen reads.
   const { church } = useChurchIdentity();
@@ -93,8 +112,9 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [sort, setSort] = useState<'name' | 'recent' | 'oldest'>('name');
+  const [importing, setImporting] = useState(false);
 
-  const { listMembers, isLoading, error } = useMembers();
+  const { listMembers, updateMember, isLoading, error } = useMembers();
 
   const [members, setMembers] = useState<ParishMember[]>([]);
   const [total, setTotal] = useState(0);
@@ -315,7 +335,11 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             <div className="flex items-center justify-end gap-1">
               <button
                 type="button"
-                onClick={() => setActiveCareModalMember(member)}
+                onClick={() => {
+                  setPhotoError(null);
+                  setPhotoSaved(false);
+                  setActiveCareModalMember(member);
+                }}
                 className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#9b2f00] transition-colors cursor-pointer"
                 title="View Care Log"
               >
@@ -365,27 +389,27 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-[#006243]/10 px-2 py-0.5 font-headline text-xs text-[#006243] font-bold">
               <span aria-hidden="true" className="material-symbols-outlined text-[14px]">diversity_1</span>
-              {memberStats.households} households
+              {roll.households} households
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
-              {memberStats.total.toLocaleString()}
+              {roll.total.toLocaleString()}
             </span>
             <span className="font-body text-xs text-[#59413a]">On the roll</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
             <span>Membership Register Vol. I</span>
             <span className="text-[#9b2f00] font-bold">
-              {memberStats.total === 0 ? 0 : Math.round((memberStats.baptized / memberStats.total) * 100)}% with
-              baptism on file
+              {shareOfRoll(roll.withBaptismRecord)}% with
+              a baptism or dedication on file
             </span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
             <div
               className="h-1.5 rounded-full bg-[#9b2f00]"
               style={{
-                width: `${memberStats.total === 0 ? 0 : Math.round((memberStats.baptized / memberStats.total) * 100)}%`,
+                width: `${shareOfRoll(roll.withBaptismRecord)}%`,
               }}
             ></div>
           </div>
@@ -399,21 +423,21 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               Members
             </span>
             <span className="inline-flex items-center rounded-md bg-[#f4ece8] px-2 py-0.5 font-mono text-xs text-[#904d00] font-bold">
-              {memberStats.votingRatio}% ratio
+              {shareOfRoll(roll.active)}% of the roll
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">{memberStats.voting}</span>
-            <span className="font-body text-xs text-[#59413a]">Full Voting Roll</span>
+            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">{roll.active}</span>
+            <span className="font-body text-xs text-[#59413a]">Active on the roll</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
             <span>Envelope numbers issued</span>
             <span className="text-[#006243] font-bold">
-              {members.filter((m) => m.envelopeNumber).length} of {memberStats.total}
+              {roll.envelopesIssued} of {roll.total}
             </span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
-            <div className="h-1.5 rounded-full bg-[#fe932c]" style={{ width: `${memberStats.votingRatio}%` }}></div>
+            <div className="h-1.5 rounded-full bg-[#fe932c]" style={{ width: `${shareOfRoll(roll.active)}%` }}></div>
           </div>
         </div>
 
@@ -430,16 +454,16 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
-              {memberStats.inquirers}
+              {roll.awaitingRecord}
             </span>
             <span className="font-body text-xs text-[#59413a]">Under Instruction</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
-            <span>Next Membership Class</span>
-            <span className="font-bold text-[#1e1b19]">Feb 13</span>
+            <span>Share of the register</span>
+            <span className="font-bold text-[#1e1b19]">{shareOfRoll(roll.awaitingRecord)}% of the roll</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
-            <div className="h-1.5 rounded-full bg-[#006243]" style={{ width: `${memberStats.inquirerRatio}%` }}></div>
+            <div className="h-1.5 rounded-full bg-[#006243]" style={{ width: `${shareOfRoll(roll.awaitingRecord)}%` }}></div>
           </div>
         </div>
 
@@ -455,15 +479,15 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">{memberStats.youth}</span>
+            <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">{roll.youth}</span>
             <span className="font-body text-xs text-[#59413a]">On the youth roll</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-[#59413a] font-headline text-xs">
             <span>Share of the register</span>
-            <span className="text-[#9b2f00] font-bold">{memberStats.youthRatio}% of the roll</span>
+            <span className="text-[#9b2f00] font-bold">{shareOfRoll(roll.youth)}% of the roll</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-[#f4ece8] overflow-hidden">
-            <div className="h-1.5 rounded-full bg-[#8d7168]" style={{ width: `${memberStats.youthRatio}%` }}></div>
+            <div className="h-1.5 rounded-full bg-[#8d7168]" style={{ width: `${shareOfRoll(roll.youth)}%` }}></div>
           </div>
         </div>
       </div>
@@ -616,6 +640,19 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">print</span>
               </button>
             </div>
+
+            {/* Bringing an existing register in is the same act as enrolling one person, so it needs
+                the same right. */}
+            {canEdit('members') && (
+              <button
+                type="button"
+                onClick={() => setImporting(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#faf2ee] hover:bg-[#f4ece8] border border-[#e1bfb5]/40 font-headline text-xs font-semibold text-[#1e1b19] shadow-sm transition-colors cursor-pointer"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">upload_file</span>
+                <span>Import</span>
+              </button>
+            )}
 
             {/* A viewer role may read the roll but not enrol anyone — ECCLESIA's `edit` action. */}
             {canEdit('members') && (
@@ -805,6 +842,36 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               </div>
             </div>
 
+            <div className="mb-4 pt-1">
+              <FileUpload
+                purpose="member_photo"
+                label="Photograph"
+                hint="Optional, and personal data: an usher checking who is at the door is the reason it exists. PNG, JPEG or WebP."
+                currentFileId={activeCareModalMember.photoFileId ?? null}
+                onUploaded={async (file) => {
+                  setPhotoError(null);
+                  try {
+                    const updated = await updateMember(activeCareModalMember.id, { photoFileId: file.id });
+                    setActiveCareModalMember(updated);
+                    setMembers((rows) => rows.map((row) => (row.id === updated.id ? updated : row)));
+                    setPhotoSaved(true);
+                  } catch (cause) {
+                    setPhotoError(errorMessage(cause));
+                  }
+                }}
+              />
+              {photoError && (
+                <p role="alert" className="mt-2 text-[11px] font-semibold text-[#B91C1C]">
+                  {photoError}
+                </p>
+              )}
+              {photoSaved && !photoError && (
+                <p role="status" className="mt-2 text-[11px] font-semibold text-[#006243]">
+                  Photograph saved to this member’s record.
+                </p>
+              )}
+            </div>
+
             <div className="space-y-3 text-xs">
               <div className="p-3 bg-[#faf2ee] rounded-lg">
                 <span className="font-bold text-[#1e1b19] block mb-1">Pastoral Triage & Notes:</span>
@@ -851,6 +918,17 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {importing && (
+        <ImportMembersDialog
+          onClose={() => setImporting(false)}
+          onImported={() => {
+            // The census cards and the table are both reads of the register, so both are asked again.
+            setPage(1);
+            void fetchMembers();
+          }}
+        />
       )}
     </div>
   );

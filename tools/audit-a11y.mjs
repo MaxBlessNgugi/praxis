@@ -32,10 +32,12 @@ const ALL_SECTIONS = [
   { title: 'Giving & Stewardship', screens: ['Tithes', 'Offerings', 'Project Funding', 'Welfare', 'Charity Activities'] },
   { title: 'Inventory & Assets', screens: [] },
   { title: 'Groups & Fellowships', screens: ['Departmental', 'Leadership Roles', 'Volunteer Roles'] },
-  { title: 'Reports & Certs', screens: ['Baptism Certificate', 'Dedication', 'Matrimony', 'Discipleship'] },
+  // Two, not four: the screen now offers the two ordinances the register actually records, so a
+  // matrimony or discipleship certificate is not a form that exists to be reached.
+  { title: 'Reports & Certs', screens: ['Baptism', 'Dedication'] },
   { title: 'Communications', screens: ['Announcements', 'Broadcasts', 'Events & Calendar', 'Prayer Requests', 'Birthdays & Milestones'] },
-  { title: 'Settings & Profile', screens: ['Organization Profile', 'Notifications & Alerts', 'Integrations & APIs', 'Data Sovereignty & Backup', 'Customization & Lexicon'] },
-  { title: 'Admin Portal', screens: ['Users & Rights', 'Trash', 'Finance Audit'] },
+  { title: 'Settings & Profile', screens: ['Organization Profile', 'Subscription & Billing', 'Notifications & Alerts', 'Integrations & APIs', 'Data Sovereignty & Backup', 'Customization & Lexicon'] },
+  { title: 'Admin Portal', screens: ['Users & Rights', 'Trash', 'Finance Audit', 'Churches (Praxis)'] },
 ];
 
 const chrome = launchChrome({ port: PORT, profile: 'praxis-a11y', width: WIDTH, height: HEIGHT });

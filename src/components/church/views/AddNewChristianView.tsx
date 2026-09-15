@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ParishMember } from '../../../types';
 import { DEFAULT_LOCATION } from '../../../data/churchDomain';
-import { useDemoData } from '../../../data/demoStore';
+import { useMemberReport } from '../../../lib/hooks/useReports';
 import { useMembers } from '../../../lib/hooks/useMembers';
 import { ApiError } from '../../../lib/api';
 
@@ -26,7 +26,10 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   // The census cards report the roll itself, so enrolling someone moves them.
-  const { memberStats, enrolledIds } = useDemoData();
+  const { data: register, refetch: refetchRegister } = useMemberReport();
+  const [enrolledThisSession, setEnrolledThisSession] = useState(0);
+  const rollTotal = register?.total ?? 0;
+  const householdCount = register?.households.total ?? 0;
   const { createMember, isLoading: apiLoading } = useMembers();
 
   const handleAddTag = (tagText: string) => {
@@ -40,7 +43,7 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
 
   const handleSubmit = async (clearAfter = false) => {
     if (!firstName.trim() || !lastName.trim()) {
-      alert('Please fill in the required First Name and Last Name fields.');
+      setSubmitError('Enter both a first name and a last name.');
       return;
     }
 
@@ -51,10 +54,11 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
       const newMember = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        phone: phone || '+254 750 000 000',
-        email: email || `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
-        residentialAddress: address || 'Nyahururu, Laikipia',
-        dateOfBirth: dob || '1996-01-01',
+        // Only what the clerk entered: a fabricated phone number, email or date of birth is a
+        // fiction the parish would have to unpick one record at a time.
+        phone: phone || undefined,
+        email: email || undefined,
+        dateOfBirth: dob || undefined,
         baptismType: baptismStatus === 'awaiting' ? 'none' : baptismStatus,
         pastoralNotes: notes,
         location: DEFAULT_LOCATION,
@@ -62,11 +66,14 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
         householdRole: assignHousehold ? 'Head' : undefined,
         isHouseholdHead: assignHousehold,
         status: 'active' as const,
-        envelopeNumber: `ENV-${Math.floor(1400 + Math.random() * 200)}`,
+        // No envelope number: the API issues the next one from the register, so two clerks cannot
+        // both invent the same one on a column that has to be unique.
         tags: [],
       };
 
       await createMember(newMember);
+      setEnrolledThisSession((count) => count + 1);
+      void refetchRegister();
 
       setFeedbackToast(`Christian record for ${firstName} ${lastName} successfully saved to members register.`);
       setTimeout(() => setFeedbackToast(null), 4000);
@@ -109,16 +116,16 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2 relative z-10">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
-              {memberStats.total}
+              {rollTotal}
             </span>
-            {enrolledIds.length > 0 && (
+            {enrolledThisSession > 0 && (
               <span className="font-headline text-xs text-[#006243] font-semibold flex items-center gap-0.5">
                 <span aria-hidden="true" className="material-symbols-outlined text-[14px]">arrow_upward</span>
-                +{enrolledIds.length} you enrolled
+                +{enrolledThisSession} you enrolled
               </span>
             )}
           </div>
-          <p className="mt-1 font-body text-xs text-[#59413a]/80">Active members directory count</p>
+          <p className="mt-1 font-body text-xs text-[#59413a]/80">Members on the live register</p>
         </div>
 
         {/* Stat 2: New Baptisms */}
@@ -134,9 +141,9 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2 relative z-10">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
-              18
+              {register?.baptismsThisYear ?? 0}
             </span>
-            <span className="font-headline text-xs text-[#904d00] font-medium">Q1 Jan-Mar</span>
+            <span className="font-headline text-xs text-[#904d00] font-medium">This year</span>
           </div>
           <p className="mt-1 font-body text-xs text-[#59413a]/80">Recorded baptism & communion records</p>
         </div>
@@ -146,7 +153,7 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           <div className="absolute -right-4 -top-4 w-20 h-20 bg-[#ffdbd0]/40 rounded-full blur-xl group-hover:scale-125 transition-transform"></div>
           <div className="flex items-center justify-between relative z-10">
             <span className="font-headline text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              Pending Verification
+              Awaiting Baptism Record
             </span>
             <span className="w-8 h-8 rounded-lg bg-[#ffdbd0] flex items-center justify-center text-[#9b2f00]">
               <span aria-hidden="true" className="material-symbols-outlined text-[18px]">pending_actions</span>
@@ -154,10 +161,10 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2 relative z-10">
             <span className="font-headline text-3xl text-[#9b2f00] font-bold tracking-tight">
-              6
+              {register?.byBaptismType.none ?? 0}
             </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#c2410c]/15 text-[#9b2f00] font-headline text-xs font-semibold">
-              Requires Review
+              Pastoral follow-up
             </span>
           </div>
           <p className="mt-1 font-body text-xs text-[#59413a]/80">Baptism letters & pastoral triage</p>
@@ -176,13 +183,13 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2 relative z-10">
             <span className="font-headline text-3xl text-[#1e1b19] font-bold tracking-tight">
-              {memberStats.households}
+              {householdCount}
             </span>
             <span className="font-headline text-xs text-[#006243] font-semibold flex items-center gap-0.5">
               <span aria-hidden="true" className="material-symbols-outlined text-[14px]">family_restroom</span>
-              {memberStats.households === 0
+              {householdCount === 0
                 ? 'none yet'
-                : `${(memberStats.total / memberStats.households).toFixed(1)} souls per unit`}
+                : `${(rollTotal / householdCount).toFixed(1)} souls per unit`}
             </span>
           </div>
           <p className="mt-1 font-body text-xs text-[#59413a]/80">Family units registered</p>

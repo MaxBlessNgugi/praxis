@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { prisma } from './prisma';
+import { prisma, type Db } from './prisma';
 import { AppError } from '../middleware/errorHandler';
 import { appendFinanceEntry } from './financeAudit';
 import { live } from './live';
@@ -81,7 +81,7 @@ interface ArchiveDelegate {
   update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<Record<string, unknown>>;
 }
 
-const delegateFor = (client: Prisma.TransactionClient | typeof prisma, table: string): ArchiveDelegate =>
+const delegateFor = (client: Db, table: string): ArchiveDelegate =>
   (client as unknown as Record<string, ArchiveDelegate>)[table] as ArchiveDelegate;
 
 /**
@@ -110,7 +110,7 @@ export interface RetireOptions {
    * Work that has to commit with the retirement. One caller, deliberately: the finance module appends
    * its ledger line here, and a payment voided without its ledger line is the hole the chain closes.
    */
-  after?: (tx: Prisma.TransactionClient, row: Record<string, unknown>) => Promise<void>;
+  after?: (tx: Db, row: Record<string, unknown>) => Promise<void>;
 }
 
 /** Retires one record and returns the archive entry the Trash screen reads. */

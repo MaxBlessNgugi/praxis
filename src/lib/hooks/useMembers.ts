@@ -42,6 +42,8 @@ export interface CreateMemberInput {
   envelopeNumber?: string;
   pastoralNotes?: string;
   tags?: string[];
+  /** Set after the photograph has been uploaded; the upload itself goes through `/api/files`. */
+  photoFileId?: string | null;
 }
 
 export interface UpdateMemberInput extends Partial<CreateMemberInput> {}
@@ -50,6 +52,60 @@ export interface RetireMemberInput {
   reason: 'transferred' | 'relocated' | 'deceased' | 'request' | 'disciplinary' | 'duplicate' | 'other';
   reasonLabel: string;
   destinationParish?: string;
+}
+
+/** The register's fields a spreadsheet column may fill. */
+export type MemberImportField =
+  | 'firstName'
+  | 'lastName'
+  | 'location'
+  | 'email'
+  | 'phone'
+  | 'nationalId'
+  | 'dateOfBirth'
+  | 'status'
+  | 'baptismType'
+  | 'baptismDate'
+  | 'baptismOfficiant'
+  | 'envelopeNumber'
+  | 'tags'
+  | 'pastoralNotes';
+
+/** Which column of the file holds which field, by zero-based column position. */
+export interface MemberImportColumn {
+  index: number;
+  field: MemberImportField;
+}
+
+export interface MemberImportInput {
+  csv: string;
+  /** Absent on the first call, which is how the console asks what the file's columns are. */
+  columns?: MemberImportColumn[];
+  /** For a file with no congregation column: the one every row belongs to. */
+  defaultLocation?: string;
+  /** True — a report only — unless this is the request that writes. */
+  dryRun?: boolean;
+}
+
+export interface MemberImportRowReport {
+  row: number;
+  name: string;
+  status: 'create' | 'duplicate' | 'invalid';
+  errors: { field: string; message: string }[];
+  duplicateOf?: { memberId: string; name: string; matchedOn: string; retired: boolean };
+}
+
+export interface MemberImportReport {
+  headers: string[];
+  rowCount: number;
+  mapped: boolean;
+  dryRun: boolean;
+  missingRequired: MemberImportField[];
+  summary: { create: number; duplicate: number; invalid: number };
+  rows: MemberImportRowReport[];
+  truncated: boolean;
+  /** Rows written by this request; zero on anything that only reported. */
+  imported: number;
 }
 
 export interface ListHouseholdsQuery {
@@ -196,6 +252,29 @@ export function useMembers() {
     }
   }, []);
 
+  /**
+   * The register as a spreadsheet.
+   *
+   * One call, three questions: with no columns it asks the server what the file holds, with `dryRun`
+   * it asks what each row would do, and only a request that repeats the file with `dryRun: false`
+   * writes. The parsing and the rules live on the server, so the console and the import agree by
+   * construction rather than by both being edited.
+   */
+  const importMembers = useCallback(async (input: MemberImportInput): Promise<MemberImportReport> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await api.post<{ data: MemberImportReport }>('/api/members/import', input);
+      return response.data;
+    } catch (err) {
+      const message = err instanceof ApiError ? err.body.error : 'Failed to read the file';
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // Households
   const listHouseholds = useCallback(async (query: ListHouseholdsQuery = {}): Promise<ListHouseholdsResponse> => {
     setIsLoading(true);
@@ -333,6 +412,7 @@ export function useMembers() {
     listMembers,
     getMember,
     createMember,
+    importMembers,
     updateMember,
     retireMember,
     restoreMember,

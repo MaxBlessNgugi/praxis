@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { env } from '../config/env';
 import { live, findLive } from '../lib/live';
 import { getObjectBytes, putObject } from '../lib/storage';
+import { declaredTypeMatches } from '../lib/fileType';
 import { page } from '../lib/respond';
 import { AppError } from '../middleware/errorHandler';
 import { allowedTypesFor, type ListFilesQuery, type UploadFileInput } from '../schemas/file.schema';
@@ -73,6 +74,17 @@ export async function uploadFile(input: UploadFileInput, actorId: string) {
       415,
       `A ${input.purpose.replace('_', ' ')} must be one of: ${allowed.join(', ')}`,
       'unsupported_media_type',
+    );
+  }
+
+  // The declared type is the client's claim, and a file's name is where that claim comes from. The
+  // bytes get a say: a script named `logo.png` declaring `image/png` is refused here rather than
+  // stored and served back to every browser that loads the church's logo.
+  if (!declaredTypeMatches(input.mimeType, bytes)) {
+    throw new AppError(
+      415,
+      `Those bytes are not a ${input.mimeType}, whatever the file is called. Save it in an accepted format and try again.`,
+      'content_type_mismatch',
     );
   }
 

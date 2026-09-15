@@ -10,7 +10,9 @@ import { z } from 'zod';
  */
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(4000),
+  /// `0` is allowed and means "any free port", which is what a test runner or an ephemeral host
+  /// asks for; the default is the port the console expects.
+  PORT: z.coerce.number().int().min(0).default(4000),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_EXPIRES_IN: z.string().default('7d'),
@@ -30,6 +32,10 @@ const schema = z.object({
   /// Sign-in gets its own, much tighter ceiling. The general one is sized for a console that loads a
   /// dozen resources at once, which is far too generous to stop a password run against one account.
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+  /// A third ceiling, for the two things where one request has a bill attached: sending a broadcast,
+  /// which reaches the whole congregation over SMS or email, and uploading a file, which moves
+  /// megabytes. Ten a minute is far above what an office does and far below what a script would.
+  COSTLY_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
 
   // -------------------------------------------------------------------------------------------
   // Uploads
@@ -61,9 +67,19 @@ const schema = z.object({
   SMS_DRIVER: z.enum(['console', 'africastalking', 'twilio']).default('console'),
   AFRICASTALKING_USERNAME: z.string().optional(),
   AFRICASTALKING_API_KEY: z.string().optional(),
+  /// The sender ID a church sends under. Africa's Talking rejects an unregistered alphanumeric ID, so
+  /// leaving it out falls back to the account's own short code rather than failing the send.
+  AFRICASTALKING_SENDER_ID: z.string().optional(),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_FROM: z.string().optional(),
+
+  // -------------------------------------------------------------------------------------------
+  // Monitoring
+  // -------------------------------------------------------------------------------------------
+  /// A Sentry-compatible DSN. Unset — the default — means failures are logged and go no further, and
+  /// nothing is sent to a third party unless somebody deliberately configured one.
+  SENTRY_DSN: z.string().optional(),
 });
 
 /**
@@ -96,5 +112,15 @@ export const env = parsed.data;
 export const corsOrigins = env.CORS_ORIGIN.split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+
+/**
+ * The request-body ceiling for an upload: the file limit, plus base64's 4/3 overhead, plus the rest
+ * of the JSON envelope.
+ *
+ * Derived in one place because two do have to agree — the parser that accepts the body, mounted in
+ * `app.ts`, and the service that measures the decoded bytes. If they drift, the failure is an upload
+ * that one of them refuses and the other would have taken.
+ */
+export const uploadBodyLimit = Math.ceil(env.UPLOAD_MAX_BYTES * 1.4) + 64 * 1024;
 
 export const isProduction = env.NODE_ENV === 'production';

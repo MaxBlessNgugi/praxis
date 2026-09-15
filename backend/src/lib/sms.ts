@@ -14,7 +14,7 @@ import type { DeliveryReport } from './email';
  * never happened.
  */
 
-export function smsStatus(): { driver: string; configured: boolean } {
+export function smsStatus(): { driver: string; configured: boolean; from: string | null } {
   const configured =
     (env.SMS_DRIVER === 'africastalking' && Boolean(env.AFRICASTALKING_USERNAME) && Boolean(env.AFRICASTALKING_API_KEY)) ||
     (env.SMS_DRIVER === 'twilio' &&
@@ -22,7 +22,11 @@ export function smsStatus(): { driver: string; configured: boolean } {
       Boolean(env.TWILIO_AUTH_TOKEN) &&
       Boolean(env.TWILIO_FROM));
 
-  return { driver: env.SMS_DRIVER, configured };
+  // What the recipient's phone shows as the sender: the church's registered sender ID, the Twilio
+  // number, or nothing when the provider falls back to its own short code.
+  const from = env.SMS_DRIVER === 'twilio' ? env.TWILIO_FROM ?? null : env.AFRICASTALKING_SENDER_ID ?? null;
+
+  return { driver: env.SMS_DRIVER, configured, from };
 }
 
 export function assertSmsConfigured(): void {
@@ -55,6 +59,8 @@ async function sendViaAfricasTalking(recipients: string[], message: string): Pro
   for (const recipient of recipients) body.append('to', recipient);
   body.set('message', message);
   body.set('username', env.AFRICASTALKING_USERNAME ?? '');
+  // Only sent when a sender ID is configured: an unregistered alphanumeric ID is rejected outright.
+  if (env.AFRICASTALKING_SENDER_ID) body.set('from', env.AFRICASTALKING_SENDER_ID);
 
   const response = await fetch('https://api.africastalking.com/version1/messaging', {
     method: 'POST',

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { api, ApiError, type ItemEnvelope } from '../api';
+import { api, ApiError, type ItemEnvelope, type MemberReportDto } from '../api';
 
 export interface ReportOverviewResponse {
   period: { from: string | null; to: string | null };
@@ -85,4 +85,35 @@ export function useOverviewReport() {
   }, [fetchOverview]);
 
   return { data, isLoading, error, refetch: fetchOverview };
+}
+
+/**
+ * The register's own counts, for the census cards above the Members screens.
+ *
+ * Those cards report the whole roll, so they cannot read the page of rows underneath them: that list
+ * is filtered by the search box and paged, and a filtered page is not a census.
+ */
+export function useMemberReport() {
+  const [data, setData] = useState<MemberReportDto | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refetch = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await api.get<ItemEnvelope<MemberReportDto>>('/api/reports/members');
+      setData(response.data);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.body.error : 'Failed to load the register report');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { data, isLoading, error, refetch };
 }

@@ -4,6 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import { page } from '../lib/respond';
 import { retireRecord, restoreArchived } from '../lib/archive';
 import { findLive, includingRetired, live } from '../lib/live';
+import { assertWithinPlan } from './billing.service';
 import type { CreateMemberInput, ListMembersQuery, RetireMemberInput, UpdateMemberInput } from '../schemas/member.schema';
 
 /** What every member response carries: the household it belongs to, and nothing it does not need. */
@@ -11,26 +12,58 @@ const memberInclude = {
   household: { select: { id: true, name: true, unitNumber: true, location: true } },
 } satisfies Prisma.MemberInclude;
 
-function initialsOf(firstName: string, lastName: string): string {
+export function initialsOf(firstName: string, lastName: string): string {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
 /**
- * The next register number.
+ * The highest register number already issued, or the floor the sequence counts up from.
  *
- * Derived from the highest number already issued rather than from a row count: a count reuses a
- * number as soon as anything is retired, and two living members sharing an identifier is the kind of
- * defect a parish discovers a year later. The unique index is the real guarantee; this loop just
- * retries the rare collision instead of failing the request.
+ * Read from the highest number rather than from a row count: a count reuses a number as soon as
+ * anything is retired, and two living members sharing an identifier is the kind of defect a parish
+ * discovers a year later. Retired rows are included in the read — their numbers are spent.
  */
-async function nextMemberId(): Promise<string> {
+async function lastIssued(field: 'memberId' | 'envelopeNumber', prefix: string): Promise<number> {
   const latest = await prisma.member.findFirst({
-    where: { memberId: { startsWith: 'MBR-' }, ...includingRetired },
-    orderBy: { memberId: 'desc' },
-    select: { memberId: true },
+    where: { [field]: { startsWith: prefix }, ...includingRetired },
+    orderBy: { [field]: 'desc' },
+    select: { [field]: true },
   });
-  const last = latest ? Number.parseInt(latest.memberId.replace('MBR-', ''), 10) : 1000;
-  return `MBR-${(Number.isFinite(last) ? last : 1000) + 1}`;
+  const issued = Number.parseInt(String(latest?.[field] ?? '').replace(prefix, ''), 10);
+  return Number.isFinite(issued) ? issued : 1000;
+}
+
+/**
+ * The next register numbers.
+ *
+ * A batch asks once and then counts, because a spreadsheet of four hundred members cannot afford four
+ * hundred reads — and inside one transaction those reads would all see the same committed state and
+ * issue the same number. The unique index is still the real guarantee; a collision fails the import
+ * loudly rather than sharing an identifier quietly.
+ */
+export async function nextMemberIds(count: number): Promise<string[]> {
+  const start = (await lastIssued('memberId', 'MBR-')) + 1;
+  return Array.from({ length: count }, (_, offset) => `MBR-${start + offset}`);
+}
+
+/** The single next register number, which is what enrolling one member needs. */
+async function nextMemberId(): Promise<string> {
+  return (await nextMemberIds(1))[0] as string;
+}
+
+/**
+ * The next offering-envelope numbers, issued the way `MBR-` is and for the same reason: from the
+ * highest already issued, so a retired member's envelope is never handed to somebody else. A clerk
+ * who has already written a number on the card sends one and this is not consulted.
+ */
+export async function nextEnvelopeNumbers(count: number): Promise<string[]> {
+  const start = (await lastIssued('envelopeNumber', 'ENV-')) + 1;
+  return Array.from({ length: count }, (_, offset) => `ENV-${start + offset}`);
+}
+
+/** The single next envelope number, for the create form. */
+async function nextEnvelopeNumber(): Promise<string> {
+  return (await nextEnvelopeNumbers(1))[0] as string;
 }
 
 export async function listMembers(query: ListMembersQuery) {
@@ -99,6 +132,10 @@ export function getMember(id: string) {
 }
 
 export async function createMember(input: CreateMemberInput, actorId: string) {
+  // The plan's ceiling, checked where the register grows rather than at the route: a second endpoint
+  // that enrols somebody is one nobody has to remember to guard.
+  await assertWithinPlan('maxMembers');
+
   if (input.householdId) {
     const household = await prisma.household.findFirst({ where: { id: input.householdId, ...live } });
     if (!household) throw new AppError(400, 'That household does not exist', 'unknown_household');
@@ -109,6 +146,7 @@ export async function createMember(input: CreateMemberInput, actorId: string) {
       data: {
         ...input,
         memberId: await nextMemberId(),
+        envelopeNumber: input.envelopeNumber ?? (await nextEnvelopeNumber()),
         initials: initialsOf(input.firstName, input.lastName),
       },
       include: memberInclude,

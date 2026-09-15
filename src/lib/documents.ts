@@ -173,7 +173,7 @@ function certificateShell(input: {
           <div class="signature">
             <div class="line"></div>
             <div class="who">Church Secretary</div>
-            <div class="role">Destiny Sanctuary Int&rsquo;L</div>
+            <div class="role">${escapeHtml(input.church.name)}</div>
           </div>
         </div>
         <div class="meta">
@@ -262,6 +262,152 @@ export function buildDedicationCertificate(input: DedicationCertificateInput): s
     signatureName: input.officiant ?? 'The Officiating Minister',
     signatureRole: 'Officiating Minister',
   });
+}
+
+/**
+ * The register, as one page the council can read.
+ *
+ * Deliberately a *summary* rather than a printout of every row: a 400-member roll printed in full is
+ * a document nobody reads, and the pastoral question asked in a meeting is "how many, who are we
+ * missing, where do they live" — which is exactly what the counts below answer. Every figure is
+ * computed from the live register at the moment it is printed, so this page cannot disagree with the
+ * screens it summarises.
+ */
+export interface MembershipReportInput {
+  church: ChurchHeader;
+  generatedBy: string;
+  report: {
+    total: number;
+    byStatus: Record<string, number>;
+    byBaptismType: Record<string, number>;
+    withBaptismRecord: number;
+    envelopesIssued: number;
+    baptismsThisYear: number;
+    youth: number;
+    byLocation: Array<{ location: string; members: number }>;
+    households: { total: number; household: number; single: number; large: number };
+    joinedByYear: Array<{ year: string; members: number }>;
+  };
+}
+
+const STATUS_NAMES: Record<string, string> = {
+  active: 'Active',
+  transferred: 'Transferred out',
+  deceased: 'With the Lord',
+  inactive: 'Inactive',
+};
+
+const BAPTISM_NAMES: Record<string, string> = {
+  baptized: 'Baptised',
+  dedicated: 'Dedicated as a child',
+  none: 'No ordinance recorded',
+};
+
+function countRows(counts: Record<string, number>, names: Record<string, string>): string {
+  const rows = Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .map(([key, count]) => `<tr><td>${escapeHtml(names[key] ?? key)}</td><td class="num">${count}</td></tr>`)
+    .join('');
+  return rows || '<tr><td colspan="2">Nothing recorded yet.</td></tr>';
+}
+
+export function buildMembershipReport(input: MembershipReportInput): string {
+  const { report } = input;
+
+  const locationRows = report.byLocation
+    .map((row) => `<tr><td>${escapeHtml(row.location)}</td><td class="num">${row.members}</td></tr>`)
+    .join('');
+
+  const yearRows = report.joinedByYear
+    .map((row) => `<tr><td>${escapeHtml(row.year)}</td><td class="num">${row.members}</td></tr>`)
+    .join('');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Register summary — ${escapeHtml(input.church.name)}</title>
+<style>
+  ${BASE_CSS}
+  h1 { font-size: 22px; margin: 14px 0 2px; }
+  .period { font-size: 11px; color: #57534E; margin: 0; }
+  .cards { display: flex; gap: 10px; margin-top: 14px; }
+  .card { flex: 1; border: 1px solid #E7E5E4; border-radius: 6px; padding: 10px 12px; }
+  .card .label { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #A8A29E; }
+  .card .value { font-size: 17px; font-weight: 700; margin-top: 4px; color: #9B2F00; }
+  .card .sub { font-size: 9.5px; color: #57534E; margin-top: 2px; }
+  .split { display: flex; gap: 18px; align-items: flex-start; margin-top: 4px; }
+  .split > * { flex: 1; min-width: 0; }
+  .note { font-size: 10px; color: #57534E; margin-top: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="sheet">
+    ${letterhead(input.church)}
+    <h1>Membership Register Summary</h1>
+    <p class="period">Prepared by ${escapeHtml(input.generatedBy)} on ${escapeHtml(proseDate(new Date().toISOString()))} from the live register</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="label">On the roll</div>
+        <div class="value">${report.total}</div>
+        <div class="sub">${report.byStatus.active ?? 0} active</div>
+      </div>
+      <div class="card">
+        <div class="label">With an ordinance recorded</div>
+        <div class="value">${report.withBaptismRecord}</div>
+        <div class="sub">${report.baptismsThisYear} this year</div>
+      </div>
+      <div class="card">
+        <div class="label">Households</div>
+        <div class="value">${report.households.total}</div>
+        <div class="sub">${report.households.household} homes · ${report.households.single} living alone</div>
+      </div>
+      <div class="card">
+        <div class="label">Children &amp; youth</div>
+        <div class="value">${report.youth}</div>
+        <div class="sub">${report.envelopesIssued} envelopes issued</div>
+      </div>
+    </div>
+
+    <div class="split">
+      <div>
+        <h2 class="section">Standing</h2>
+        <table><tbody>${countRows(report.byStatus, STATUS_NAMES)}</tbody></table>
+      </div>
+      <div>
+        <h2 class="section">Ordinances</h2>
+        <table><tbody>${countRows(report.byBaptismType, BAPTISM_NAMES)}</tbody></table>
+      </div>
+    </div>
+
+    <div class="split">
+      <div>
+        <h2 class="section">Where they live</h2>
+        <table><thead><tr><th>Area</th><th class="num">Members</th></tr></thead>
+        <tbody>${locationRows || '<tr><td colspan="2">No locations recorded.</td></tr>'}</tbody></table>
+      </div>
+      <div>
+        <h2 class="section">Joined by year</h2>
+        <table><thead><tr><th>Year</th><th class="num">Joined</th></tr></thead>
+        <tbody>${yearRows || '<tr><td colspan="2">No join dates recorded.</td></tr>'}</tbody></table>
+      </div>
+    </div>
+
+    <p class="note">
+      Counts are taken from the register itself rather than from a stored total, so this page and the
+      Members screens cannot disagree. Retired records are excluded: a member transferred out or
+      called home is no longer on the roll, though their history remains in the Trash for thirty days
+      and in the audit log for good.
+    </p>
+
+    <footer>
+      <span>${escapeHtml(input.church.name)}</span>
+      <span>Generated by Praxis Church OS</span>
+    </footer>
+  </div>
+</body>
+</html>`;
 }
 
 export interface FinanceSummaryInput {

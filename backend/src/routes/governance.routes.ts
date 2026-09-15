@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as governanceController from '../controllers/governance.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { requireAuth, requireRole } from '../middleware/authenticate';
+import { requireWritableSubscription } from '../middleware/subscription';
 
 /**
  * `/api/governance` — the Session's meetings, the resolutions that come out of them, and the
@@ -18,7 +19,7 @@ export const governanceRouter = Router();
 const WRITERS = requireRole('super_admin', 'admin', 'staff');
 const ADMINS = requireRole('admin');
 
-governanceRouter.use(requireAuth);
+governanceRouter.use(requireAuth, requireWritableSubscription);
 
 // The Session
 governanceRouter.get('/meetings', asyncHandler(governanceController.listMeetings));

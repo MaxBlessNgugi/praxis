@@ -1,548 +1,489 @@
+import React, { useEffect, useState } from 'react';
+import { memberRefName, rosterApi, type DutyDto, type DutyStatus } from '../../../../lib/api';
+import { errorMessage, useMemberOptions, useRoster, useServices, useSwaps } from '../../../../hooks/useApi';
+import { usePermissions } from '../../../../lib/permissions';
+import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 import { useDialog } from '../../dialog';
-import React, { useState } from 'react';
-import {
-  VolunteerRosterDuty,
-  SwapRequest,
-  WorshipService,
-  ParishMember,
-} from '../../../../types';
-import {
-  INITIAL_VOLUNTEER_ROSTER,
-  INITIAL_SWAP_REQUESTS,
-  INITIAL_SERVICES,
-} from '../../../../data/churchMockData';
-import { useDemoData } from '../../../../data/demoStore';
+
+/**
+ * Who is serving, and who is covering for whom.
+ *
+ * The roster is the church's actual duty list: a person, a role, and a state — scheduled, confirmed,
+ * completed, missed, replaced, cancelled. Two things here exist because the API does and the mock it
+ * replaced did not. Statuses are the six the server accepts rather than three invented ones, and a
+ * swap is a *request* with a decision: somebody asks for cover, and an administrator approves it,
+ * which is one transaction that moves the duty and closes the request together.
+ *
+ * Deciding is gated on the administrator's role because the endpoint is — an approval that changed the
+ * duty would otherwise be a way for any volunteer to reassign the sound desk.
+ */
+
+const STATUSES: DutyStatus[] = ['scheduled', 'confirmed', 'completed', 'missed', 'replaced', 'cancelled'];
+
+const STATUS_STYLE: Record<DutyStatus, string> = {
+  scheduled: 'bg-[#F8F1E9] text-[#57534E]',
+  confirmed: 'bg-[#ECFDF5] text-[#047857]',
+  completed: 'bg-[#EFF6FF] text-[#1D4ED8]',
+  missed: 'bg-[#FEF2F2] text-[#B91C1C]',
+  replaced: 'bg-[#FFFBEB] text-[#92400E]',
+  cancelled: 'bg-[#F5F5F4] text-[#78716C]',
+};
+
+const FIELD =
+  'w-full px-3.5 py-2.5 text-sm rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] text-[#1C1917] placeholder-[#A8A29E] transition-all focus:outline-none focus:border-[#C2410C] focus:ring-4 focus:ring-[#C2410C]/15';
+const LABEL = 'block text-xs font-bold text-[#1C1917] mb-1.5';
+
+const whenOf = (iso: string): string =>
+  new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 
 export const VolunteerRosterPanel: React.FC = () => {
-  const [duties, setDuties] = useState<VolunteerRosterDuty[]>(INITIAL_VOLUNTEER_ROSTER);
-  const [swapRequests, setSwapRequests] = useState<SwapRequest[]>(INITIAL_SWAP_REQUESTS);
-  const [selectedServiceId, setSelectedServiceId] = useState<string>(INITIAL_SERVICES[0].id);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  // Most recent first, so the panel opens on the service being rostered rather than on the oldest one
+  // in the church's history — which is where `upcoming` lands a parish whose calendar is behind today.
+  const services = useServices({ pageSize: 100, sort: 'recent' });
+  const members = useMemberOptions();
+  const { canEdit, role } = usePermissions();
+  const isAdministrator = role === 'admin' || role === 'super_admin';
 
-  // Assign Volunteer Modal
-  const [isAssigningDuty, setIsAssigningDuty] = useState<boolean>(false);
-  const assigningDutyDialog = useDialog(() => setIsAssigningDuty(false), "Assign Volunteer to Service");
-  const [targetDept, setTargetDept] = useState<VolunteerRosterDuty['department']>('ushers');
-  const [roleTitle, setRoleTitle] = useState<string>('');
-  const { members } = useDemoData();
-  const [selectedMemberId, setSelectedMemberId] = useState<string>(members[0]?.id ?? '');
-  const [callTime, setCallTime] = useState<string>('09:45 AM');
-  const [dutyNotes, setDutyNotes] = useState<string>('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const duties = useRoster(selectedId ? { serviceId: selectedId } : {});
+  const swaps = useSwaps('requested');
 
-  // Request Swap Modal
-  const [swappingDuty, setSwappingDuty] = useState<VolunteerRosterDuty | null>(null);
-  const swappingDutyDialog = useDialog(() => setSwappingDuty(null), "Request Duty Replacement");
-  const [replacementName, setReplacementName] = useState<string>('');
-  const [swapReason, setSwapReason] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const currentService = INITIAL_SERVICES.find((s) => s.id === selectedServiceId) || INITIAL_SERVICES[0];
+  const [isAssigning, setIsAssigning] = useState(false);
+  const assigningDialog = useDialog(() => setIsAssigning(false), 'Assign a volunteer');
+  const [swapFor, setSwapFor] = useState<DutyDto | null>(null);
+  const swapDialog = useDialog(() => setSwapFor(null), 'Request cover');
 
-  const filteredDuties = duties.filter((duty) => {
-    if (selectedDepartment !== 'all' && duty.department !== selectedDepartment) return false;
-    return true;
-  });
+  const [draft, setDraft] = useState({ memberId: '', roleTitle: '', status: 'scheduled' as DutyStatus, notes: '' });
+  const [swapDraft, setSwapDraft] = useState({ replacementId: '', reason: '' });
 
-  const handleUpdateStatus = (dutyId: string, newStatus: VolunteerRosterDuty['status']) => {
-    setDuties(duties.map((d) => (d.id === dutyId ? { ...d, status: newStatus } : d)));
+  const serviceRows = services.items.filter((service) => !service.isTemplate);
+  const selected = serviceRows.find((service) => service.id === selectedId) ?? null;
+
+  useEffect(() => {
+    if (!selectedId && serviceRows.length > 0) setSelectedId(serviceRows[0].id);
+  }, [selectedId, serviceRows]);
+
+  const visible = duties.items.filter((duty) => !selectedId || duty.serviceId === selectedId);
+  const confirmed = visible.filter((duty) => duty.status === 'confirmed').length;
+  const open = visible.filter((duty) => duty.status === 'scheduled').length;
+
+  const run = async (id: string, work: () => Promise<unknown>, done: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await work();
+      setNotice(done);
+      await Promise.all([duties.refetch(), swaps.refetch()]);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
   };
 
-  const handleCreateAssignment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!roleTitle.trim()) return;
-
-    const chosenMember = members.find((m) => m.id === selectedMemberId) || members[0];
-    if (!chosenMember) return;
-
-    const newDuty: VolunteerRosterDuty = {
-      id: `vol-${Date.now()}`,
-      serviceId: currentService.id,
-      serviceDate: `${currentService.date} (${currentService.time.split('–')[0].trim()})`,
-      serviceTitle: currentService.title,
-      department: targetDept,
-      roleName: roleTitle,
-      assignedMemberId: chosenMember.id,
-      assignedMemberName: chosenMember.name,
-      callTime,
-      status: 'pending',
-      phone: chosenMember.phone,
-      email: chosenMember.email,
-      notes: dutyNotes,
-    };
-
-    setDuties([...duties, newDuty]);
-    setIsAssigningDuty(false);
-    setRoleTitle('');
-    setDutyNotes('');
+  const assign = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedId) return;
+    const member = members.members.find((row) => row.id === draft.memberId);
+    setBusyId('assign');
+    setError(null);
+    try {
+      await rosterApi.createDuty(selectedId, {
+        memberId: draft.memberId,
+        roleTitle: draft.roleTitle.trim(),
+        status: draft.status,
+        ...(draft.notes.trim() ? { notes: draft.notes.trim() } : {}),
+      });
+      setIsAssigning(false);
+      setDraft({ memberId: '', roleTitle: '', status: 'scheduled', notes: '' });
+      announce(`Added ${memberRefName(member) || 'a volunteer'} to the roster as ${draft.roleTitle.trim()}.`);
+      await duties.refetch();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
   };
 
-  const handleSubmitSwapRequest = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!swappingDuty || !replacementName.trim()) return;
+  function announce(message: string) {
+    setNotice(message);
+    setError(null);
+  }
 
-    const newSwap: SwapRequest = {
-      id: `swap-${Date.now()}`,
-      dutyId: swappingDuty.id,
-      serviceDate: swappingDuty.serviceDate,
-      roleName: swappingDuty.roleName,
-      requestingVolunteer: swappingDuty.assignedMemberName,
-      replacementVolunteer: replacementName,
-      reason: swapReason || 'Schedule conflict.',
-      status: 'pending-approval',
-      requestDate: new Date().toISOString().split('T')[0],
-    };
+  const requestSwap = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!swapFor) return;
+    setBusyId(swapFor.id);
+    setError(null);
+    try {
+      await rosterApi.requestSwap(swapFor.id, {
+        reason: swapDraft.reason.trim(),
+        ...(swapDraft.replacementId ? { replacementId: swapDraft.replacementId } : {}),
+      });
+      setSwapFor(null);
+      setSwapDraft({ replacementId: '', reason: '' });
+      announce('The request for cover is with the administrators.');
+      await swaps.refetch();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
-    // update the duty status to replacement
-    setDuties(
-      duties.map((d) => (d.id === swappingDuty.id ? { ...d, status: 'replacement' } : d))
+  const decide = (swapId: string, decision: 'approved' | 'declined') =>
+    void run(
+      swapId,
+      () => rosterApi.decideSwap(swapId, { decision }),
+      decision === 'approved' ? 'The swap is approved and the duty has moved.' : 'The request was declined.',
     );
-
-    setSwapRequests([newSwap, ...swapRequests]);
-    setSwappingDuty(null);
-    setReplacementName('');
-    setSwapReason('');
-  };
-
-  const handleApproveSwap = (swapId: string, dutyId: string, replacementName: string) => {
-    setSwapRequests(
-      swapRequests.map((s) => (s.id === swapId ? { ...s, status: 'approved' } : s))
-    );
-    setDuties(
-      duties.map((d) =>
-        d.id === dutyId
-          ? {
-              ...d,
-              assignedMemberName: replacementName,
-              status: 'confirmed',
-              notes: `Substituted via swap workflow approved by ministry director.`,
-            }
-          : d
-      )
-    );
-  };
-
-  const confirmedCount = duties.filter((d) => d.status === 'confirmed').length;
-  const pendingCount = duties.filter((d) => d.status === 'pending').length;
-  const replacementCount = duties.filter((d) => d.status === 'replacement' || d.status === 'swapped').length;
 
   return (
-    <div className="flex flex-col space-y-6">
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Total Roster Slots</span>
-            <div className="text-2xl font-black text-[#1C1917] mt-0.5">{duties.length} Assigned</div>
-            <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">event_available</span>
-              Across 7 service teams
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">assignment_ind</span>
-          </div>
+    <div className="space-y-5">
+      {error && (
+        <div role="alert" className="rounded-[9px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-xs font-semibold text-[#B91C1C]">
+          {error}
         </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Confirmed & Ready</span>
-            <div className="text-2xl font-black text-[#059669] mt-0.5">{confirmedCount} Volunteers</div>
-            <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span>
-              {Math.round((confirmedCount / (duties.length || 1)) * 100)}% coverage confirmed
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">check_circle</span>
-          </div>
+      )}
+      {notice && (
+        <div role="status" className="rounded-[9px] border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-xs font-semibold text-[#047857]">
+          {notice}
         </div>
+      )}
 
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Awaiting RSVP</span>
-            <div className="text-2xl font-black text-[#D97706] mt-0.5">{pendingCount} Pending</div>
-            <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">sms</span>
-              SMS automated reminders active
-            </span>
+      <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <label className={LABEL} htmlFor="roster-service">Which service</label>
+            <select
+              id="roster-service"
+              value={selectedId ?? ''}
+              onChange={(event) => setSelectedId(event.target.value)}
+              className={`${FIELD} max-w-md`}
+            >
+              {serviceRows.length === 0 && <option value="">Nothing on the calendar yet</option>}
+              {serviceRows.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.title} · {whenOf(service.heldAt)}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#D97706]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">schedule</span>
-          </div>
-        </div>
 
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Swap / Replacements</span>
-            <div className="text-2xl font-black text-[#C2410C] mt-0.5">{replacementCount} Requests</div>
-            <span className="text-xs text-[#DC2626] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">swap_horiz</span>
-              {swapRequests.filter((s) => s.status === 'pending-approval').length} awaiting approval
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#DC2626]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">swap_horiz</span>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'On the roster', value: visible.length },
+              { label: 'Confirmed', value: confirmed },
+              { label: 'Still to confirm', value: open },
+            ].map((card) => (
+              <div key={card.label} className="rounded-[12px] border border-[#E7E5E4] bg-[#FDF8F3] px-3 py-2 text-center">
+                <div className="font-headline text-xl font-bold text-[#1C1917]">{card.value}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-[#57534E]">{card.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Main Roster Table & Swap Workflow Section */}
-      <div className="bg-[#FFFFFF] rounded-[14px] p-5 border border-[#E7E5E4] shadow-warm-card">
-        {/* Header & Filter Controls */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#E7E5E4] mb-4">
+      <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+        <div className="flex flex-col gap-3 border-b border-[#E7E5E4] pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">badge</span>
-              Service Duty Roster & Ministry Allocation
+            <h3 className="flex items-center gap-2 font-headline text-base font-bold text-[#1C1917]">
+              <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-[#C2410C]">badge</span>
+              Duties for this service
             </h3>
-            <p className="text-xs text-[#57534E] mt-0.5">
-              Service: <span className="font-bold text-[#1C1917]">{currentService.title}</span> ({currentService.date})
+            <p className="mt-0.5 text-xs text-[#57534E]">
+              Each row is a person, a role and a state. Changing the state is how a confirmation is recorded.
             </p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <select aria-label="Department filter"
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="px-3 py-1.5 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-medium"
-            >
-              <option value="all">All Departments (7)</option>
-              <option value="ushers">Ushers & Collectors</option>
-              <option value="greeters">Greeters & Welcome</option>
-              <option value="kids">Kids & Nursery</option>
-              <option value="media-sound">Media & AV Broadcast</option>
-              <option value="worship-band">Worship Choir & Band</option>
-              <option value="hospitality">Hospitality & Refreshments</option>
-              <option value="parking">Parking & Mobility</option>
-            </select>
-
+          {canEdit('services') && (
             <button
               type="button"
-              onClick={() => setIsAssigningDuty(true)}
-              className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              onClick={() => setIsAssigning(true)}
+              disabled={!selected}
+              className="inline-flex items-center gap-1.5 self-start rounded-[9px] bg-[#C2410C] px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer"
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">person_add</span>
-              Assign Volunteer
+              Assign a volunteer
             </button>
-          </div>
+          )}
         </div>
 
-        {/* Table of Roster Duties */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-[#F8F1E9] text-[#57534E] font-bold text-[11px] uppercase tracking-wider border-b border-[#E7E5E4]">
-                <th className="py-3 px-3 rounded-l-[8px]">Department & Role</th>
-                <th className="py-3 px-3">Assigned Volunteer</th>
-                <th className="py-3 px-3">Call Time</th>
-                <th className="py-3 px-3">Contact</th>
-                <th className="py-3 px-3">Status</th>
-                <th className="py-3 px-3">Notes</th>
-                <th className="py-3 px-3 rounded-r-[8px] text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E7E5E4]/80">
-              {filteredDuties.map((duty) => (
-                <tr key={duty.id} className="hover:bg-[#FDF8F3] transition-colors">
-                  <td className="py-3 px-3">
-                    <div className="font-bold text-[#1C1917]">{duty.roleName}</div>
-                    <span className="inline-block mt-0.5 px-2 py-0.2 rounded-md bg-[#E7E5E4]/60 text-[#57534E] text-[10px] font-bold uppercase tracking-wider">
-                      {duty.department}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <div className="font-bold text-[#1C1917] flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-[#C2410C]/10 text-[#C2410C] font-bold text-[10px] flex items-center justify-center">
-                        {duty.assignedMemberName.split(' ')[0][0]}
-                      </div>
-                      {duty.assignedMemberName}
+        <div className="pt-4">
+          {duties.loading && <LoadingBlock label="Reading the roster…" />}
+          {duties.error && <ErrorBlock message={duties.error} onRetry={() => void duties.refetch()} />}
+          {!duties.loading && !duties.error && visible.length === 0 && (
+            <EmptyBlock
+              icon="group_off"
+              title="Nobody is on the roster yet"
+              hint="Assign the roles this service needs — preacher, worship lead, ushers, sound desk — and each person can confirm or ask for cover."
+            />
+          )}
+
+          {visible.length > 0 && (
+            <ul className="divide-y divide-[#E7E5E4]">
+              {visible.map((duty) => (
+                <li key={duty.id} className="flex flex-col gap-3 py-3.5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-[#1C1917]">{memberRefName(duty.holder) || 'Unassigned'}</span>
+                      <span className={`rounded-[6px] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STATUS_STYLE[duty.status]}`}>
+                        {duty.status}
+                      </span>
                     </div>
-                  </td>
-                  <td className="py-3 px-3 font-mono font-bold text-[#1C1917]">{duty.callTime}</td>
-                  <td className="py-3 px-3">
-                    <div className="text-[#1C1917] font-medium">{duty.phone}</div>
-                    <div className="text-[11px] text-[#A8A29E]">{duty.email}</div>
-                  </td>
-                  <td className="py-3 px-3">
-                    <select aria-label="Duty status"
-                      value={duty.status}
-                      onChange={(e) => handleUpdateStatus(duty.id, e.target.value as any)}
-                      className={`text-[11px] font-bold px-2 py-1 rounded-[6px] border ${
-                        duty.status === 'confirmed'
-                          ? 'bg-[#059669]/10 text-[#059669] border-[#059669]/30'
-                          : duty.status === 'pending'
-                          ? 'bg-[#D97706]/10 text-[#D97706] border-[#D97706]/30'
-                          : 'bg-[#DC2626]/10 text-[#DC2626] border-[#DC2626]/30'
-                      }`}
-                    >
-                      <option value="confirmed">Confirmed</option>
-                      <option value="pending">Pending</option>
-                      <option value="replacement">Substitute Needed</option>
-                      <option value="swapped">Swapped</option>
-                    </select>
-                  </td>
-                  <td className="py-3 px-3 text-[#57534E] max-w-[200px] truncate">
-                    {duty.notes || '—'}
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setSwappingDuty(duty)}
-                      className="px-2.5 py-1 rounded-[6px] bg-[#F8F1E9] hover:bg-[#C2410C] hover:text-white text-[#C2410C] text-[11px] font-bold border border-[#E7E5E4] transition-all cursor-pointer"
-                      title="Request Swap or Substitute"
-                    >
-                      Swap
-                    </button>
-                  </td>
-                </tr>
+                    <p className="mt-0.5 text-xs text-[#57534E]">
+                      {duty.roleTitle}
+                      {duty.holder?.phone ? ` · ${duty.holder.phone}` : ''}
+                    </p>
+                    {duty.notes && <p className="mt-0.5 text-[11px] italic text-[#57534E]">{duty.notes}</p>}
+                  </div>
+
+                  {canEdit('services') && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="sr-only" htmlFor={`status-${duty.id}`}>State of {duty.roleTitle}</label>
+                      <select
+                        id={`status-${duty.id}`}
+                        value={duty.status}
+                        disabled={busyId === duty.id}
+                        onChange={(event) =>
+                          void run(
+                            duty.id,
+                            () => rosterApi.updateDuty(duty.id, { status: event.target.value as DutyStatus }),
+                            `${memberRefName(duty.holder)}'s duty is marked ${event.target.value}.`,
+                          )
+                        }
+                        className="rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] px-2.5 py-1.5 text-xs font-semibold text-[#1C1917] capitalize cursor-pointer"
+                      >
+                        {STATUSES.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSwapDraft({ replacementId: '', reason: '' });
+                          setSwapFor(duty);
+                        }}
+                        className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-2.5 py-1.5 text-xs font-bold text-[#1C1917] transition-colors hover:bg-[#F5EDE4] cursor-pointer"
+                      >
+                        Ask for cover
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === duty.id}
+                        onClick={() => void run(duty.id, () => rosterApi.removeDuty(duty.id), 'That duty was taken off the roster.')}
+                        className="rounded-[9px] border border-[#FECACA] bg-[#FFFFFF] px-2.5 py-1.5 text-xs font-bold text-[#B91C1C] transition-colors hover:bg-[#FEF2F2] disabled:opacity-60 cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+          )}
         </div>
       </div>
 
-      {/* Volunteer Swap Requests Queue */}
-      <div className="bg-[#FFFFFF] rounded-[14px] p-5 border border-[#E7E5E4] shadow-warm-card">
-        <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4] mb-4">
-          <div>
-            <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">swap_horiz</span>
-              Substitute & Roster Swap Queue
-            </h3>
-            <p className="text-xs text-[#57534E] mt-0.5">
-              Review volunteer replacement proposals submitted by team members.
+      <div className="rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-5 shadow-warm-card">
+        <h3 className="flex items-center gap-2 font-headline text-base font-bold text-[#1C1917]">
+          <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-[#C2410C]">swap_horiz</span>
+          Requests for cover
+        </h3>
+        <p className="mt-0.5 text-xs text-[#57534E]">
+          {isAdministrator
+            ? 'Approving moves the duty to the replacement and closes the request in one step.'
+            : 'An administrator approves a swap — it changes who is serving, so it is not a volunteer’s decision.'}
+        </p>
+
+        <div className="mt-4">
+          {swaps.loading && <LoadingBlock label="Reading the requests…" />}
+          {swaps.error && <ErrorBlock message={swaps.error} onRetry={() => void swaps.refetch()} />}
+          {!swaps.loading && !swaps.error && swaps.items.length === 0 && (
+            <EmptyBlock
+              icon="pending_actions"
+              title="No swaps waiting"
+              hint="When somebody asks for cover, the request appears here with their reason and the person they suggested."
+            />
+          )}
+
+          {swaps.items.length > 0 && (
+            <ul className="divide-y divide-[#E7E5E4]">
+              {swaps.items.map((swap) => (
+                <li key={swap.id} className="flex flex-col gap-3 py-3.5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-[#1C1917]">{memberRefName(swap.requestedBy)}</span>
+                      <span className="text-xs text-[#57534E]">needs cover for</span>
+                      <span className="text-xs font-semibold text-[#1C1917]">{swap.duty?.roleTitle ?? 'a duty'}</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-[#57534E]">
+                      {swap.duty?.service ? `${swap.duty.service.title} · ${whenOf(swap.duty.service.heldAt)}` : 'Service not recorded'}
+                      {swap.replacement ? ` · suggested: ${memberRefName(swap.replacement)}` : ' · no replacement suggested'}
+                    </p>
+                    {swap.reason && <p className="mt-0.5 text-[11px] italic text-[#57534E]">“{swap.reason}”</p>}
+                  </div>
+
+                  {isAdministrator ? (
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        disabled={busyId === swap.id}
+                        onClick={() => decide(swap.id, 'approved')}
+                        className="rounded-[9px] bg-[#047857] px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#065F46] disabled:opacity-60 cursor-pointer"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === swap.id}
+                        onClick={() => decide(swap.id, 'declined')}
+                        className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-3 py-1.5 text-xs font-bold text-[#1C1917] transition-colors hover:bg-[#F5EDE4] disabled:opacity-60 cursor-pointer"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="shrink-0 text-[11px] font-semibold text-[#57534E]">Waiting on an administrator</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {isAssigning && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...assigningDialog}>
+          <form onSubmit={assign} className="w-full max-w-[480px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
+            <h3 className="font-headline text-base font-bold text-[#1C1917]">Assign a volunteer</h3>
+            <p className="mt-0.5 text-xs text-[#57534E]">
+              {selected ? `${selected.title} · ${whenOf(selected.heldAt)}` : 'Choose a service first.'}
             </p>
-          </div>
-          <span className="px-2.5 py-0.5 rounded-full bg-[#F8F1E9] text-xs font-bold text-[#57534E] border border-[#E7E5E4]">
-            {swapRequests.length} Total Requests
-          </span>
-        </div>
-
-        <div className="space-y-3">
-          {swapRequests.map((req) => (
-            <div
-              key={req.id}
-              className="p-4 rounded-[12px] bg-[#FDF8F3] border border-[#E7E5E4] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-xs text-[#1C1917]">{req.roleName}</span>
-                  <span className="text-[11px] font-mono text-[#A8A29E]">({req.serviceDate})</span>
-                  <span
-                    className={`px-2 py-0.2 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      req.status === 'approved'
-                        ? 'bg-[#059669]/10 text-[#059669]'
-                        : req.status === 'pending-approval'
-                        ? 'bg-[#D97706]/10 text-[#D97706]'
-                        : 'bg-[#DC2626]/10 text-[#DC2626]'
-                    }`}
-                  >
-                    {req.status.replace('-', ' ')}
-                  </span>
-                </div>
-                <div className="text-xs text-[#57534E] flex items-center gap-2">
-                  <span>Scheduled: <strong className="text-[#1C1917]">{req.requestingVolunteer}</strong></span>
-                  <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-[#C2410C]">arrow_forward</span>
-                  <span>Substitute: <strong className="text-[#059669]">{req.replacementVolunteer}</strong></span>
-                </div>
-                <div className="text-[11px] text-[#A8A29E] italic">Reason: "{req.reason}"</div>
-              </div>
-
-              {req.status === 'pending-approval' && (
-                <div className="flex items-center gap-2 self-end sm:self-center">
-                  <button
-                    type="button"
-                    onClick={() => handleApproveSwap(req.id, req.dutyId, req.replacementVolunteer)}
-                    className="px-3 py-1.5 rounded-[8px] bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
-                  >
-                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check</span>
-                    Approve Swap
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSwapRequests(
-                        swapRequests.map((s) => (s.id === req.id ? { ...s, status: 'rejected' } : s))
-                      )
-                    }
-                    className="px-3 py-1.5 rounded-[8px] bg-[#F8F1E9] hover:bg-[#FEE2E2] hover:text-[#DC2626] text-[#57534E] text-xs font-bold border border-[#E7E5E4] transition-all cursor-pointer"
-                  >
-                    Decline
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* MODAL: Assign Volunteer Duty */}
-      {isAssigningDuty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...assigningDutyDialog}>
-          <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
-              <h3 className="font-headline text-base font-bold text-[#1C1917]">Assign Volunteer to Service</h3>
-              <button
-                type="button"
-                onClick={() => setIsAssigningDuty(false)}
-                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              aria-label="Close">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateAssignment} className="mt-4 space-y-4">
+            <div className="mt-4 space-y-3">
               <div>
-                <label htmlFor="roster-department" className="block text-xs font-bold text-[#1C1917] mb-1">Ministry Department</label>
-                <select id="roster-department" aria-label="Ministry Department"
-                  value={targetDept}
-                  onChange={(e) => setTargetDept(e.target.value as any)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                >
-                  <option value="ushers">Ushers & Collectors</option>
-                  <option value="greeters">Greeters & Welcome</option>
-                  <option value="kids">Kids & Nursery</option>
-                  <option value="media-sound">Media & Sound AV</option>
-                  <option value="worship-band">Worship Band & Choir</option>
-                  <option value="hospitality">Hospitality & Coffee</option>
-                  <option value="parking">Parking & Mobility Guide</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="roster-role-title" className="block text-xs font-bold text-[#1C1917] mb-1">Role Title *</label>
-                <input id="roster-role-title" aria-label="Role Title"
-                  type="text"
+                <label className={LABEL} htmlFor="duty-member">Who</label>
+                <select
+                  id="duty-member"
                   required
-                  placeholder="e.g. Aisle 2 Collection Steward"
-                  value={roleTitle}
-                  onChange={(e) => setRoleTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                  value={draft.memberId}
+                  onChange={(e) => setDraft((previous) => ({ ...previous, memberId: e.target.value }))}
+                  className={FIELD}
+                >
+                  <option value="">Choose somebody on the register</option>
+                  {members.members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {memberRefName(member)}
+                    </option>
+                  ))}
+                </select>
+                {members.members.length === 0 && !members.loading && (
+                  <p className="mt-1 text-[11px] text-[#57534E]">
+                    The register is empty — enrol people on the Members screen first.
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className={LABEL} htmlFor="duty-role">Which role</label>
+                <input
+                  id="duty-role"
+                  required
+                  value={draft.roleTitle}
+                  onChange={(e) => setDraft((previous) => ({ ...previous, roleTitle: e.target.value }))}
+                  placeholder="Aisle 2 collection steward"
+                  className={FIELD}
                 />
               </div>
-
               <div>
-                <label htmlFor="roster-volunteer" className="block text-xs font-bold text-[#1C1917] mb-1">Select Volunteer (Member Roll)</label>
-                <select id="roster-volunteer" aria-label="Select Volunteer (Member Roll)"
-                  value={selectedMemberId}
-                  onChange={(e) => setSelectedMemberId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                <label className={LABEL} htmlFor="duty-status">State</label>
+                <select
+                  id="duty-status"
+                  value={draft.status}
+                  onChange={(e) => setDraft((previous) => ({ ...previous, status: e.target.value as DutyStatus }))}
+                  className={FIELD}
                 >
-                  {members.map((mbr) => (
-                    <option key={mbr.id} value={mbr.id}>
-                      {mbr.name} ({mbr.memberId})
+                  {STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
                     </option>
                   ))}
                 </select>
               </div>
-
               <div>
-                <label htmlFor="roster-call-time" className="block text-xs font-bold text-[#1C1917] mb-1">Call Time</label>
-                <input id="roster-call-time" aria-label="Call Time"
-                  type="text"
-                  placeholder="09:45 AM"
-                  value={callTime}
-                  onChange={(e) => setCallTime(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                <label className={LABEL} htmlFor="duty-notes">Notes for them</label>
+                <input
+                  id="duty-notes"
+                  value={draft.notes}
+                  onChange={(e) => setDraft((previous) => ({ ...previous, notes: e.target.value }))}
+                  placeholder="Collect the badge from the welcome kiosk by 09:30."
+                  className={FIELD}
                 />
               </div>
-
-              <div>
-                <label htmlFor="roster-duty-notes" className="block text-xs font-bold text-[#1C1917] mb-1">Duty Notes / Special Instructions</label>
-                <textarea id="roster-duty-notes" aria-label="Duty Notes / Special Instructions"
-                  rows={2}
-                  placeholder="e.g. Please pick up badge at Welcome Kiosk by 09:30 AM"
-                  value={dutyNotes}
-                  onChange={(e) => setDutyNotes(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
-                <button
-                  type="button"
-                  onClick={() => setIsAssigningDuty(false)}
-                  className="px-4 py-2 text-xs font-bold text-[#57534E] hover:text-[#1C1917] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
-                >
-                  Assign to Roster
-                </button>
-              </div>
-            </form>
-          </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setIsAssigning(false)} className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" disabled={busyId === 'assign'} className="rounded-[9px] bg-[#C2410C] px-4 py-2 text-xs font-bold text-white hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer">
+                {busyId === 'assign' ? 'Assigning…' : 'Put them on the roster'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* MODAL: Request Swap */}
-      {swappingDuty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...swappingDutyDialog}>
-          <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
-              <h3 className="font-headline text-base font-bold text-[#1C1917]">Request Duty Replacement</h3>
-              <button
-                type="button"
-                onClick={() => setSwappingDuty(null)}
-                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              aria-label="Close">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
+      {swapFor && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...swapDialog}>
+          <form onSubmit={requestSwap} className="w-full max-w-[460px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
+            <h3 className="font-headline text-base font-bold text-[#1C1917]">Ask for cover</h3>
+            <p className="mt-0.5 text-xs text-[#57534E]">
+              {swapFor.roleTitle} · {memberRefName(swapFor.holder)}
+            </p>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className={LABEL} htmlFor="swap-replacement">Who might take it</label>
+                <select
+                  id="swap-replacement"
+                  value={swapDraft.replacementId}
+                  onChange={(e) => setSwapDraft((previous) => ({ ...previous, replacementId: e.target.value }))}
+                  className={FIELD}
+                >
+                  <option value="">Nobody in mind — the office will find somebody</option>
+                  {members.members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {memberRefName(member)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={LABEL} htmlFor="swap-reason">Why</label>
+                <textarea
+                  id="swap-reason"
+                  required
+                  rows={3}
+                  value={swapDraft.reason}
+                  onChange={(e) => setSwapDraft((previous) => ({ ...previous, reason: e.target.value }))}
+                  placeholder="Family travel that weekend."
+                  className={FIELD}
+                />
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setSwapFor(null)} className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" disabled={busyId === swapFor.id} className="rounded-[9px] bg-[#C2410C] px-4 py-2 text-xs font-bold text-white hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer">
+                {busyId === swapFor.id ? 'Sending…' : 'Send the request'}
               </button>
             </div>
-
-            <form onSubmit={handleSubmitSwapRequest} className="mt-4 space-y-4">
-              <div className="p-3 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4]">
-                <div className="text-[10px] font-bold text-[#A8A29E] uppercase">Scheduled Role</div>
-                <div className="font-headline text-sm font-bold text-[#1C1917] mt-0.5">
-                  {swappingDuty.roleName}
-                </div>
-                <div className="text-xs text-[#57534E]">
-                  Current Volunteer: <strong>{swappingDuty.assignedMemberName}</strong> · {swappingDuty.callTime}
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="swap-replacement" className="block text-xs font-bold text-[#1C1917] mb-1">Proposed Replacement Volunteer *</label>
-                <input id="swap-replacement" aria-label="Proposed Replacement Volunteer"
-                  type="text"
-                  required
-                  placeholder="e.g. Elena Mwangi"
-                  value={replacementName}
-                  onChange={(e) => setReplacementName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="swap-reason" className="block text-xs font-bold text-[#1C1917] mb-1">Reason for Swap</label>
-                <textarea id="swap-reason" aria-label="Reason for Swap"
-                  rows={2}
-                  placeholder="e.g. Family travel / rehearsal overlap"
-                  value={swapReason}
-                  onChange={(e) => setSwapReason(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
-                <button
-                  type="button"
-                  onClick={() => setSwappingDuty(null)}
-                  className="px-4 py-2 text-xs font-bold text-[#57534E] hover:text-[#1C1917] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
-                >
-                  Submit Swap Request
-                </button>
-              </div>
-            </form>
-          </div>
+          </form>
         </div>
       )}
     </div>

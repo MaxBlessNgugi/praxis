@@ -4,11 +4,13 @@ import {
   createUserSchema,
   listUsersQuerySchema,
   removeUserSchema,
+  resetPasswordSchema,
   updateUserSchema,
 } from '../schemas/user.schema';
 import * as userService from '../services/user.service';
 import { ok } from '../lib/respond';
 import { actor } from '../lib/request';
+import { unauthorizedError } from '../middleware/errorHandler';
 
 export async function listUsers(req: Request, res: Response): Promise<void> {
   const query = listUsersQuerySchema.parse(req.query);
@@ -19,6 +21,16 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
 export async function createUser(req: Request, res: Response): Promise<void> {
   const input = createUserSchema.parse(req.body);
   res.status(201).json({ data: await userService.createUser(input, actor(req)) });
+}
+
+/** 204: an administrator set this password and already knows it. Nothing is echoed back. */
+export async function resetPassword(req: Request, res: Response): Promise<void> {
+  const { password } = resetPasswordSchema.parse(req.body);
+  // The whole account rather than its id: this is the one administrative action where what the actor
+  // may do depends on the actor's own role.
+  if (!req.user) throw unauthorizedError();
+  await userService.resetPassword(req.params.id as string, password, req.user);
+  res.status(204).send();
 }
 
 export async function updateUser(req: Request, res: Response): Promise<void> {

@@ -35,7 +35,8 @@ export async function listServices(query: ListServicesQuery) {
     prisma.service.count({ where }),
     prisma.service.findMany({
       where,
-      include: { _count: { select: { liturgy: true, attendance: true, roster: true } } },
+      // Counted live only: a duty taken off the roster is in the Trash, not still on duty.
+      include: { _count: { select: { liturgy: { where: live }, attendance: { where: live }, roster: { where: live } } } },
       orderBy: { heldAt: query.sort === 'upcoming' ? 'asc' : 'desc' },
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
