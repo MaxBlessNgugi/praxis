@@ -358,6 +358,23 @@ export const UsersRightsPanel: React.FC = () => {
                         Set password
                       </button>
 
+                      {row.isInvited && (
+                        <button
+                          type="button"
+                          disabled={busyId === row.id}
+                          onClick={() =>
+                            void act(
+                              row.id,
+                              () => usersApi.reinvite(row.id),
+                              `A new activation link was issued for ${row.name}.`,
+                            )
+                          }
+                          className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-2.5 py-1.5 text-xs font-bold text-[#1C1917] transition-colors hover:bg-[#F5EDE4] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                        >
+                          Re-issue invitation
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         disabled={busyId === row.id || isSelf}

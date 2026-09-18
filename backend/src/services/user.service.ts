@@ -86,6 +86,8 @@ export async function listUsers(query: ListUsersQuery) {
         row,
         row.memberships.find((membership) => membership.organizationId === requireTenantId())?.role ?? row.role,
       ),
+      // The activation-pending marker the accounts screen offers its re-invite action against.
+      isInvited: row.isInvited,
       // The churches this account serves, with its role in each — what the accounts screen shows
       // beside a name so an office knows who they are looking at before they pick up the phone.
       churches: row.memberships.map((membership) => ({
@@ -145,6 +147,23 @@ export async function inviteUser(
   if (input.memberId) await assertMemberExists(input.memberId);
   const roleId = await roleIdFor(input.roleKey);
 
+  // A duplicate address gets the answer that names the remedy, not a raw unique-constraint 409.
+  // The database's unique constraint remains the authority — two invites racing still cannot both
+  // win — this only decides which sentence the office reads when the address is already taken.
+  const existing = await prisma.user.findFirst({
+    where: { email: input.email.toLowerCase() },
+    select: { isInvited: true },
+  });
+  if (existing) {
+    throw new AppError(
+      409,
+      existing.isInvited
+        ? 'That address is already invited and waiting on its activation link — re-issue the invitation from the accounts screen'
+        : 'An account already uses that email address',
+      existing.isInvited ? 'invitation_pending' : 'email_taken',
+    );
+  }
+
   // The account exists the moment it is invited — the email address must be reserved now, or two
   // invitations could race — but its password is a value that verifies nothing. The hash is of a
   // discarded random string, so the account cannot be signed into until its owner finishes the link.
@@ -155,6 +174,7 @@ export async function inviteUser(
       passwordHash: await hashPassword(generateResetToken()),
       roleId,
       memberId: input.memberId ?? null,
+      isInvited: true,
       memberships: { create: { organizationId: requireTenantId(), roleId, isDefault: true } },
     },
     include: { role: true },
@@ -308,6 +328,73 @@ export async function removeUser(id: string, input: RetireReason, actorId: strin
     // The account as the Trash screen shows it, and never the password hash with it.
     snapshot: () => ({ id: existing.id, name: existing.name, email: existing.email, roleKey: existing.role?.key ?? null }),
   });
+}
+
+/**
+ * Re-issue the activation link for an invited account that never finished signing up.
+ *
+ * Invitation links expire in two days, and the honest failure a parish office hits is "their link
+ * lapsed while the church was closed". The rules that make this safe are the ones the invite itself
+ * enforces: only an account that **cannot sign in yet** may be re-invited (an active account gets
+ * the ordinary reset flow instead, which no invitee can be talked into using on somebody else), the
+ * caller's church must hold the membership (a user row is global; the membership is the tenant
+ * boundary), and the newest link sweeps the old ones so exactly one link ever works.
+ */
+export async function resendInvitation(id: string, actor: AuthenticatedUser): Promise<{ canSendEmail: boolean; devLink?: string }> {
+  const target = await findLive(prisma.user, id, 'That account does not exist', { include: { role: true } });
+  const membership = await prisma.organizationMember.findFirst({
+    where: { userId: id, organizationId: requireTenantId(), isActive: true, ...live },
+  });
+  if (!membership) throw forbiddenError('That account does not serve this church');
+  // "Never finished signing up" is the invited flag, not merely never-signed-in: a seeded
+  // administrator has never signed in either but holds a real password, and their lapsed-sign-in
+  // case belongs to the reset flow, not to a second invitation.
+  if (!target.isInvited) {
+    throw new AppError(
+      409,
+      'That account already finished signing up — send a password reset instead of a new invitation',
+      'already_activated',
+    );
+  }
+  if (target.id === actor.id) throw new AppError(400, 'You cannot invite yourself — sign in with your password', 'self_invite');
+
+  await prisma.passwordResetToken.deleteMany({ where: { userId: id, usedAt: null } });
+  const token = generateResetToken();
+  await prisma.passwordResetToken.create({
+    data: {
+      userId: id,
+      tokenHash: hashResetToken(token),
+      // Same two-day window as the first invitation; same reasoning.
+      expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60_000),
+    },
+  });
+
+  const link = `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/?reset=${encodeURIComponent(token)}`;
+  const canSendEmail = emailStatus().configured;
+  if (canSendEmail) {
+    const report = await sendEmail({
+      to: [target.email],
+      subject: `${env.APP_NAME}: your invitation to ${env.APP_NAME}`,
+      text: [
+        `Hello ${target.name},`,
+        '',
+        `${actor.name} has re-issued your invitation to this church's records. Choose your own password here:`,
+        '',
+        link,
+        '',
+        'The link can be used once and expires in two days. Any earlier invitation link no longer works.',
+        'If you were not expecting this, you can ignore the message — no account works until the password is chosen.',
+      ].join('\n'),
+    });
+    if (report.delivered === 0) throw new AppError(502, 'The email provider refused the invitation — the account exists, but the link was not delivered', 'email_send_failed');
+  } else {
+    await audit(actor.id, 'update', id, 'A new activation link was issued but could not be emailed (no email provider is configured)');
+  }
+
+  return {
+    canSendEmail,
+    ...(canSendEmail || env.NODE_ENV !== 'development' ? {} : { devLink: link }),
+  };
 }
 
 /** A link to a register record has to point at somebody real, or the FK failure arrives as a 409. */

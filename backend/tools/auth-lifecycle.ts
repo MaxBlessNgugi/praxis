@@ -262,11 +262,31 @@ try {
     const invitedBefore = await call('POST', '/api/auth/login', { body: { email: invitedEmail, password: 'guess-anything' } });
     check('the invited account cannot sign in before its link is spent', invitedBefore.status === 401, `got ${invitedBefore.status}`);
 
-    const inviteLinkToken = invitedRow?.devLink ? tokenFromLink(invitedRow.devLink) : null;
+    let inviteLinkToken = invitedRow?.devLink ? tokenFromLink(invitedRow.devLink) : null;
     check(
       inDevelopment ? 'the activation link is handed back in development' : 'no activation link is handed back in production',
       inDevelopment ? !!inviteLinkToken : !invitedRow?.devLink,
     );
+
+    // Re-issuing the invitation (the "their link lapsed" case): the old link must stop working,
+    // and an account that was never invited must be refused the invite path entirely.
+    const reinvite = await call('POST', `/api/admin/users/${invitedRow?.user.id}/reinvite`, { token: adminToken });
+    const reinvitedRow = data<{ canSendEmail: boolean; devLink?: string }>(reinvite);
+    check('a lapsed invitation can be re-issued to the same account', reinvite.status === 200 && typeof reinvitedRow?.canSendEmail === 'boolean', `got ${reinvite.status}`);
+    const reinviteToken = reinvitedRow?.devLink ? tokenFromLink(reinvitedRow.devLink) : null;
+    if (inviteLinkToken && reinviteToken) {
+      const staleSpend = await call('POST', '/api/auth/password-reset/confirm', { body: { token: inviteLinkToken, password: 'stale-link-password-1' } });
+      check('the earlier link is swept by the re-issued one', staleSpend.status === 400, `got ${staleSpend.status}`);
+      check('the re-issued link is the one that works', reinviteToken !== inviteLinkToken);
+    }
+
+    // A seeded administrator has also never signed in, but holds a real password: their lapsed
+    // sign-in case is the reset flow, and offering them a second invitation would be wrong.
+    const aliceRow = await basePrisma.user.findFirst({ where: { email: 'alice@destinysanctuary.co.ke' }, select: { id: true } });
+    const reinviteSeeded = await call('POST', `/api/admin/users/${aliceRow?.id}/reinvite`, { token: adminToken });
+    check('an account that was never invited is refused a re-issued invitation', reinviteSeeded.status === 409, `got ${reinviteSeeded.status}`);
+    // The re-issued link is now the only live one; the activation below must spend it.
+    if (reinviteToken) inviteLinkToken = reinviteToken;
 
     if (inviteLinkToken) {
       const activate = await call('POST', '/api/auth/password-reset/confirm', {

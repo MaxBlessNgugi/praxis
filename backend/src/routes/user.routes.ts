@@ -19,6 +19,9 @@ userRouter.post('/', asyncHandler(userController.createUser));
 // Invited, not created: the account row exists, but only its owner's activation link can make it
 // sign-in-able. Declared before `/:id` so "invite" cannot parse as an account id.
 userRouter.post('/invite', asyncHandler(userController.inviteUser));
+// Re-issue the activation link for an account that never finished signing up. Same scoping rules
+// as the invite; declared before `/:id` for the same reason.
+userRouter.post('/:id/reinvite', asyncHandler(userController.resendInvitation));
 userRouter.patch('/:id', asyncHandler(userController.updateUser));
 userRouter.post('/:id/role', asyncHandler(userController.assignRole));
 // Setting somebody else's password. `admin` may do this for anyone below them; the service refuses

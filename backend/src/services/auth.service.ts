@@ -152,7 +152,9 @@ export async function login(input: LoginInput, ip?: string) {
 
   const signedIn = await prisma.user.update({
     where: { id: user.id },
-    data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
+    // Clearing `isInvited` here is the activation endpoint's other half: the account chose its own
+    // password, so it is no longer waiting on an invitation and must never be offered one again.
+    data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date(), isInvited: false },
     include: { role: true },
   });
 

@@ -35,6 +35,12 @@ export async function inviteUser(req: Request, res: Response): Promise<void> {
   res.status(201).json({ data: await userService.inviteUser(input, req.user) });
 }
 
+/** Re-issue the activation link for an invited account that never finished signing up. */
+export async function resendInvitation(req: Request, res: Response): Promise<void> {
+  if (!req.user) throw unauthorizedError();
+  res.json({ data: await userService.resendInvitation(req.params.id as string, req.user) });
+}
+
 /** 204: an administrator set this password and already knows it. Nothing is echoed back. */
 export async function resetPassword(req: Request, res: Response): Promise<void> {
   const { password } = resetPasswordSchema.parse(req.body);

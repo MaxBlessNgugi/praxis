@@ -1847,6 +1847,8 @@ export interface AdminUserDto {
   memberId: string | null;
   isActive: boolean;
   lastLoginAt: string | null;
+  /** Still waiting on its activation link: the only forward path is a re-issued invitation. */
+  isInvited: boolean;
   createdAt: string;
   /** Every church this account serves, with its role in each — the multi-org picture of one person. */
   churches: Array<{ id: string; name: string; roleKey: string | null }>;
@@ -1865,6 +1867,12 @@ export const usersApi = {
     api.post<
       ItemEnvelope<{ user: AdminUserDto; canSendEmail: boolean; devLink?: string }>
     >('/api/admin/users/invite', body),
+  /**
+   * Re-issue the activation link for an invited account that never finished signing up — the
+   * office's "their link lapsed" case. Same shape as the invite's answer.
+   */
+  reinvite: (id: string) =>
+    api.post<ItemEnvelope<{ canSendEmail: boolean; devLink?: string }>>(`/api/admin/users/${id}/reinvite`, {}),
   update: (id: string, body: { name?: string; email?: string; isActive?: boolean }) =>
     api.patch<ItemEnvelope<AdminUserDto>>(`/api/admin/users/${id}`, body),
   assignRole: (id: string, roleKey: string) =>

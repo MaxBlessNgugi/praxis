@@ -82,6 +82,10 @@ model User {
   isActive    Boolean   @default(true)
   lastLoginAt DateTime?
 
+  /// Created by an administrator's invitation and still waiting on its activation link — the
+  /// account has never signed in, and the only way forward is a re-issued link, not a reset.
+  isInvited   Boolean   @default(false)
+
   /// A Praxis employee rather than a church's own account: it is what opens `/api/vendor`, the only
   /// routes that deliberately cross between churches (list them, assign a plan, record a payment).
   /// Default false, so an account created by a church can never reach another's records.
