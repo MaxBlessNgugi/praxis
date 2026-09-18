@@ -1,7 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { CHURCH, DEMO_TODAY, initialsOf } from '../../data/churchDomain';
-import { useDemoData } from '../../data/demoStore';
-import { ROLES, type DemoRole } from '../../lib/permissions';
+import { CHURCH, initialsOf } from '../../data/churchDomain';
 import { useAuth } from '../../lib/auth';
 import { useAnnouncements } from '../../hooks/useApi';
 import { AccountMenuBody, useDismissableMenu } from './AccountMenu';
@@ -153,14 +151,6 @@ export const ChurchHeader: React.FC<ChurchHeaderProps> = ({
   onSearchChange,
   activeTabTitle = 'Home Cloud Dashboard',
 }) => {
-  // The console is editable now, so the header — the one strip every screen shares —
-  // carries the way back to the original mock data, and the role it is being viewed as.
-  const { role, setRole } = useDemoData();
-  const { user } = useAuth();
-
-  // Only a super admin may preview another role; for everyone else the switcher is not offered.
-  const canPreviewRoles = user?.roleKey === 'super_admin';
-
   return (
     <header className="h-16 bg-[#FFFFFF] border-b border-[#E7E5E4] px-6 flex items-center justify-between shadow-[0_1px_4px_rgba(87,83,78,0.04)] shrink-0 z-20">
       {/* Left: Breadcrumbs & Global Search */}
@@ -189,32 +179,8 @@ export const ChurchHeader: React.FC<ChurchHeaderProps> = ({
       <div className="flex items-center gap-3">
         <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] bg-[#F8F1E9] text-[#57534E] font-headline text-xs border border-[#E7E5E4] font-medium">
           <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#C2410C]">calendar_today</span>
-          <span>{DEMO_TODAY.label}</span>
+          <span aria-label="Today's date">{new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}</span>
         </div>
-
-        {/* Rights come from the signed-in account. This is a *preview* for a super admin — it shows
-            what the same console looks like to a treasurer or a volunteer — and a super admin is the
-            only role offered it, so it can never be used to widen somebody's own access. */}
-        {canPreviewRoles && (
-          <label className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-[9px] bg-[#F8F1E9] border border-[#E7E5E4] font-headline text-xs text-[#57534E]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#C2410C]">
-              visibility
-            </span>
-            <span className="sr-only">Preview the console as</span>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as DemoRole)}
-              title="Preview the console as this role"
-              className="bg-transparent font-semibold text-[#1C1917] rounded-[6px] py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#C2410C]/40"
-            >
-              {ROLES.map((option) => (
-                <option key={option} value={option}>
-                  {option.replace('_', ' ')}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
 
         <NoticesBell />
 

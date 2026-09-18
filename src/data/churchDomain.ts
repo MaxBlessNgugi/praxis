@@ -64,16 +64,6 @@ export const SERVICE_TIMES: ReadonlyArray<{ name: string; time: string }> = [
 ];
 
 /**
- * The mockup's clock: the day every screen pretends is now. `label` is what the
- * header chip shows and `short` is how dated records are written, so a record added
- * from a dialog lands on the same day the rest of the console is living in.
- */
-export const DEMO_TODAY = {
-  label: 'Sunday, Feb 09, 2025',
-  short: 'Feb 09, 2025',
-} as const;
-
-/**
  * The initials an avatar shows for a person's name — "Bishop Sammy" reads as "BS". Derived from
  * the name itself so an avatar can never disagree with the name printed beside it.
  */
