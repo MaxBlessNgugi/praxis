@@ -13,9 +13,14 @@ import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
  * id, so "which of these three drafts is true" is a question nobody has to answer. The panel reads
  * that one report, shows it, and edits it in place.
  *
- * It also does something the mock it replaced could not: the census figures are already in the system,
- * so **adults and children are filled in from the attendance summary** rather than retyped, and the
- * only numbers somebody has to think about are the ones no other screen knows.
+ * The numbers are the report's own. The census recorded against the service is shown beside them as a
+ * cross-check, because it is what the ushers counted — adults and children together, since that is how
+ * they count — while adults, children and visitors apart are the church's official figures, and the
+ * person writing the report is the one who knows them.
+ *
+ * Signing off is the act that closes a service. It is an administrator's — the signature is what a
+ * board minute refers to — and it makes the report read-only, which is why the form stops offering to
+ * change it afterwards.
  */
 
 const FIELD =
@@ -38,7 +43,8 @@ const EMPTY: Draft = { summary: '', adultsCount: '', childrenCount: '', visitors
 
 export const ServiceReportsPanel: React.FC = () => {
   const services = useServices({ pageSize: 100, sort: 'recent' });
-  const { canEdit } = usePermissions();
+  const { canEdit, role } = usePermissions();
+  const isAdmin = role === 'admin' || role === 'super_admin';
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -122,13 +128,19 @@ export const ServiceReportsPanel: React.FC = () => {
     }
   };
 
-  const fillFromCensus = () => {
-    const adults = summary?.byKind.service ?? summary?.totalCounted ?? 0;
-    setDraft((previous) => ({
-      ...previous,
-      adultsCount: previous.adultsCount || String(adults),
-      visitorsCount: previous.visitorsCount || String(summary?.namedVisitors ?? 0),
-    }));
+  const finalize = async () => {
+    if (!selectedId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await servicesApi.finalizeReport(selectedId);
+      await record.refetch();
+      setNotice('The report is signed off, and the service is closed.');
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const printDossier = () => {
@@ -263,17 +275,25 @@ export const ServiceReportsPanel: React.FC = () => {
                         Print
                       </button>
                     )}
-                    {canEdit('services') && !editing && (
+                    {report && !report.finalizedAt && isAdmin && (
                       <button
                         type="button"
-                        onClick={() => {
-                          fillFromCensus();
-                          setEditing(true);
-                        }}
+                        disabled={busy}
+                        onClick={() => void finalize()}
+                        className="inline-flex items-center gap-1.5 rounded-[9px] border border-[#A7F3D0] bg-[#ECFDF5] px-3 py-1.5 text-xs font-bold text-[#047857] transition-colors hover:bg-[#D1FAE5] disabled:opacity-60 cursor-pointer"
+                      >
+                        <span aria-hidden="true" className="material-symbols-outlined text-[16px]">verified</span>
+                        {busy ? 'Signing…' : 'Sign it off'}
+                      </button>
+                    )}
+                    {canEdit('services') && !editing && (!report?.finalizedAt || isAdmin) && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(true)}
                         className="inline-flex items-center gap-1.5 rounded-[9px] bg-[#C2410C] px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#EA580C] cursor-pointer"
                       >
                         <span aria-hidden="true" className="material-symbols-outlined text-[16px]">edit</span>
-                        {report ? 'Revise the report' : 'Write the report'}
+                        {report?.finalizedAt ? 'Revise it anyway' : report ? 'Revise the report' : 'Write the report'}
                       </button>
                     )}
                   </div>
@@ -281,9 +301,9 @@ export const ServiceReportsPanel: React.FC = () => {
 
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
-                    { label: 'Adults & youth', value: report?.adultsCount ?? summary?.totalCounted ?? '—' },
+                    { label: 'Adults & youth', value: report?.adultsCount ?? '—' },
                     { label: 'Children', value: report?.childrenCount ?? '—' },
-                    { label: 'First-time visitors', value: report?.visitorsCount ?? summary?.namedVisitors ?? '—' },
+                    { label: 'First-time visitors', value: report?.visitorsCount ?? '—' },
                     {
                       label: 'Offerings recorded here',
                       value: report?.offeringsTotal === null || report?.offeringsTotal === undefined
@@ -297,10 +317,33 @@ export const ServiceReportsPanel: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                {!report && (
-                  <p className="mt-3 text-[11px] text-[#57534E]">
-                    The counts shown before a report exists are the census recorded against the service — the figures the
-                    report starts from.
+                <p className="mt-3 text-[11px] text-[#57534E]">
+                  {summary && summary.attendanceRows > 0 ? (
+                    <>
+                      The census recorded <strong className="text-[#1C1917]">{summary.totalCounted}</strong> in all across{' '}
+                      {summary.attendanceRows} {summary.attendanceRows === 1 ? 'row' : 'rows'}, with{' '}
+                      <strong className="text-[#1C1917]">{summary.namedVisitors}</strong>{' '}
+                      {summary.namedVisitors === 1 ? 'visitor' : 'visitors'} named.
+                    </>
+                  ) : (
+                    'No census was recorded against this service. The attendance tab is where it is taken.'
+                  )}
+                </p>
+                {report?.finalizedAt && (
+                  <p
+                    role="status"
+                    className="mt-3 rounded-[9px] border border-[#A7F3D0] bg-[#ECFDF5] px-3 py-2 text-[11px] font-semibold text-[#047857]"
+                  >
+                    Signed off on{' '}
+                    {new Date(report.finalizedAt).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                    .{' '}
+                    {isAdmin
+                      ? 'The service is closed; an administrator can still revise it.'
+                      : 'The service is closed, and the report is read-only.'}
                   </p>
                 )}
               </div>
@@ -359,14 +402,12 @@ export const ServiceReportsPanel: React.FC = () => {
                       />
                     </div>
                   </div>
-                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={fillFromCensus}
-                      className="text-[11px] font-bold text-[#C2410C] hover:underline cursor-pointer"
-                    >
-                      Fill the counts from the census
-                    </button>
+                  <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
+                    <span className="mr-auto text-[11px] text-[#57534E]">
+                      {summary && summary.attendanceRows > 0
+                        ? `The census recorded ${summary.totalCounted} in all and ${summary.namedVisitors} named visitors.`
+                        : 'No census was recorded against this service.'}
+                    </span>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setEditing(false)} className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer">
                         Cancel

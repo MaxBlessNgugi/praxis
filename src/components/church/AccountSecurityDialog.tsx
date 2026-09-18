@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { authApi } from '../../lib/api';
 import { errorMessage } from '../../hooks/useApi';
 import { useAuth } from '../../lib/auth';
 import { useDialog } from './dialog';
@@ -12,9 +11,9 @@ import { useDialog } from './dialog';
  * password printed in a file is not one to hand to a church.
  *
  * Two facts are stated rather than glossed. The current password is asked for even though the session
- * is already signed in, because the thing being defended against is a copied token. And signing out
- * does not revoke a token that has already been copied — that is a property of the token design, and
- * the person changing their password is exactly the person who should know it.
+ * is already signed in, because the thing being defended against is a copied token. And changing the
+ * password is what ends the *other* sessions: a token already copied stops working at that moment,
+ * while this one carries on with the replacement the server hands back.
  */
 
 const FIELD =
@@ -22,7 +21,7 @@ const FIELD =
 const LABEL = 'block text-xs font-bold text-[#1C1917] mb-1.5';
 
 export const AccountSecurityDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { user } = useAuth();
+  const { user, changePassword } = useAuth();
   const dialog = useDialog(onClose, 'Change your password');
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -41,7 +40,9 @@ export const AccountSecurityDialog: React.FC<{ onClose: () => void }> = ({ onClo
     setBusy(true);
     setError(null);
     try {
-      await authApi.changePassword({ currentPassword, newPassword });
+      // Through the session rather than the client directly: a password change ends the account's
+      // other sessions and answers with a token for this one, which has to be stored.
+      await changePassword(currentPassword, newPassword);
       setDone(true);
     } catch (err) {
       setError(errorMessage(err));

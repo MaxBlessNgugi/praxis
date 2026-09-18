@@ -33,6 +33,7 @@ vendorRouter.get('/organizations/:id/stats', asyncHandler(vendorController.organ
 vendorRouter.post('/organizations/:id/suspension', asyncHandler(vendorController.setSuspension));
 vendorRouter.post('/organizations/:id/support-sessions', asyncHandler(vendorController.startSupportSession));
 vendorRouter.post('/organizations/:id/plan', asyncHandler(vendorController.assignPlan));
+vendorRouter.get('/organizations/:id/payments', asyncHandler(vendorController.listPayments));
 vendorRouter.post('/organizations/:id/payments', asyncHandler(vendorController.recordPayment));
 
 vendorRouter.get('/plans', asyncHandler(vendorController.listPlans));

@@ -131,6 +131,13 @@ export async function startSupportSession(
 
   const expiresAt = new Date(Date.now() + SUPPORT_SESSION_MINUTES * 60_000);
 
+  // The operator's session generation, read here rather than carried on every request: a visit is a
+  // rare operation, and this is what makes it end if the operator's own password is changed mid-visit.
+  const account = await basePrisma.user.findUnique({
+    where: { id: operator.id },
+    select: { tokenVersion: true },
+  });
+
   // Written into the church's own trail before the token is handed over: if the audit write fails,
   // there is no session to explain.
   await clientFor(organizationId).auditLog.create({
@@ -144,7 +151,10 @@ export async function startSupportSession(
   });
 
   return {
-    token: signAccessToken({ sub: operator.id, org: organizationId, imp: true }, `${SUPPORT_SESSION_MINUTES}m`),
+    token: signAccessToken(
+      { sub: operator.id, org: organizationId, imp: true, ver: account?.tokenVersion ?? 0 },
+      `${SUPPORT_SESSION_MINUTES}m`,
+    ),
     expiresAt: expiresAt.toISOString(),
     minutes: SUPPORT_SESSION_MINUTES,
     organization: {

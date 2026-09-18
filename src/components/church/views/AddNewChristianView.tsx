@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { ParishMember } from '../../../types';
-import { DEFAULT_LOCATION } from '../../../data/churchDomain';
+import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
 import { useMemberReport } from '../../../lib/hooks/useReports';
 import { useMembers } from '../../../lib/hooks/useMembers';
 import { ApiError } from '../../../lib/api';
+
+/** The baptism states this form offers; the API records them as `baptismType`. */
+type BaptismStatus = 'baptized' | 'dedicated' | 'awaiting' | 'transfer';
 
 interface AddNewChristianViewProps {
   onNavigateToFind: () => void;
@@ -18,8 +20,8 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [dob, setDob] = useState('');
-  const [membershipTier, setMembershipTier] = useState<'member' | 'active-member' | 'first-timer' | 'youth' | 'visitor'>('member');
-  const [baptismStatus, setBaptismStatus] = useState<'baptized' | 'dedicated' | 'awaiting' | 'transfer'>('baptized');
+  const [location, setLocation] = useState(DEFAULT_LOCATION);
+  const [baptismStatus, setBaptismStatus] = useState<BaptismStatus>('baptized');
   const [notes, setNotes] = useState('');
   const [assignHousehold, setAssignHousehold] = useState(true);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
@@ -59,13 +61,14 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
         phone: phone || undefined,
         email: email || undefined,
         dateOfBirth: dob || undefined,
-        baptismType: baptismStatus === 'awaiting' ? 'none' : baptismStatus,
+        baptismType: baptismStatus === 'baptized' ? 'baptized' : baptismStatus === 'dedicated' ? 'dedicated' : 'none',
         pastoralNotes: notes,
-        location: DEFAULT_LOCATION,
+        location,
         householdId: undefined,
         householdRole: assignHousehold ? 'Head' : undefined,
         isHouseholdHead: assignHousehold,
-        status: 'active' as const,
+        // A letter of transfer is not a baptism state: the person arrives already baptized elsewhere.
+        status: baptismStatus === 'transfer' ? ('transferred' as const) : ('active' as const),
         // No envelope number: the API issues the next one from the register, so two clerks cannot
         // both invent the same one on a column that has to be unique.
         tags: [],
@@ -82,6 +85,7 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
         setFirstName('');
         setLastName('');
         setPhone('');
+        setLocation(DEFAULT_LOCATION);
         setEmail('');
         setAddress('');
         setDob('');
@@ -357,19 +361,19 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label htmlFor="member-tier" className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
-                    Membership Tier <span className="text-[#ba1a1a]">*</span>
+                  <label htmlFor="member-location" className="block font-headline text-xs text-[#1e1b19] font-bold mb-1.5">
+                    Congregation <span className="text-[#ba1a1a]">*</span>
                   </label>
-                  <select id="member-tier" aria-label="Membership Tier"
-                    value={membershipTier}
-                    onChange={(e) => setMembershipTier(e.target.value as any)}
+                  <select id="member-location" aria-label="Congregation"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
                     className="w-full h-10 px-3 rounded-lg bg-white border border-[#e1bfb5]/70 text-[#1e1b19] font-body text-sm focus:outline-none focus:border-[#9b2f00] cursor-pointer"
                   >
-                    <option value="member">Member (Full Voting)</option>
-                    <option value="active-member">Active Member</option>
-                    <option value="first-timer">First Timer / New Believer</option>
-                    <option value="youth">Youth Discipleship Class</option>
-                    <option value="visitor">Visitor</option>
+                    {LOCATIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -388,7 +392,7 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => setBaptismStatus(item.id as any)}
+                      onClick={() => setBaptismStatus(item.id as BaptismStatus)}
                       className={`py-2 px-2 rounded-lg text-center font-headline text-xs font-semibold truncate transition-all cursor-pointer ${
                         baptismStatus === item.id
                           ? 'bg-white text-[#9b2f00] shadow-sm font-bold'

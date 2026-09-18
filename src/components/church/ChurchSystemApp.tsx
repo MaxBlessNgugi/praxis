@@ -1,17 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { 
   ParishNavTab, 
   MembersSubTab, 
   MinistriesSubTab, 
   FinancesSubTab, 
   AdminSubTab,
-  ReportsSubTab,
-  GovernanceSubTab,
   ServicesSubTab,
   CommunicationsSubTab,
   SettingsSubTab,
 } from '../../types';
-import { useDemoData } from '../../data/demoStore';
 import { ChurchSidebar } from './ChurchSidebar';
 import { ChurchHeader } from './ChurchHeader';
 import { HomeDashboardView } from './views/HomeDashboardView';
@@ -32,41 +29,57 @@ import { SettingsView } from './views/SettingsView';
 import { CommandPalette, type CommandAction } from './CommandPalette';
 import { SubscriptionBanner } from './SubscriptionBanner';
 import { SupportSessionBanner } from './SupportSessionBanner';
+import { EmptyBlock } from './DataState';
+import { useRouter } from '../../lib/router';
+import { usePermissions } from '../../lib/permissions';
+
+/**
+ * Which sidebar panel each section belongs to, for the route gate: a section a role may not see is
+ * refused here before its screen renders, with the same sentence the in-panel checks use. The
+ * backend remains the authority — this only spares a viewer a screen of their own refusals.
+ */
+const TAB_PANEL: Partial<Record<ParishNavTab, string>> = {
+  'find-christian': 'members',
+  'add-new-christian': 'members',
+  'delete-christian': 'members',
+  'family-unit': 'members',
+  'services-worship': 'services',
+  'giving-stewardship': 'giving',
+  'inventory-assets': 'inventory',
+  'ministries-groups': 'groups',
+  'reports-certs': 'reports',
+  governance: 'council',
+  communications: 'communications',
+  'settings-profile': 'settings',
+  'admin-portal': 'admin',
+};
 
 interface ChurchSystemAppProps {
-  initialTab?: ParishNavTab;
-  initialSubTab?: MembersSubTab;
-  initialMinistriesSubTab?: MinistriesSubTab;
-  initialFinancesSubTab?: FinancesSubTab;
-  initialAdminSubTab?: AdminSubTab;
-  initialServicesSubTab?: ServicesSubTab;
-  initialCommunicationsSubTab?: CommunicationsSubTab;
-  initialSettingsSubTab?: SettingsSubTab;
   compactMode?: boolean;
 }
 
 export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
-  initialTab = 'home',
-  initialSubTab = 'find-christian',
-  initialMinistriesSubTab = 'ministries-departmental',
-  initialFinancesSubTab = 'tithes',
-  initialAdminSubTab = 'users-rights',
-  initialServicesSubTab = 'service-planner',
-  initialCommunicationsSubTab = 'announcements',
-  initialSettingsSubTab = 'org-profile',
   compactMode = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<ParishNavTab>(initialTab);
-  const [activeSubTab, setActiveSubTab] = useState<MembersSubTab>(initialSubTab);
-  const [activeMinistriesSubTab, setActiveMinistriesSubTab] = useState<MinistriesSubTab>(initialMinistriesSubTab);
-  const [activeFinancesSubTab, setActiveFinancesSubTab] = useState<FinancesSubTab>(initialFinancesSubTab);
-  const [activeAdminSubTab, setActiveAdminSubTab] = useState<AdminSubTab>(initialAdminSubTab);
-  const [activeServicesSubTab, setActiveServicesSubTab] = useState<ServicesSubTab>(initialServicesSubTab);
-  const [activeCommunicationsSubTab, setActiveCommunicationsSubTab] = useState<CommunicationsSubTab>(initialCommunicationsSubTab);
-  const [activeSettingsSubTab, setActiveSettingsSubTab] = useState<SettingsSubTab>(initialSettingsSubTab);
-  // The editable demo data lives in the store, so this shell no longer owns a copy of the
-  // register that the screens below it can drift away from.
-  const { addMember } = useDemoData();
+  // The URL is the single source of truth for location: every navigation is a `pushState`, and
+  // back/forward arrive through the same parse. Sub-tab defaults are the sections' own.
+  const { route, navigate } = useRouter();
+  const activeTab = route.tab;
+  const { canView } = usePermissions();
+
+  const go = useCallback((tab: ParishNavTab, sub: string | null = null, replace = false) => {
+    navigate({ tab, sub, memberId: null }, replace);
+  }, [navigate]);
+
+  const setActiveTab = (tab: ParishNavTab) => go(tab);
+  const setActiveSubTab = (sub: MembersSubTab) => go(sub);
+  const setActiveMinistriesSubTab = (sub: MinistriesSubTab) => go('ministries-groups', sub);
+  const setActiveFinancesSubTab = (sub: FinancesSubTab) => go('giving-stewardship', sub);
+  const setActiveAdminSubTab = (sub: AdminSubTab) => go('admin-portal', sub);
+  const setActiveServicesSubTab = (sub: ServicesSubTab) => go('services-worship', sub);
+  const setActiveCommunicationsSubTab = (sub: CommunicationsSubTab) => go('communications', sub);
+  const setActiveSettingsSubTab = (sub: SettingsSubTab) => go('settings-profile', sub);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [quickActionModal, setQuickActionModal] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -74,9 +87,6 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
   /** The same navigation the sidebar performs, so a command lands exactly where a click would. */
   const goTo = (tab: ParishNavTab) => {
     setActiveTab(tab);
-    if (tab === 'find-christian' || tab === 'add-new-christian' || tab === 'delete-christian' || tab === 'family-unit') {
-      setActiveSubTab(tab);
-    }
   };
 
   /** Every section, plus the register actions worth reaching without hunting through a sidebar. */
@@ -115,6 +125,12 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
     activeTab === 'delete-christian' || 
     activeTab === 'family-unit';
 
+  /** The sidebar sections this role may open, for the route gate below. */
+  const visibleForRole = useMemo(() => {
+    const panel = TAB_PANEL[activeTab];
+    return !panel || canView(panel as never);
+  }, [activeTab, canView]);
+
   const getHeaderTitle = () => {
     if (activeTab === 'home') return 'Home Cloud Dashboard';
     if (isMembersView) return 'Members & Believers Registry';
@@ -130,22 +146,38 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
     return "Destiny Sanctuary Int'L Console";
   };
 
+  // A section the role may not see is refused before it renders — the same verdict the panels'
+  // own checks give, applied at the boundary a URL can cross. The backend still refuses every
+  // request; this only keeps a shared link from showing a viewer their own refusals.
+  if (!visibleForRole) {
+    return (
+      <div className="w-full h-full flex bg-[#FDF8F3] text-[#1C1917] font-['Inter',sans-serif] overflow-hidden">
+        <ChurchSidebar activeTab={activeTab} activeSubTab={'find-christian'} onSelectTab={setActiveTab} onSelectSubTab={setActiveSubTab} collapsed={compactMode} />
+        <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
+          <div className="max-w-md w-full rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card">
+            <EmptyBlock
+              icon="lock"
+              title="This panel is not part of your role"
+              hint="Your account does not include this section, so the console will not open it. The server refuses these requests either way — ask a super administrator if you need it."
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // The members section *is* four tabs — each sub-tab is its own top-level tab in the sidebar —
+  // so the register's sub-tab and the section are the same value here, as the old state kept them.
+  const activeSubTab = (isMembersView ? activeTab : 'find-christian') as MembersSubTab;
+
   return (
     <div className="w-full h-full flex bg-[#FDF8F3] text-[#1C1917] font-['Inter',sans-serif] overflow-hidden">
       {/* Sidebar Navigation */}
       <ChurchSidebar
         activeTab={activeTab}
         activeSubTab={activeSubTab}
-        onSelectTab={(tab) => {
-          setActiveTab(tab);
-          if (tab === 'find-christian' || tab === 'add-new-christian' || tab === 'delete-christian' || tab === 'family-unit') {
-            setActiveSubTab(tab);
-          }
-        }}
-        onSelectSubTab={(sub) => {
-          setActiveSubTab(sub);
-          setActiveTab(sub);
-        }}
+        onSelectTab={setActiveTab}
+        onSelectSubTab={setActiveSubTab}
         collapsed={compactMode}
       />
 
@@ -180,7 +212,6 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                 setActiveTab(tab);
                 if (subTab) setActiveSubTab(subTab as MembersSubTab);
               }}
-              onAddMember={addMember}
             />
           )}
 
@@ -188,7 +219,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
           {activeTab === 'services-worship' && (
             <div className="w-full px-6 sm:px-8 py-6">
               <ServicesWorshipView
-                activeSubTab={activeServicesSubTab}
+                activeSubTab={(route.sub ?? 'service-planner') as ServicesSubTab}
                 onSelectSubTab={setActiveServicesSubTab}
               />
             </div>
@@ -198,7 +229,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
           {activeTab === 'ministries-groups' && (
             <div className="w-full px-6 sm:px-8 py-6">
               <MinistriesView 
-                initialSubTab={activeMinistriesSubTab}
+                initialSubTab={(route.sub ?? 'ministries-departmental') as MinistriesSubTab}
                 onSubTabChange={setActiveMinistriesSubTab}
               />
             </div>
@@ -208,7 +239,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
           {activeTab === 'giving-stewardship' && (
             <div className="w-full px-6 sm:px-8 py-6">
               <StewardshipFinancesView
-                initialSubTab={activeFinancesSubTab}
+                initialSubTab={(route.sub ?? 'tithes') as FinancesSubTab}
                 onSubTabChange={setActiveFinancesSubTab}
               />
             </div>
@@ -239,7 +270,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
           {activeTab === 'communications' && (
             <div className="w-full px-6 sm:px-8 py-6">
               <CommunicationsView
-                activeSubTab={activeCommunicationsSubTab}
+                activeSubTab={(route.sub ?? 'announcements') as CommunicationsSubTab}
                 onSelectSubTab={setActiveCommunicationsSubTab}
               />
             </div>
@@ -249,7 +280,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
           {activeTab === 'settings-profile' && (
             <div className="w-full px-6 sm:px-8 py-6">
               <SettingsView
-                activeSubTab={activeSettingsSubTab}
+                activeSubTab={(route.sub ?? 'org-profile') as SettingsSubTab}
                 onSelectSubTab={setActiveSettingsSubTab}
               />
             </div>
@@ -259,7 +290,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
           {activeTab === 'admin-portal' && (
             <div className="w-full px-6 sm:px-8 py-6">
               <AdminSecurityView
-                initialSubTab={activeAdminSubTab}
+                initialSubTab={(route.sub ?? 'users-rights') as AdminSubTab}
                 onSubTabChange={setActiveAdminSubTab}
               />
             </div>
@@ -293,10 +324,7 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
                         <button
                           key={tab.id}
                           type="button"
-                          onClick={() => {
-                            setActiveSubTab(tab.id as MembersSubTab);
-                            setActiveTab(tab.id as ParishNavTab);
-                          }}
+                          onClick={() => setActiveSubTab(tab.id as MembersSubTab)}
                           className={`pb-3 px-1 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
                             isActive
                               ? 'border-[#C2410C] text-[#C2410C] font-bold'
@@ -314,43 +342,21 @@ export const ChurchSystemApp: React.FC<ChurchSystemAppProps> = ({
               {/* Sub-view Rendering Container */}
               <div className="w-full px-6 sm:px-8 py-6">
                 {activeSubTab === 'add-new-christian' && (
-                  <AddNewChristianView
-                    onSaveMember={addMember}
-                    onNavigateToFind={() => {
-                      setActiveSubTab('find-christian');
-                      setActiveTab('find-christian');
-                    }}
-                  />
+                  <AddNewChristianView onNavigateToFind={() => setActiveSubTab('find-christian')} />
                 )}
 
                 {activeSubTab === 'find-christian' && (
                   <FindChristianView
-                    onNavigateToAdd={() => {
-                      setActiveSubTab('add-new-christian');
-                      setActiveTab('add-new-christian');
-                    }}
-                    onNavigateToFamilyUnit={() => {
-                      setActiveSubTab('family-unit');
-                      setActiveTab('family-unit');
-                    }}
-                    onSelectMemberForArchive={() => {
-                      setActiveSubTab('delete-christian');
-                      setActiveTab('delete-christian');
-                    }}
+                    onNavigateToAdd={() => setActiveSubTab('add-new-christian')}
+                    onNavigateToFamilyUnit={() => setActiveSubTab('family-unit')}
+                    onSelectMemberForArchive={() => setActiveSubTab('delete-christian')}
                   />
                 )}
 
-                {activeSubTab === 'delete-christian' && (
-                  <DeleteChristianView />
-                )}
+                {activeSubTab === 'delete-christian' && <DeleteChristianView />}
 
                 {activeSubTab === 'family-unit' && (
-                  <FamilyUnitView
-                    onNavigateToAddChristian={() => {
-                      setActiveSubTab('add-new-christian');
-                      setActiveTab('add-new-christian');
-                    }}
-                  />
+                  <FamilyUnitView onNavigateToAddChristian={() => setActiveSubTab('add-new-christian')} />
                 )}
               </div>
             </>

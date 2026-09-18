@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import {
   broadcastsApi,
-  type BroadcastBody,
   type BroadcastDeliveryDto,
   type BroadcastDto,
 } from '../../../../lib/api';
 import { errorMessage, useBroadcasts, useChannels } from '../../../../hooks/useApi';
+import { usePermissions } from '../../../../lib/permissions';
 import { useDialog } from '../../dialog';
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 
@@ -41,14 +41,19 @@ const FIELD =
   'w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]';
 const LABEL = 'block text-xs font-bold text-[#1C1917] mb-1';
 
-const when = (value: string | null) => (value ? new Date(value).toLocaleString('en-GB') : '—');
+const when = (value: string | null) => (value ? new Date(value).toLocaleString('en-GB') : 'not yet');
+
+/** Sent campaigns carry when they went; the others carry when they are due or when they were written. */
+const stampOf = (row: BroadcastDto) =>
+  row.status === 'sent' ? row.sentAt : row.status === 'scheduled' ? row.scheduledFor : row.createdAt;
 
 const channelLabel = (channel: BroadcastDto['channel']) =>
   CHANNELS.find((entry) => entry.value === channel)?.label ?? channel;
 
 /** The one-line verdict for a campaign: what went out, and what did not. */
 function outcome(broadcast: BroadcastDto): string {
-  if (broadcast.status !== 'sent') return 'Not sent yet';
+  if (broadcast.status === 'scheduled') return `Goes out ${when(broadcast.scheduledFor)}`;
+  if (broadcast.status !== 'sent') return 'Held as a draft';
   const report = broadcast.lastReport;
   if (!report) return `${broadcast.recipients.toLocaleString()} copies distributed`;
   if (report.failed === 0) return `${report.delivered.toLocaleString()} delivered of ${report.attempted.toLocaleString()}`;
@@ -56,8 +61,9 @@ function outcome(broadcast: BroadcastDto): string {
 }
 
 export const BroadcastsPanel: React.FC = () => {
-  const broadcasts = useBroadcasts();
+  const broadcasts = useBroadcasts({ pageSize: 100 });
   const { channels } = useChannels();
+  const { canEdit, canDelete } = usePermissions();
 
   const [selectedChannel, setSelectedChannel] = useState<'all' | BroadcastDto['channel']>('all');
   const [isComposing, setIsComposing] = useState(false);
@@ -67,7 +73,10 @@ export const BroadcastsPanel: React.FC = () => {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [audience, setAudience] = useState(AUDIENCES[0].label);
+  /** Empty means "do not send yet": a campaign can be written now and sent from the log later. */
+  const [goesOutAt, setGoesOutAt] = useState('');
   const [sending, setSending] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [result, setResult] = useState<{ broadcast: BroadcastDto; delivery: BroadcastDeliveryDto } | null>(null);
   /** Only a printed notice sheet has no gateway to count for it, so the office supplies the number. */
@@ -108,13 +117,15 @@ export const BroadcastsPanel: React.FC = () => {
     setSubject('');
     setBody('');
     setAudience(AUDIENCES[0].label);
+    setGoesOutAt('');
     setCopies('');
     setProblem(null);
     setResult(null);
     setIsComposing(true);
   };
 
-  const send = async (event: React.FormEvent) => {
+  /** `draft` writes the campaign down and stops; the log sends it when the office is ready. */
+  const compose = async (event: React.FormEvent, mode: 'send' | 'draft') => {
     event.preventDefault();
     if (!body.trim() || sending) return;
 
@@ -126,7 +137,15 @@ export const BroadcastsPanel: React.FC = () => {
         subject: channel === 'email' ? subject.trim() || undefined : undefined,
         body: body.trim(),
         audience,
+        scheduledFor: goesOutAt ? new Date(goesOutAt).toISOString() : undefined,
       });
+
+      if (mode === 'draft') {
+        broadcasts.setItems((list) => [created.data, ...list]);
+        setIsComposing(false);
+        return;
+      }
+
       const sent = await broadcastsApi.send(created.data.id, {
         recipients: channel === 'notice_sheet' ? Number(copies) || 0 : undefined,
       });
@@ -139,6 +158,38 @@ export const BroadcastsPanel: React.FC = () => {
     }
   };
 
+  /** Sending a campaign the office wrote earlier, from the log rather than the composer. */
+  const sendRow = async (row: BroadcastDto) => {
+    setBusyId(row.id);
+    setProblem(null);
+    try {
+      const sent = await broadcastsApi.send(row.id, {
+        recipients: row.channel === 'notice_sheet' ? row.recipients : undefined,
+      });
+      broadcasts.setItems((list) => list.map((entry) => (entry.id === row.id ? sent.data : entry)));
+    } catch (error) {
+      setProblem(errorMessage(error));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const retireRow = async (row: BroadcastDto) => {
+    setBusyId(row.id);
+    setProblem(null);
+    try {
+      await broadcastsApi.retire(row.id, {
+        reason: 'other',
+        reasonLabel: 'Withdrawn by the church office',
+      });
+      await broadcasts.refetch();
+    } catch (error) {
+      setProblem(errorMessage(error));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const publishing = readiness(channel);
 
   return (
@@ -148,7 +199,9 @@ export const BroadcastsPanel: React.FC = () => {
         <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card">
           <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Campaigns sent</span>
           <div className="text-2xl font-black text-[#1C1917] mt-0.5">{totals.campaigns}</div>
-          <span className="text-xs text-[#57534E]">{rows.length} composed in total</span>
+          <span className="text-xs text-[#57534E]">
+            {rows.filter((row) => row.status !== 'sent').length} still unsent of {rows.length} composed
+          </span>
         </div>
 
         <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card">
@@ -264,7 +317,10 @@ export const BroadcastsPanel: React.FC = () => {
                 </div>
 
                 <div className="text-right">
-                  <span className="text-[11px] font-mono font-bold text-[#A8A29E]">{when(row.sentAt)}</span>
+                  <span className="text-[11px] font-mono font-bold text-[#A8A29E]">
+                    {row.status === 'draft' ? 'Written ' : ''}
+                    {when(stampOf(row))}
+                  </span>
                   <div
                     className={`text-[10px] font-bold flex items-center justify-end gap-1 ${
                       row.status === 'sent' ? 'text-[#059669]' : 'text-[#57534E]'
@@ -279,6 +335,30 @@ export const BroadcastsPanel: React.FC = () => {
               </div>
 
               <p className="text-xs text-[#57534E] mt-2.5 leading-relaxed whitespace-pre-line">{row.body}</p>
+
+              {canEdit && row.status !== 'sent' && (
+                <div className="mt-3 pt-2.5 border-t border-[#E7E5E4]/60 flex flex-wrap items-center justify-end gap-2 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => void sendRow(row)}
+                    disabled={busyId === row.id || !readiness(row.channel).ready}
+                    title={readiness(row.channel).ready ? undefined : readiness(row.channel).note}
+                    className="px-2.5 py-1 rounded-[6px] bg-[#C2410C] hover:bg-[#EA580C] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold cursor-pointer"
+                  >
+                    {busyId === row.id ? 'Sending…' : 'Send now'}
+                  </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => void retireRow(row)}
+                      disabled={busyId === row.id}
+                      className="px-2.5 py-1 rounded-[6px] font-bold text-[#DC2626] hover:bg-[#FEF2F2] cursor-pointer"
+                    >
+                      Withdraw
+                    </button>
+                  )}
+                </div>
+              )}
 
               {row.lastReport && row.lastReport.failures.length > 0 && (
                 <div className="mt-3 p-2.5 rounded-[8px] bg-[#FEF2F2] border border-[#FECACA]">
@@ -352,7 +432,7 @@ export const BroadcastsPanel: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <form onSubmit={send} className="mt-4 space-y-4">
+              <form onSubmit={(event) => void compose(event, 'send')} className="mt-4 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label htmlFor="broadcast-channel" className={LABEL}>
@@ -441,6 +521,22 @@ export const BroadcastsPanel: React.FC = () => {
                   />
                 </div>
 
+                <div>
+                  <label htmlFor="broadcast-schedule" className={LABEL}>
+                    Send at (optional)
+                  </label>
+                  <input
+                    id="broadcast-schedule"
+                    type="datetime-local"
+                    value={goesOutAt}
+                    onChange={(event) => setGoesOutAt(event.target.value)}
+                    className={FIELD}
+                  />
+                  <p className="text-[11px] text-[#57534E] mt-1">
+                    Leave it empty to send when you press Send, or save the campaign as a draft and come back to it.
+                  </p>
+                </div>
+
                 {channel === 'notice_sheet' && (
                   <div>
                     <label htmlFor="broadcast-copies" className={LABEL}>
@@ -473,8 +569,17 @@ export const BroadcastsPanel: React.FC = () => {
                     Cancel
                   </button>
                   <button
+                    type="button"
+                    onClick={(event) => void compose(event, 'draft')}
+                    disabled={sending || !body.trim()}
+                    className="px-4 py-2 rounded-[8px] border border-[#E7E5E4] hover:bg-[#F5EDE4] disabled:opacity-60 disabled:cursor-not-allowed text-xs font-bold text-[#1C1917] cursor-pointer"
+                  >
+                    {goesOutAt ? 'Save for later' : 'Save draft'}
+                  </button>
+                  <button
                     type="submit"
-                    disabled={sending || !body.trim() || !publishing.ready}
+                    disabled={sending || !body.trim() || !publishing.ready || Boolean(goesOutAt)}
+                    title={goesOutAt ? 'Saved as a draft until its time comes' : undefined}
                     className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1 cursor-pointer"
                   >
                     <span aria-hidden="true" className="material-symbols-outlined text-[16px]">

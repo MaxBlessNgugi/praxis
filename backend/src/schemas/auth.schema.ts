@@ -61,12 +61,50 @@ export const changePasswordSchema = z.object({
 /** An administrator setting somebody else's password, for the office's "I have forgotten mine" case. */
 export const resetPasswordSchema = z.object({ password: passwordSchema });
 
+/**
+ * Asking for a reset link.
+ *
+ * The address is validated as an email because a typo here is a link sent to a stranger; nothing else
+ * about the account is asked for, and the endpoint is deliberately unable to say whether the address
+ * is known.
+ */
+export const passwordResetRequestSchema = z.object({
+  email: z.string().trim().email('Enter a valid email address').max(200),
+});
+
+/**
+ * Spending one.
+ *
+ * The token is a 43-character base64url string; its length is checked here so an obviously malformed
+ * link is refused by validation rather than by a database lookup.
+ */
+export const passwordResetConfirmSchema = z.object({
+  token: z.string().trim().min(20, 'That reset link is incomplete').max(200),
+  password: passwordSchema,
+});
+
+export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
+export type PasswordResetConfirmInput = z.infer<typeof passwordResetConfirmSchema>;
+
 export const loginSchema = z.object({
   email: z.string().trim().email('Enter a valid email address'),
   password: z.string().min(1, 'Enter your password'),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
+
+/**
+ * Editing your own profile.
+ *
+ * Only the display name: the email address is the account's identity across every church it serves
+ * and how password mail finds its owner, so it changes through the office — the same way every other
+ * account fact about a person is changed by the people accountable for the record.
+ */
+export const updateOwnProfileSchema = z.object({
+  name: z.string().trim().min(2, 'Enter a name').max(120),
+});
+
+export type UpdateOwnProfileInput = z.infer<typeof updateOwnProfileSchema>;
 
 /** Choosing which church to act for. The id, not the slug: a slug can be renamed, an id cannot. */
 export const switchOrganizationSchema = z.object({

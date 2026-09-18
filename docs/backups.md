@@ -177,13 +177,25 @@ recovery. Put a note in the calendar for it once a quarter.
 
 ---
 
-## What is not covered yet
-
-- **No automated off-site dump in the product.** The scheduled job above is an instruction, not
+## What is not covered yet- **No automated off-site dump in the product.** The scheduled job above is an instruction, not
   something Praxis runs: a container that dumps its own database has to hold credentials for the
   place it dumps to, and the provider's own backups already cover the machine. If an off-site copy is
   wanted, the cron line above is how it is taken, on a host somebody owns.
-- **No restore drill has been run against a real church database** — Praxis has not yet held live data.
-  Do the rehearsal above before the first real Sunday, not after the first incident.
-- **`STORAGE_DRIVER=s3` is reserved, not implemented.** If you enable it later, the bucket needs its own
-  versioning and its own place in this document.
+- **`STORAGE_DRIVER=s3` is reserved, not implemented.** If you enable it later, the bucket needs its
+  own versioning and its own place in this document.
+
+---
+
+## Restore drill record
+
+The rehearsal is only worth what its evidence is worth, so the record lives here and is renewed
+every time it is run again.
+
+| | |
+| --- | --- |
+| **Last rehearsed** | 2026-09-17 (release-candidate validation) |
+| **Dump rehearsed** | `backups/praxis-2026-09-17-17-34.dump` (2.9 MB, custom format) |
+| **Method** | `createdb praxis_restore_check` → `pg_restore --no-owner` (the commands above, run exactly as written) |
+| **Verification** | Row counts of `Organization`, `User`, `Member`, `Tithe`, `AuditLog` matched the live database exactly (3 / 3 / 18 / 34 / 70) |
+| **Time to restore** | Under a minute for this size of database; the scratch database was dropped afterwards |
+| **Responsible operator** | Whoever holds the `DIRECT_URL` for the environment — the church's administrator on a self-hosted box, the platform operator on managed hosting |

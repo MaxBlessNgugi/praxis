@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as serviceController from '../controllers/service.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { moduleGate } from '../middleware/authorize';
 import { requireAuth, requireRole } from '../middleware/authenticate';
 import { requireWritableSubscription } from '../middleware/subscription';
 
@@ -14,7 +15,7 @@ export const serviceRouter = Router();
 
 const WRITERS = requireRole('super_admin', 'admin', 'staff');
 
-serviceRouter.use(requireAuth, requireWritableSubscription);
+serviceRouter.use(requireAuth, moduleGate('services'), requireWritableSubscription);
 
 serviceRouter.get('/', asyncHandler(serviceController.listServices));
 serviceRouter.get('/roster', asyncHandler(serviceController.listRoster));
@@ -33,6 +34,9 @@ serviceRouter.delete('/:id', requireRole('admin'), asyncHandler(serviceControlle
 serviceRouter.put('/:id/liturgy', WRITERS, asyncHandler(serviceController.putLiturgy));
 serviceRouter.post('/:id/attendance', WRITERS, asyncHandler(serviceController.recordAttendance));
 serviceRouter.put('/:id/report', WRITERS, asyncHandler(serviceController.putReport));
+// Signing off is the supervising act that closes a service, and it is what makes the report
+// read-only afterwards — so it belongs to an administrator rather than to whoever types it up.
+serviceRouter.post('/:id/report/finalize', requireRole('admin'), asyncHandler(serviceController.finalizeReport));
 
 // The roster is keyed by service: duties belong to a service, so they are addressed through it.
 serviceRouter.post('/:id/roster', WRITERS, asyncHandler(serviceController.createDuty));

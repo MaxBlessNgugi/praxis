@@ -11,15 +11,26 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/server.js",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "prisma:generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
     "check:isolation": "tsx tools/tenant-isolation.ts",
+    "check:inventory": "tsx tools/inventory.ts",
     "check:vendor": "tsx tools/vendor-smoke.ts",
+    "check:billing": "tsx tools/billing-lifecycle.ts",
     "check:import": "tsx tools/member-import.ts",
     "check:launch": "tsx tools/launch-check.ts",
     "check:security": "tsx tools/security-smoke.ts",
+    "check:errors": "tsx tools/error-envelope.ts",
+    "check:auth": "tsx tools/auth-lifecycle.ts",
+    "check:finance": "tsx tools/finance-ledger.ts",
+    "check:worship": "tsx tools/services-worship.ts",
+    "check:governance": "tsx tools/governance.ts",
+    "check:communications": "tsx tools/communications.ts",
+    "check:reports": "tsx tools/reports.ts",
+    "check:settings": "tsx tools/settings-files.ts",
     "studio": "prisma studio"
   },
   "prisma": {
@@ -41,8 +52,11 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.14.0",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.70.0"
   }
 }

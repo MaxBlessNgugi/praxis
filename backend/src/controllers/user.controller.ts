@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import {
   assignRoleSchema,
   createUserSchema,
+  inviteUserSchema,
   listUsersQuerySchema,
   removeUserSchema,
   resetPasswordSchema,
@@ -21,6 +22,17 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
 export async function createUser(req: Request, res: Response): Promise<void> {
   const input = createUserSchema.parse(req.body);
   res.status(201).json({ data: await userService.createUser(input, actor(req)) });
+}
+
+/**
+ * Invite an account: it is created immediately but only its owner's activation link can make it
+ * sign-in-able. 201 because the account row exists; the body carries whether the link could be
+ * emailed, and a development handover link when no provider is configured.
+ */
+export async function inviteUser(req: Request, res: Response): Promise<void> {
+  const input = inviteUserSchema.parse(req.body);
+  if (!req.user) throw unauthorizedError();
+  res.status(201).json({ data: await userService.inviteUser(input, req.user) });
 }
 
 /** 204: an administrator set this password and already knows it. Nothing is echoed back. */

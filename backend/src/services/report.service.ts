@@ -126,7 +126,7 @@ export async function overview(range: Range) {
 }
 
 export async function memberReport() {
-  const [byStatus, byLocation, households, householdsWithSizes, recent] = await Promise.all([
+  const [byStatus, byLocation, households, householdsWithSizes, headlessHouseholds, recent] = await Promise.all([
     prisma.member.groupBy({ by: ['status'], where: live, _count: true }),
     prisma.member.groupBy({ by: ['location'], where: live, _count: true }),
     prisma.household.count({ where: live }),
@@ -134,6 +134,7 @@ export async function memberReport() {
       where: live,
       select: { id: true, name: true, unitNumber: true, _count: { select: { members: { where: live } } } },
     }),
+    prisma.household.count({ where: { ...live, members: { none: { isHouseholdHead: true, deletedAt: null } } } }),
     prisma.member.findMany({
       where: live,
       select: { joinedAt: true },
@@ -180,7 +181,17 @@ export async function memberReport() {
     baptismsThisYear,
     youth,
     byLocation: byLocation.map((row) => ({ location: row.location, members: row._count })).sort((a, b) => b.members - a.members),
-    households: { total: households, ...sizes },
+    // The pastoral shape of the roll: how many homes have nobody recorded as their head, and the
+    // largest ones — a visit list a pastor can act on, not just a count.
+    households: {
+      total: households,
+      ...sizes,
+      headless: headlessHouseholds,
+      largest: [...householdsWithSizes]
+        .sort((a, b) => b._count.members - a._count.members)
+        .slice(0, 10)
+        .map((row) => ({ id: row.id, name: row.name, unitNumber: row.unitNumber, members: row._count.members })),
+    },
     joinedByYear: [...byYear.entries()].map(([year, members]) => ({ year, members })).sort((a, b) => a.year.localeCompare(b.year)),
   };
 }
@@ -338,5 +349,80 @@ export async function governanceReport(range: Range) {
     documents: { byKind: Object.fromEntries(documentsByKind.map((row) => [row.kind, row._count])) },
     recentMeetings,
     recentResolutions,
+  };
+}
+
+/**
+ * The inventory report: what the church owns, what it is worth, and where the shelf is thin.
+ *
+ * Aggregated in SQL for the same reason giving is — a register of a few thousand lines grouped into
+ * a handful of rows the screen can draw — and scoped by hand because it is raw SQL. Variance is read
+ * from approved stock takes only: a count still in review is somebody's opinion until an
+ * administrator signs it.
+ */
+export async function inventoryReport() {
+  const organizationId = requireTenantId();
+
+  const [totals, byCategory, byLocation, byCondition, lowStock, variances, movementsByKind] = await Promise.all([
+    prisma.$queryRaw<Array<{ kind: string; lines: bigint; quantity: bigint; value: Prisma.Decimal | null }>>`
+      SELECT "kind", COUNT(*) AS lines, COALESCE(SUM("quantity"), 0) AS quantity, COALESCE(SUM("quantity" * "cost"), 0) AS value
+      FROM "InventoryItem" WHERE ${liveSql} AND "organizationId" = ${organizationId} AND "status" != 'disposed'
+      GROUP BY "kind"`,
+    prisma.$queryRaw<Array<{ category: string; lines: bigint; value: Prisma.Decimal | null }>>`
+      SELECT "category", COUNT(*) AS lines, COALESCE(SUM("quantity" * "cost"), 0) AS value
+      FROM "InventoryItem" WHERE ${liveSql} AND "organizationId" = ${organizationId} AND "status" != 'disposed'
+      GROUP BY "category" ORDER BY 3 DESC`,
+    prisma.$queryRaw<Array<{ location: string; lines: bigint; quantity: bigint }>>`
+      SELECT "location", COUNT(*) AS lines, COALESCE(SUM("quantity"), 0) AS quantity
+      FROM "InventoryItem" WHERE ${liveSql} AND "organizationId" = ${organizationId} AND "status" != 'disposed'
+      GROUP BY "location" ORDER BY 2 DESC LIMIT 20`,
+    prisma.$queryRaw<Array<{ condition: string; lines: bigint }>>`
+      SELECT "condition", COUNT(*) AS lines
+      FROM "InventoryItem" WHERE ${liveSql} AND "organizationId" = ${organizationId} AND "kind" = 'asset' AND "condition" IS NOT NULL
+      GROUP BY "condition"`,
+    prisma.inventoryItem.findMany({
+      where: { ...live, reorderAt: { not: null } },
+      select: { id: true, sku: true, name: true, quantity: true, reorderAt: true, unit: true, location: true },
+      orderBy: { quantity: 'asc' },
+      take: 15,
+    }),
+    prisma.stockTake.findMany({
+      where: { status: 'approved', variance: { not: 0 } },
+      include: { item: { select: { id: true, name: true, sku: true } } },
+      orderBy: { approvedAt: 'desc' },
+      take: 10,
+    }),
+    prisma.stockMovement.groupBy({ by: ['kind'], _count: true }),
+  ]);
+
+  const consumables = totals.find((row) => row.kind === 'consumable');
+  const assets = totals.find((row) => row.kind === 'asset');
+  const stockValue = money(consumables?.value ?? null) ?? 0;
+  const assetValue = money(assets?.value ?? null) ?? 0;
+  const n = (value: bigint | undefined) => Number(value ?? 0);
+
+  return {
+    totals: {
+      consumableLines: n(consumables?.lines),
+      consumableQuantity: n(consumables?.quantity),
+      assetLines: n(assets?.lines),
+      assetQuantity: n(assets?.quantity),
+      stockValue,
+      assetValue,
+      totalValue: stockValue + assetValue,
+    },
+    byCategory: byCategory.map((row) => ({ category: row.category, lines: n(row.lines), value: money(row.value) ?? 0 })),
+    byLocation: byLocation.map((row) => ({ location: row.location, lines: n(row.lines), quantity: n(row.quantity) })),
+    byCondition: byCondition.map((row) => ({ condition: row.condition, lines: n(row.lines) })),
+    lowStock: lowStock.filter((item) => item.quantity <= (item.reorderAt ?? 0)),
+    recentVariances: variances.map((take) => ({
+      id: take.id,
+      approvedAt: take.approvedAt,
+      variance: take.variance,
+      item: take.item,
+      countedQuantity: take.countedQuantity,
+      bookQuantity: take.bookQuantity,
+    })),
+    movementsByKind: Object.fromEntries(movementsByKind.map((row) => [row.kind, row._count])),
   };
 }

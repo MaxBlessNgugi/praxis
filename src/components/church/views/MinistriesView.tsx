@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MinistriesSubTab } from '../../../types';
-import { MinistriesDepartmentalPanel, DEPARTMENT_COUNT } from './MinistriesDepartmentalPanel';
-import { MinistriesLeadershipPanel, LEADER_COUNT } from './MinistriesLeadershipPanel';
+import { MinistriesDepartmentalPanel } from './MinistriesDepartmentalPanel';
+import { MinistriesLeadershipPanel } from './MinistriesLeadershipPanel';
 import { MinistriesVolunteerPanel } from './MinistriesVolunteerPanel';
 
 interface MinistriesViewProps {
@@ -58,7 +58,7 @@ export const MinistriesView: React.FC<MinistriesViewProps> = ({
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'ministries-departmental' ? 'bg-white/20 text-white' : 'bg-[#E7E5E4] text-[#57534E]'
             }`}>
-              {DEPARTMENT_COUNT}
+              Departments
             </span>
           </button>
 
@@ -75,7 +75,7 @@ export const MinistriesView: React.FC<MinistriesViewProps> = ({
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'ministries-leadership' ? 'bg-white/20 text-white' : 'bg-[#E7E5E4] text-[#57534E]'
             }`}>
-              {LEADER_COUNT}
+              Roles
             </span>
           </button>
 

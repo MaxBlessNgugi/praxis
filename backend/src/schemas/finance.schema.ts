@@ -59,7 +59,10 @@ export const listGivingQuerySchema = z.object({
   memberId: z.string().uuid().optional(),
   method: paymentMethodSchema.optional(),
   category: z.string().trim().max(80).optional(),
+  /** The service an offering was collected at. Tithes ignore it — they name a giver, not a service. */
+  serviceId: z.string().uuid().optional(),
   minAmount: z.coerce.number().positive().optional(),
+  maxAmount: z.coerce.number().positive().optional(),
   ...dateRange,
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),

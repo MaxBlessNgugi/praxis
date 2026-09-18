@@ -1,29 +1,19 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { InventoryItem, ParishMember, SoftDeleteRecord, TitheTransaction } from '../types';
-import {
-  INITIAL_CHURCH_MEMBERS,
-  INITIAL_INVENTORY_ITEMS,
-  INITIAL_SOFT_DELETE_RECORDS,
-  INITIAL_TITHES,
-} from './churchMockData';
-import { CHURCH, DEFAULT_LOCATION, DEMO_TODAY } from './churchDomain';
+import type { InventoryItem, TitheTransaction } from '../types';
+import { INITIAL_INVENTORY_ITEMS, INITIAL_TITHES } from './churchMockData';
+import { CHURCH, DEMO_TODAY } from './churchDomain';
 import { ROLES, type DemoRole } from '../lib/permissions';
 
 /**
- * The demo's editable data, in one place.
+ * The demo data the console still runs on, in one place.
  *
- * Until now every screen carried its own copy of these numbers: the ledger was a module
- * constant beside its panel, the Home dashboard had its own member count and monthly
- * tithe total, and the members register lived in the shell while the trash queue lived
- * inside the Delete screen — so archiving a member took her off one list and left her on
- * the other. Nothing a visitor typed survived the dialog either.
+ * Members, households and the archive queue are real now — they come from the API — so what
+ * is left here is the small set of screens that have no backend yet: the tithe ledger's
+ * offline-envelope entry, the stationery store, and the view-as-role switch.
  *
- * Everything here derives from these three arrays. A count, a ratio or a KPI that
- * disagrees with them is a bug, not a design choice: fix the derivation, never the
- * literal.
- *
- * It persists to `localStorage`, so a visitor's edits are still there when they come
- * back — and `resetDemo()` in the header puts the original data back.
+ * A count or a total that disagrees with these arrays is a bug, not a design choice: fix the
+ * derivation, never the literal. It persists to `localStorage`, so a visitor's edits are still
+ * there when they come back — and `resetDemo()` in the header puts the original data back.
  */
 
 const STORAGE_KEY = 'praxis-demo-v1';
@@ -37,15 +27,6 @@ const METHOD_ICONS: Record<string, string> = {
   'Bank Transfer': 'account_balance',
 };
 
-export interface ArchiveDetail {
-  reason: SoftDeleteRecord['reason'];
-  reasonLabel: string;
-  destinationParish?: string;
-  destinationPastor?: string;
-  rationale: string;
-  authorizedBy: string;
-}
-
 export interface TitheInput {
   /** What the visitor typed — a member's name or member ID, or a walk-in giver. */
   donor: string;
@@ -57,26 +38,16 @@ export interface TitheInput {
 }
 
 interface DemoSnapshot {
-  members: ParishMember[];
-  trash: SoftDeleteRecord[];
   tithes: TitheTransaction[];
   inventory: InventoryItem[];
   /** The role the console is being viewed as — it decides what the permission gates allow. */
   role: DemoRole;
-  /** Members a visitor enrolled in this browser, so the dashboard can say so. */
-  enrolledIds: string[];
-  /** The full record of anyone archived from the roll, so restoring returns *them*. */
-  archived: Record<string, ParishMember>;
 }
 
 const freshSnapshot = (): DemoSnapshot => ({
-  members: INITIAL_CHURCH_MEMBERS,
-  trash: INITIAL_SOFT_DELETE_RECORDS,
   tithes: INITIAL_TITHES,
   inventory: INITIAL_INVENTORY_ITEMS,
   role: 'super_admin',
-  enrolledIds: [],
-  archived: {},
 });
 
 /** Anything unreadable in storage falls back to the seed rather than an empty console. */
@@ -87,13 +58,9 @@ function loadSnapshot(): DemoSnapshot {
     const saved = JSON.parse(raw) as Partial<DemoSnapshot>;
     const seed = freshSnapshot();
     return {
-      members: Array.isArray(saved.members) ? saved.members : seed.members,
-      trash: Array.isArray(saved.trash) ? saved.trash : seed.trash,
       tithes: Array.isArray(saved.tithes) ? saved.tithes : seed.tithes,
       inventory: Array.isArray(saved.inventory) ? saved.inventory : seed.inventory,
       role: ROLES.includes(saved.role as DemoRole) ? (saved.role as DemoRole) : seed.role,
-      enrolledIds: Array.isArray(saved.enrolledIds) ? saved.enrolledIds : [],
-      archived: saved.archived && typeof saved.archived === 'object' ? saved.archived : {},
     };
   } catch {
     return freshSnapshot();
@@ -101,26 +68,6 @@ function loadSnapshot(): DemoSnapshot {
 }
 
 /* ------------------------------------------------------------------ selectors */
-
-/** Everything the register screens count, computed from the roll itself. */
-export function memberStats(members: ParishMember[]) {
-  const voting = members.filter((m) => m.membershipTier === 'member' || m.membershipTier === 'active-member');
-  const inquirers = members.filter((m) => m.membershipTier === 'first-timer' || m.membershipTier === 'visitor');
-  const youth = members.filter((m) => m.membershipTier === 'youth');
-  const share = (n: number) => (members.length === 0 ? 0 : Math.round((n / members.length) * 100));
-  return {
-    total: members.length,
-    voting: voting.length,
-    inquirers: inquirers.length,
-    youth: youth.length,
-    votingRatio: share(voting.length),
-    inquirerRatio: share(inquirers.length),
-    youthRatio: share(youth.length),
-    /** A record is "verified" once a baptism, dedication or transfer is on file. */
-    baptized: members.filter((m) => m.baptismType !== 'awaiting').length,
-    households: new Set(members.map((m) => m.householdName)).size,
-  };
-}
 
 /** Everything the ledger screens total, computed from the rows themselves. */
 export function titheStats(tithes: TitheTransaction[]) {
@@ -163,11 +110,7 @@ export function inventoryStats(items: InventoryItem[]) {
 /* -------------------------------------------------------------------- store */
 
 interface DemoData extends DemoSnapshot {
-  memberStats: ReturnType<typeof memberStats>;
   titheStats: ReturnType<typeof titheStats>;
-  addMember: (input: Partial<ParishMember>) => ParishMember;
-  archiveMember: (member: ParishMember, detail: ArchiveDetail) => SoftDeleteRecord;
-  restoreMember: (recordId: string) => void;
   recordTithe: (input: TitheInput) => TitheTransaction;
   voidTithe: (id: string) => void;
   inventoryStats: ReturnType<typeof inventoryStats>;
@@ -200,122 +143,15 @@ export const DemoDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [snapshot]);
 
-  const addMember = useCallback((input: Partial<ParishMember>) => {
-    const name = input.name?.trim() || 'New Member';
-    const member: ParishMember = {
-      id: `mbr-${Date.now()}`,
-      name,
-      memberId: input.memberId || `#MBR-${Math.floor(1100 + Math.random() * 500)}`,
-      initials:
-        input.initials ||
-        name
-          .split(' ')
-          .slice(0, 2)
-          .map((part) => part[0]?.toUpperCase() ?? '')
-          .join(''),
-      church: input.church || DEFAULT_LOCATION,
-      roleDescription: input.roleDescription || 'Member',
-      membershipTier: input.membershipTier || 'member',
-      baptismType: input.baptismType || 'baptized',
-      baptismDate: input.baptismDate || DEMO_TODAY.short,
-      baptismOfficiant: input.baptismOfficiant || 'Bishop Sammy',
-      householdName: input.householdName || `The ${name.split(' ').slice(-1)[0]} Household`,
-      householdId: input.householdId || `#${Math.floor(100 + Math.random() * 899)}`,
-      householdRole: input.householdRole || 'Head',
-      email: input.email || `${name.toLowerCase().replace(/\s+/g, '.')}@destinysanctuary.co.ke`,
-      phone: input.phone || '+254 700 000 000',
-      residentialAddress: input.residentialAddress || 'Nyahururu',
-      pastoralStatus: input.pastoralStatus || 'active-regular',
-      statusLabel: input.statusLabel || 'Active Regular',
-      dateOfBirth: input.dateOfBirth || '1990-01-01',
-      pastoralNotes: input.pastoralNotes || '',
-      tags: input.tags || [],
-      envelopeNumber: input.envelopeNumber || `ENV-${Math.floor(1400 + Math.random() * 200)}`,
-    };
-    setSnapshot((prev) => ({
-      ...prev,
-      members: [member, ...prev.members],
-      enrolledIds: [...prev.enrolledIds, member.id],
-    }));
-    return member;
-  }, []);
-
-  const archiveMember = useCallback((member: ParishMember, detail: ArchiveDetail) => {
-    const record: SoftDeleteRecord = {
-      id: `sd-${Date.now()}`,
-      name: member.name,
-      memberId: member.memberId,
-      initials: member.initials,
-      dismissalDate: DEMO_TODAY.short,
-      daysLeft: 30,
-      reason: detail.reason,
-      reasonLabel: detail.reasonLabel,
-      authorizedBy: detail.authorizedBy,
-      destinationParish: detail.destinationParish,
-      destinationPastor: detail.destinationPastor,
-      rationale: detail.rationale,
-    };
-    setSnapshot((prev) => ({
-      ...prev,
-      members: prev.members.filter((m) => m.id !== member.id),
-      trash: [record, ...prev.trash],
-      archived: { ...prev.archived, [record.id]: member },
-    }));
-    return record;
-  }, []);
-
-  const restoreMember = useCallback((recordId: string) => {
-    setSnapshot((prev) => {
-      const record = prev.trash.find((r) => r.id === recordId);
-      if (!record) return prev;
-      const stored = prev.archived[recordId];
-      // Trash rows that predate this session were never on the roll: rebuild a member
-      // from what the record itself carries rather than dropping the restore.
-      const member: ParishMember =
-        stored ??
-        ({
-          id: `restored-${record.id}`,
-          name: record.name,
-          memberId: record.memberId,
-          initials: record.initials,
-          church: DEFAULT_LOCATION,
-          roleDescription: 'Member',
-          membershipTier: 'member',
-          baptismType: 'baptized',
-          baptismDate: DEMO_TODAY.short,
-          householdName: `${record.name.split(' ').slice(-1)[0]} Household`,
-          householdId: '#108',
-          householdRole: 'Member',
-          email: `${record.name.toLowerCase().replace(/\s+/g, '.')}@destinysanctuary.co.ke`,
-          phone: '+254 753 008 800',
-          pastoralStatus: 'active-regular',
-          statusLabel: 'Restored from Trash',
-          pastoralNotes: record.rationale,
-        } as ParishMember);
-      const { [recordId]: _restored, ...remaining } = prev.archived;
-      return {
-        ...prev,
-        members: [member, ...prev.members],
-        trash: prev.trash.filter((r) => r.id !== recordId),
-        archived: remaining,
-      };
-    });
-  }, []);
-
   const recordTithe = useCallback((input: TitheInput) => {
     const donor = input.donor.trim() || 'Anonymous Giver';
     let row!: TitheTransaction;
     setSnapshot((prev) => {
-      // A gift from someone on the roll keeps their name and envelope number, which is
-      // what ties the ledger back to the register.
-      const onRoll = prev.members.find(
-        (m) => m.name.toLowerCase() === donor.toLowerCase() || m.memberId.toLowerCase() === donor.toLowerCase(),
-      );
       row = {
         id: `tx-${Date.now()}`,
         txCode: nextTxCode(prev.tithes),
-        donor: onRoll?.name || donor,
-        envelopeNo: onRoll?.envelopeNumber ? `#${onRoll.envelopeNumber}` : input.reference || '—',
+        donor,
+        envelopeNo: input.reference || '—',
         method: input.method,
         methodIcon: METHOD_ICONS[input.method] ?? 'receipt_long',
         category: input.category || 'General Tithe',
@@ -361,11 +197,7 @@ export const DemoDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const value = useMemo<DemoData>(
     () => ({
       ...snapshot,
-      memberStats: memberStats(snapshot.members),
       titheStats: titheStats(snapshot.tithes),
-      addMember,
-      archiveMember,
-      restoreMember,
       recordTithe,
       voidTithe,
       inventoryStats: inventoryStats(snapshot.inventory),
@@ -373,7 +205,7 @@ export const DemoDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setRole,
       resetDemo,
     }),
-    [snapshot, addMember, archiveMember, restoreMember, recordTithe, voidTithe, countStock, setRole, resetDemo],
+    [snapshot, recordTithe, voidTithe, countStock, setRole, resetDemo],
   );
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;

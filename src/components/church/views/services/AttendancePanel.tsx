@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { attendanceApi, memberRefName, servicesApi, type AttendanceSummaryDto } from '../../../../lib/api';
+import { memberRefName, servicesApi, type AttendanceSummaryDto } from '../../../../lib/api';
 import { errorMessage, useAttendance, useMemberOptions, useServices } from '../../../../hooks/useApi';
+import { reportsApi } from '../../../../lib/api';
+import { downloadBlob } from '../../../../lib/export';
 import { usePermissions } from '../../../../lib/permissions';
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 
@@ -139,6 +141,20 @@ export const AttendancePanel: React.FC = () => {
     }
   };
 
+  const [exporting, setExporting] = useState(false);
+  /** The whole attendance ledger, as the server has it — the register, not the page on screen. */
+  const handleExport = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      downloadBlob('praxis-attendance.csv', await reportsApi.attendanceCsv());
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       {error && (
@@ -172,6 +188,18 @@ export const AttendancePanel: React.FC = () => {
             </select>
           </div>
 
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void handleExport()}
+              disabled={exporting}
+              className="h-9 px-3 rounded-lg bg-white border border-[#E7E5E4] text-xs font-semibold text-[#1C1917] hover:bg-[#faf2ee] disabled:opacity-60 flex items-center gap-1.5 cursor-pointer"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">download</span>
+              {exporting ? 'Preparing…' : 'Export CSV'}
+            </button>
+          </div>
+
           <div className="grid grid-cols-3 gap-3">
             {[
               { label: 'Counted', value: summary?.totalCounted ?? 0 },
@@ -196,8 +224,8 @@ export const AttendancePanel: React.FC = () => {
               Record the census
             </h3>
             <p className="mt-0.5 text-xs text-[#57534E]">
-              Two numbers, as the ushers count them. Both are stored as separate rows, so a report can still tell
-              adults from children later.
+              Two numbers, as the ushers count them, each stored as its own row and labelled the way it was
+              counted.
             </p>
 
             {!selected && (

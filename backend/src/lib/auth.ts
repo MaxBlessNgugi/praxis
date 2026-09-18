@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
@@ -20,6 +21,15 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
 /** What the token carries. Rights are read from the database on every request, not trusted here. */
 export interface TokenPayload {
   sub: string;
+  /**
+   * The account's session generation when this token was minted.
+   *
+   * Claims, not a denylist, are what make a password change end the other sessions: a token whose
+   * `ver` no longer matches the account's is refused, so the copy left signed in on a shared parish
+   * machine stops working at the same moment the password it was protecting is replaced. Absent means
+   * zero, which is what a token minted before this existed already means.
+   */
+  ver?: number;
   /**
    * The church this token is acting for.
    *
@@ -72,6 +82,26 @@ export const SUPPORT_SESSION_MINUTES = 60;
  * again, and every endpoint would leak the library's message. Both cases below are ordinary — a
  * stale tab sends an expired token, a typo sends a malformed one — so both are answered plainly.
  */
+// ---------------------------------------------------------------------------------------------
+// Password reset tokens
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A reset token: 32 random bytes, base64url, so it is URL-safe in the link that carries it.
+ *
+ * It is generated here with the rest of the token cryptography, so that "what a token looks like and
+ * how it is stored" has one owner. The database only ever holds the hash — `hashResetToken` below —
+ * which is why a copy of the table is not a set of keys to every account.
+ */
+export function generateResetToken(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+/** SHA-256, hex. Deliberately not bcrypt: this is a 256-bit random value, not a guessable password. */
+export function hashResetToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
 export function verifyAccessToken(token: string): TokenPayload {
   let decoded: string | jwt.JwtPayload;
   try {
@@ -87,6 +117,7 @@ export function verifyAccessToken(token: string): TokenPayload {
   }
   return {
     sub: decoded.sub,
+    ver: typeof decoded.ver === 'number' ? decoded.ver : undefined,
     org: typeof decoded.org === 'string' ? decoded.org : undefined,
     imp: decoded.imp === true,
   };

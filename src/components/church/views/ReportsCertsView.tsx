@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { financeApi } from '../../../lib/api';
-import { errorMessage, useMemberReport } from '../../../hooks/useApi';
+import { certificatesApi, financeApi } from '../../../lib/api';
+import { errorMessage, useCertificates, useMemberReport, useMutation } from '../../../hooks/useApi';
 import { useChurchIdentity } from '../../../hooks/useChurchIdentity';
 import { useAuth } from '../../../lib/auth';
 import {
@@ -50,6 +50,10 @@ export const ReportsCertsView: React.FC = () => {
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
+  /** The register, so issuance is recorded rather than only printed. */
+  const ledger = useCertificates();
+  const issue = useMutation(certificatesApi.issue);
+
   /** A typed date, as the certificate should carry it. An unreadable one prints as an em dash. */
   const parsedDate = (): string | null => {
     if (!ceremonyDate.trim()) return null;
@@ -62,11 +66,29 @@ export const ReportsCertsView: React.FC = () => {
       setProblem('Name the person the certificate is for.');
       return;
     }
+    if (!ceremonyDate.trim()) {
+      setProblem('Enter the date of the ordinance — a certificate without its date is not a record.');
+      return;
+    }
     setWorking('certificate');
     setProblem(null);
     setDone(null);
     try {
-      const memberNumber = registerNumber.trim() || '—';
+      // Issued first, printed second: the serial exists because the register says so, and the page
+      // the printer sees is the copy of that record — not the other way round.
+      const issued = await issue.run({
+        kind: certificateType,
+        fullName: fullName.trim(),
+        ...(registerNumber.trim() ? { memberNumber: registerNumber.trim() } : {}),
+        ...(certificateType === 'dedication' && parents.trim() ? { parents: parents.trim() } : {}),
+        ceremonyDate: parsedDate() as string,
+        ...(officiant.trim() ? { officiant: officiant.trim() } : {}),
+        ...(certificateType === 'baptism' && scriptureReference.trim() ? { scripture: scriptureReference.trim() } : {}),
+      }).catch((cause: unknown) => {
+        throw new Error(errorMessage(cause));
+      });
+      const serial = issued.data.serial;
+
       const html =
         certificateType === 'dedication'
           ? buildDedicationCertificate({
@@ -75,25 +97,28 @@ export const ReportsCertsView: React.FC = () => {
               parents: parents.trim() || 'the parents',
               dedicationDate: parsedDate(),
               officiant: officiant.trim() || null,
-              memberNumber,
+              memberNumber: registerNumber.trim() || '—',
               location: church.location,
+              serial,
             })
           : buildBaptismCertificate({
               church,
               fullName: fullName.trim(),
               baptismDate: parsedDate(),
               officiant: officiant.trim() || null,
-              memberNumber,
+              memberNumber: registerNumber.trim() || '—',
               location: church.location,
               scriptureReference: scriptureReference.trim() || undefined,
+              serial,
             });
 
       await printDocument(html);
+      void ledger.refetch();
       setDone(
-        `The ${certificateType === 'baptism' ? 'baptism' : 'dedication'} certificate for ${fullName.trim()} was handed to the printer.`,
+        `Certificate ${serial} for ${fullName.trim()} was recorded in the register and handed to the printer.`,
       );
     } catch (cause) {
-      setProblem(errorMessage(cause));
+      setProblem(cause instanceof Error ? cause.message : errorMessage(cause));
     } finally {
       setWorking(null);
     }
@@ -156,7 +181,8 @@ export const ReportsCertsView: React.FC = () => {
         </h1>
         <p className="text-sm text-[#59413a] max-w-2xl">
           Certificates the church issues, and the two summaries a council asks for — printed from the live register and
-          the live ledger, on the church’s own letterhead. Use your browser’s “Save as PDF” to file a copy.
+          the live ledger, on the church’s own letterhead. Every certificate is recorded with its own serial as it is
+          issued; use your browser’s “Save as PDF” to file a copy.
         </p>
       </div>
 
@@ -432,6 +458,53 @@ export const ReportsCertsView: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* SECTION 1b: The register of what has been issued */}
+        <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-[0_1px_3px_rgba(28,25,23,0.04),0_4px_12px_rgba(194,65,12,0.02)] border border-[#e1bfb5]/40 flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-headline text-lg text-[#1e1b19] font-bold tracking-tight">Certificate register</h2>
+              <p className="text-xs text-[#59413a] mt-0.5">
+                What the church has officially issued, newest first. A certificate exists because this register says so —
+                the print is its copy.
+              </p>
+            </div>
+            <span className="text-xs font-bold text-[#59413a] whitespace-nowrap">{ledger.certificates.length} on file</span>
+          </div>
+
+          {ledger.loading && <LoadingBlock label="Reading the register…" />}
+          {ledger.error && <ErrorBlock message={ledger.error} onRetry={() => void ledger.refetch()} />}
+
+          {!ledger.loading && !ledger.error && ledger.certificates.length === 0 && (
+            <p className="text-xs text-[#59413a] bg-[#faf2ee]/70 border border-[#e1bfb5]/30 rounded-xl p-4">
+              Nothing issued yet. The first certificate printed from the form above opens this register.
+            </p>
+          )}
+
+          {ledger.certificates.length > 0 && (
+            <ul className="divide-y divide-[#e1bfb5]/30">
+              {ledger.certificates.map((row) => (
+                <li key={row.id} className="py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#c2410c]">
+                    {row.kind === 'baptism' ? 'water_drop' : 'child_care'}
+                  </span>
+                  <span className="font-mono text-[11px] font-bold text-[#9b2f00]">{row.serial}</span>
+                  <span className="text-xs font-bold text-[#1e1b19]">{row.fullName}</span>
+                  <span className="text-[11px] text-[#59413a]">
+                    {row.kind === 'baptism' ? 'Baptism' : 'Dedication'}
+                    {row.ceremonyDate ? ` · ${new Date(row.ceremonyDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                    {row.officiant ? ` · ${row.officiant}` : ''}
+                  </span>
+                  {row.reissues && (
+                    <span className="text-[10px] font-semibold text-[#59413a] bg-[#f4ece8] rounded-full px-2 py-0.5">
+                      supersedes {row.reissues.serial}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* SECTION 2: The two summaries */}

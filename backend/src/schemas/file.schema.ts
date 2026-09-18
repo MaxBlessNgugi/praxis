@@ -44,6 +44,9 @@ export const uploadFileSchema = z.object({
     .trim()
     .min(1, 'The file needs a name')
     .max(255)
+    // The control character is the point: a NUL is what a path-traversal attempt is built around, so
+    // it is refused here rather than left out of the pattern.
+    // eslint-disable-next-line no-control-regex
     .refine((name) => !/[/\\\u0000]/.test(name), 'The file name may not contain a path'),
   mimeType: z.string().trim().min(3).max(160),
   /** Raw base64, or a `data:` URL whose prefix is stripped before decoding. */

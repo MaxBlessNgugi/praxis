@@ -180,7 +180,7 @@ export async function listAudit(query: ListFinanceAuditQuery) {
 export async function summary(query: FinanceSummaryQuery) {
   const window = query.from || query.to ? { gte: query.from, lte: query.to } : undefined;
 
-  const [tithes, offerings, contributions, welfare, charity, givenByMethod, givenByCategory] = await Promise.all([
+  const [tithes, offerings, contributions, welfare, charity, tithesByMethod, tithesByCategory, offeringsByMethod] = await Promise.all([
     prisma.tithe.aggregate({ where: { ...live, ...(window ? { receivedAt: window } : {}) }, _sum: { amount: true }, _count: true }),
     prisma.offering.aggregate({ where: { ...live, ...(window ? { receivedAt: window } : {}) }, _sum: { amount: true }, _count: true }),
     prisma.projectContribution.groupBy({
@@ -204,6 +204,14 @@ export async function summary(query: FinanceSummaryQuery) {
     }),
     prisma.tithe.groupBy({
       by: ['category'],
+      where: { ...live, ...(window ? { receivedAt: window } : {}) },
+      _sum: { amount: true },
+      _count: true,
+    }),
+    // Offerings are counted apart from tithes throughout: one names a giver, the other is a plate
+    // passed at a gathering, and a screen that mixed the two splits would be reporting neither.
+    prisma.offering.groupBy({
+      by: ['method'],
       where: { ...live, ...(window ? { receivedAt: window } : {}) },
       _sum: { amount: true },
       _count: true,
@@ -251,11 +259,14 @@ export async function summary(query: FinanceSummaryQuery) {
     },
     welfare: welfareTotals,
     charity: { total: money(charity._sum.amount) ?? 0, count: charity._count },
-    givingByMethod: givenByMethod
+    tithesByMethod: tithesByMethod
       .map((row) => ({ method: row.method, amount: money(row._sum.amount) ?? 0, count: row._count }))
       .sort((a, b) => b.amount - a.amount),
-    givingByCategory: givenByCategory
+    tithesByCategory: tithesByCategory
       .map((row) => ({ category: row.category, amount: money(row._sum.amount) ?? 0, count: row._count }))
+      .sort((a, b) => b.amount - a.amount),
+    offeringsByMethod: offeringsByMethod
+      .map((row) => ({ method: row.method, amount: money(row._sum.amount) ?? 0, count: row._count }))
       .sort((a, b) => b.amount - a.amount),
   };
 }

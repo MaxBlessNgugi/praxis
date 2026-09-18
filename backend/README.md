@@ -98,20 +98,22 @@ documents plus a write to one, and the Trash — retire, list, restore, and an a
 create, delete and restore. It needs a live seeded database, so it is evidence for a revision rather
 than a gate; what CI re-proves every time is the provisioning above.
 
-**The console is on this API for the modules the root `README.md` lists as real** — authentication,
-home, members and households, announcements, events, prayer, celebrations, welfare, charity, project
-funding, the finance ledger and the church profile. The rest of the console still renders sample
-data, so a request in this document is still a `curl` for those.
+**The console is on this API everywhere** — every screen in it reads and writes these routes, and
+nothing renders sample data any more. What a request in this document is still a `curl` for is the
+operator's side of the platform and the parts a screen deliberately does not offer (a switch of
+church, a support session, an outbound send).
 
 ## Endpoints
 
 Everything is JSON, `{ data }` for one item, `{ data, meta }` for a page, `{ error, code }` for a
-failure. All routes need `Authorization: Bearer <token>` except `POST /api/auth/login`.
+failure and `{ error, fields }` when validation refused something. All routes need
+`Authorization: Bearer <token>` except `POST /api/auth/login`, `POST /api/auth/signup` and the two
+password-reset routes — the point of those four is that the caller cannot sign in.
 
 | Area | Routes |
 |---|---|
-| Auth | `POST /api/auth/login` · `POST /api/auth/logout` · `GET /api/auth/me` |
-| Users (admin) | `GET/POST /api/admin/users` · `PATCH /api/admin/users/:id` · `POST /api/admin/users/:id/role` · `DELETE /api/admin/users/:id` |
+| Auth | `POST /api/auth/login` · `POST /api/auth/signup` · `POST /api/auth/logout` · `GET /api/auth/me` · `POST /api/auth/switch-organization` · `POST /api/auth/password` · `POST /api/auth/password-reset/request` · `POST /api/auth/password-reset/confirm` |
+| Users (admin) | `GET/POST /api/admin/users` · `PATCH /api/admin/users/:id` · `POST /api/admin/users/:id/role` · `POST /api/admin/users/:id/password` · `DELETE /api/admin/users/:id` |
 | Members | `GET/POST /api/members` · `GET/PATCH/DELETE /api/members/:id` · `POST /api/members/trash/:id/restore` |
 | Households | `GET/POST /api/households` · `GET/PATCH/DELETE /api/households/:id` · `POST /api/households/:id/members` · `DELETE /api/households/:id/members/:memberId` · `POST /api/households/:id/head` |
 | Services | `GET/POST /api/services` · `GET/PATCH/DELETE /api/services/:id` · `PUT /api/services/:id/liturgy` · `POST /api/services/:id/attendance` · `GET /api/services/:id/attendance` · `PUT/GET /api/services/:id/report` |
@@ -129,6 +131,9 @@ failure. All routes need `Authorization: Bearer <token>` except `POST /api/auth/
 | Reports | `GET /api/reports/overview` · `/members` · `/giving` · `/attendance` · `/ministries` · `/governance` — all read-only, all accepting `?from=&to=` |
 | Settings | `GET/PATCH /api/settings/profile` · `GET /api/settings/preferences` · `GET/PUT /api/settings/preferences/:key` (`notifications`, `integrations`, `customization`) · `GET /api/settings/preferences/backup` |
 | Admin | `GET /api/admin/trash` · `POST /api/admin/trash/:id/restore` · `GET /api/admin/audit` · `GET /api/admin/audit/:entityName/:entityId` · `GET/POST /api/admin/roles` · `GET/PATCH /api/admin/roles/:key` |
+| Files | `POST /api/files` · `GET /api/files` · `GET /api/files/:id` (bytes) · `GET /api/files/:id/meta` · `DELETE /api/files/:id` |
+| Billing | `GET /api/billing/plans` · `GET /api/billing/subscription` · `POST /api/billing/request-upgrade` |
+| Vendor (platform staff only) | `GET /api/vendor/organizations` · `GET /api/vendor/organizations/:id/stats` · `POST …/plan` · `POST …/payments` · `POST …/suspension` · `POST …/support-sessions` · `POST /api/vendor/support-sessions/end` |
 
 **Every retirement speaks the same language**, whichever module it belongs to:
 
@@ -144,7 +149,13 @@ the row.
 
 Reading needs a signed-in account. Writing needs `staff` or above. Retiring a record, deciding a
 swap, managing users, deciding a resolution, changing the profile and its preferences, and restoring
-an archived record all need `admin`. **Changing rights needs `super_admin`**, because a role is what
+an archived record all need `admin`. On top of the role, every operating router is behind
+`middleware/authorize.ts`, which reads the **panel** a section belongs to and the **action** a verb
+needs out of the role's own `panels`/`actions` document — so a role with `view` but not `edit` is
+refused a write by the server, not merely hidden the button by the console. `PANEL_KEYS` in
+`lib/panels.ts` is the one list the gate, the console's union and the seed all read.
+
+**Changing rights needs `super_admin`**, because a role is what
 grants access in the first place — an `admin` who could widen their own would make every other gate
 decorative. `super_admin` is otherwise always allowed, so an owner cannot be locked out of their own
 system by a rights edit; the role itself cannot be narrowed.
@@ -212,9 +223,19 @@ every other model. An audit trail that can be edited is not an audit trail.
 asking; whether that account still works here, still has its rights and is not locked is answered by
 the row, not by a claim signed up to seven days ago.
 
-**A 7-day JWT cannot be revoked.** So `POST /api/auth/logout` records the intent and returns `204`;
-the client discards the token. A stolen one stays valid until it expires. Making logout real means a
-denylist or a short-lived token with a refresh flow — a decision to make deliberately.
+**A 7-day JWT cannot be revoked — except when it matters most.** `POST /api/auth/logout` records the
+intent and returns `204`; the client discards the token, and a *stolen* one stays valid until it
+expires. The exception is an account's own password: `User.tokenVersion` is carried in the token as
+`ver` and compared on every request, and changing or resetting a password bumps it, so every other
+session on that account ends at that instant. The session that made the change is handed a fresh
+token rather than being signed out by its own success. A full denylist or a short-lived token with a
+refresh flow is still the deliberate step not taken here.
+
+**A reset link is a hash in the database, never the token itself.** `PasswordResetToken` stores
+SHA-256 of a 32-byte random value, with an expiry (`RESET_TOKEN_TTL_MINUTES`) and a `usedAt`, so a
+copy of the table is not a set of keys to every account, and spending a link twice is refused. The
+*request* endpoint answers `202` with the same body whether or not the address is registered — an
+endpoint that says "no such account" is a way to enumerate a church's staff.
 
 **A bad token is a `401`, never a `500`.** Expired and malformed tokens are ordinary events — a stale
 tab, a typo — and are answered with `token_expired` / `invalid_token` so the console can send the

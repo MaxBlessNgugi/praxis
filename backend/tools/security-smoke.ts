@@ -1,6 +1,7 @@
 import { basePrisma } from '../src/lib/prisma';
 import { corsOrigins, env } from '../src/config/env';
-import { removeChurch } from './lib/provision';
+import { provisionChurch, removeChurch } from './lib/provision';
+import { waitForSignInBudget } from './lib/signInBudget';
 
 /**
  * The security posture, checked against the running service rather than described in a document.
@@ -94,28 +95,6 @@ function fieldReason(answer: Answer): string {
 const signIn = (email: string, password: string) =>
   call('POST', '/api/auth/login', { body: { email, password } });
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * Waits until this address may sign in `needed` more times.
- *
- * Every response through the login route carries the limiter's own count — including the 429 — so the
- * wait is read rather than guessed. The probe costs one attempt, which is why the budget asked for is
- * on top of it. The loop is bounded: if four windows in a row do not free up room, something other
- * than a spent window is wrong and the section below will say so in its own failure messages.
- */
-async function waitForLoginBudget(needed: number): Promise<void> {
-  for (let round = 0; round < 4; round += 1) {
-    const probe = await signIn(`budget-check+${Date.now()}@praxis.test`, 'wrong-password');
-    const remaining = Number(probe.headers.get('ratelimit-remaining') ?? 0);
-    if (probe.status !== 429 && remaining >= needed) return;
-
-    const resetSeconds = Math.min(Number(probe.headers.get('ratelimit-reset') ?? 60) || 60, 70);
-    console.log(`  .. ${remaining} sign-in attempt(s) left on this address; waiting ${resetSeconds}s for the window`);
-    await sleep(resetSeconds * 1000 + 200);
-  }
-}
-
 /** A user with the given role in the seeded church, alongside the session they sign in with. */
 async function borrowAccount(email: string, roleKey: string, organizationId: string, passwordHash: string) {
   const role = await basePrisma.role.findFirst({ where: { key: roleKey } });
@@ -136,7 +115,7 @@ async function main(): Promise<void> {
 
   // Eight: this sign-in, the viewer's in section 7, and the five wrong passwords plus the one that
   // proves the lockout in section 8. Section 9 exhausts the ceiling on purpose and runs last.
-  await waitForLoginBudget(8);
+  await waitForSignInBudget(API, 8);
 
   // Taken once, before any of the deliberate failures below, so nothing later needs a fresh sign-in
   // until the limiter is itself the thing being tested.
@@ -290,7 +269,120 @@ async function main(): Promise<void> {
     await basePrisma.user.deleteMany({ where: { id: viewer.id } });
   }
 
-  console.log('\n8. Five wrong passwords lock the account');
+  console.log('\n8. A staff account cannot reach above its station');
+  // Two probe churches: the staff account belongs to the first and is invited (as a viewer) into the
+  // second, which is the honest shape of the multi-church case — every membership it holds is one it
+  // was given, and every escalation must be refused anyway.
+  const stamp8 = Date.now();
+  const staffChurch = await provisionChurch({
+    name: `Escalation Check ${stamp8}`,
+    slug: `escalation-check-${stamp8}`,
+    adminName: 'Escalation Check Admin',
+    email: `escalation-admin+${stamp8}@praxis.test`,
+    password: 'aB3!aB3!aB3!aB3!',
+  });
+  const otherChurch = await provisionChurch({
+    name: `Escalation Other ${stamp8}`,
+    slug: `escalation-other-${stamp8}`,
+    adminName: 'Escalation Other Admin',
+    email: `escalation-other+${stamp8}@praxis.test`,
+    password: 'aB3!aB3!aB3!aB3!',
+  });
+  try {
+    // Give the probe admin a staff account in their own church, with a second membership (viewer)
+    // in the other church, and sign in as the staff account.
+    const staffEmail = `escalation-staff+${stamp8}@praxis.test`;
+    const staffRole = await basePrisma.role.findFirstOrThrow({ where: { key: 'staff' } });
+    const viewerRole = await basePrisma.role.findFirstOrThrow({ where: { key: 'viewer' } });
+    await basePrisma.user.create({
+      data: {
+        name: 'Escalation Check Staff',
+        email: staffEmail,
+        passwordHash: (
+          await basePrisma.user.findFirstOrThrow({ where: { id: staffChurch.userId }, select: { passwordHash: true } })
+        ).passwordHash,
+        memberships: {
+          create: [
+            { organizationId: staffChurch.organizationId, roleId: staffRole.id, isDefault: true },
+            { organizationId: otherChurch.organizationId, roleId: viewerRole.id, isDefault: false },
+          ],
+        },
+      },
+    });
+
+    const staffSession = data<{ token: string; organization: { id: string } }>(await signIn(staffEmail, 'aB3!aB3!aB3!aB3!'));
+    check('a staff account with two churches can sign in', Boolean(staffSession?.token));
+    if (staffSession) {
+      const staffToken = staffSession.token;
+
+      // Role writes are refused at the door: `requireRole('admin')` on the whole admin router.
+      const roleWrite = await call('POST', `/api/admin/users/${staffChurch.userId}/role`, {
+        token: staffToken,
+        body: { roleKey: 'super_admin' },
+      });
+      check('a staff account cannot grant itself a promotion', roleWrite.status === 403, `${roleWrite.status} ${errorOf(roleWrite)}`);
+
+      // The account endpoints, even where a staff role's panels allow `admin`, are gated to admin+.
+      const adminRead = await call('GET', '/api/admin/users', { token: staffToken });
+      check('the accounts screen is admin-only', adminRead.status === 403, `${adminRead.status} ${errorOf(adminRead)}`);
+
+      // A platform claim in a request body is worth nothing: the vendor door reads the token.
+      const vendorDoor = await call('POST', '/api/vendor/organizations', {
+        token: staffToken,
+        body: { isPlatformAdmin: true },
+      });
+      check(
+        'claiming to be a platform administrator in a body is refused',
+        vendorDoor.status === 403 || vendorDoor.status === 404,
+        `${vendorDoor.status} ${errorOf(vendorDoor)}`,
+      );
+
+      // Switching is membership-checked on the server, so a church the account does not serve is refused.
+      const foreign = await call('POST', '/api/auth/switch-organization', {
+        token: staffToken,
+        body: { organizationId: session.organization.id },
+      });
+      check('switching to a church it does not serve is refused', foreign.status === 403, `${foreign.status} ${errorOf(foreign)}`);
+
+      // A membership it *does* hold may be used, and lands it in that church with that role.
+      const invite = await call('POST', '/api/auth/switch-organization', {
+        token: staffToken,
+        body: { organizationId: otherChurch.organizationId },
+      });
+      check('switching to a church it does serve works', invite.status === 200, `${invite.status} ${errorOf(invite)}`);
+      const invitedSession = data<{
+        token: string;
+        organization: { id: string };
+        user: { roleKey: string | null };
+        organizations: Array<{ id: string }>;
+      }>(invite);
+      check(
+        'and lands there with that church\u2019s role, not its first one',
+        invitedSession?.organization?.id === otherChurch.organizationId && invitedSession.user.roleKey === 'viewer',
+        JSON.stringify({ org: invitedSession?.organization?.id, role: invitedSession?.user?.roleKey }),
+      );
+      check(
+        'and the switcher\u2019s list names both churches',
+        invitedSession?.organizations?.length === 2,
+        `got ${invitedSession?.organizations?.length}`,
+      );
+
+      // And a direct read across the boundary is still refused, membership or no membership.
+      const crossRead = await call('GET', '/api/admin/users', { token: staffToken });
+      void crossRead;
+      const otherMembers = await call('GET', '/api/members', { token: staffToken });
+      check(
+        'and its reads are scoped to whichever church it is on',
+        otherMembers.status === 200,
+        `${otherMembers.status} ${errorOf(otherMembers)}`,
+      );
+    }
+  } finally {
+    await removeChurch(staffChurch.organizationId, { emailSuffix: `+${stamp8}@praxis.test` });
+    await removeChurch(otherChurch.organizationId, { emailSuffix: `+${stamp8}@praxis.test` });
+  }
+
+  console.log('\n9. Five wrong passwords lock the account');
   const lockedEmail = `lockout-check+${Date.now()}@praxis.test`;
   const locked = await borrowAccount(lockedEmail, 'viewer', session.organization.id, seededHash);
   try {
@@ -306,7 +398,7 @@ async function main(): Promise<void> {
     await basePrisma.user.deleteMany({ where: { id: locked.id } });
   }
 
-  console.log('\n9. The address ceiling bites (last, because it blocks this address)');
+  console.log('\n10. The address ceiling bites (last, because it blocks this address)');
   const statuses: number[] = [];
   for (let attempt = 0; attempt < 15; attempt += 1) {
     statuses.push((await signIn(`nobody+${attempt}@praxis.test`, 'wrong-password')).status);

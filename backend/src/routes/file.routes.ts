@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as fileController from '../controllers/file.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { moduleGate } from '../middleware/authorize';
 import { requireAuth, requireRole } from '../middleware/authenticate';
 import { requireWritableSubscription } from '../middleware/subscription';
 import { rateLimit } from '../middleware/rateLimit';
@@ -21,7 +22,7 @@ export const fileRouter = Router();
 
 const WRITERS = requireRole('super_admin', 'admin', 'staff');
 
-fileRouter.use(requireAuth, requireWritableSubscription);
+fileRouter.use(requireAuth, moduleGate(), requireWritableSubscription);
 
 // Rate-limited like a broadcast send, and for the same reason: one request here can move five
 // megabytes and put them in the church's database permanently. Fifty a minute is more scanning than

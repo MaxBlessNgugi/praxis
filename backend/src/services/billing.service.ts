@@ -524,6 +524,18 @@ export async function assignPlan(organizationId: string, input: AssignPlanInput,
   const plan = await basePrisma.plan.findFirst({ where: { key: input.planKey, isActive: true } });
   if (!plan) throw notFoundError(`The ${input.planKey} plan`);
 
+  // The clock (`nextStatus`) can only *advance* a decision — it can never see that `active` has no
+  // paid period behind it, or that `past_due` has nothing overdue — so a pinned status without its
+  // dates would freeze a church into a state every later read silently agrees with. Refuse those
+  // here rather than write a row the calendar cannot correct.
+  if ((input.status === 'active' || input.status === 'past_due') && !input.periodMonths) {
+    throw new AppError(
+      400,
+      `Setting a church to ${input.status} needs the months already paid, so the period it names is real. Record a payment instead, or grant trial days.`,
+      'status_needs_period',
+    );
+  }
+
   const now = new Date();
   const client = clientFor(organizationId);
 
@@ -550,7 +562,19 @@ export async function assignPlan(organizationId: string, input: AssignPlanInput,
         requestedPlanId: null,
         requestedAt: null,
         ...(input.note ? { notes: input.note } : {}),
-        ...(input.trialDays !== undefined ? { trialEndsAt: new Date(now.getTime() + input.trialDays * DAY), currentPeriodEnd: null, currentPeriodStart: null } : {}),
+        // Granting trial days closes any paid period — the two are alternatives — and the status
+        // follows the dates rather than staying behind: a church whose period was just cleared cannot
+        // honestly still read "paid up". (With no status given, `create` already lands on trial; on
+        // update the clock cannot see this gap, because `active` with no period only expires, so the
+        // decision is made here where the dates change.)
+        ...(input.trialDays !== undefined
+          ? {
+              trialEndsAt: new Date(now.getTime() + input.trialDays * DAY),
+              currentPeriodEnd: null,
+              currentPeriodStart: null,
+              ...(input.status ? {} : { status: 'trial' }),
+            }
+          : {}),
         // A period already paid and a trial are alternatives, so recording one ends the other — the
         // same rule `recordPayment` applies. Without this, a vendor could open a paid period on a
         // trialing church and watch the row still read "Trial", with the month they had just recorded
@@ -587,6 +611,32 @@ export async function assignPlan(organizationId: string, input: AssignPlanInput,
  * with no payment behind it would be a church using the system for free, and a payment with no period
  * would be money the office cannot trace to anything.
  */
+/**
+ * The money a church has paid, for the vendor's view of it.
+ *
+ * A payment's audit line lands in the *church's* log, where the people it concerns can see it; the
+ * vendor's read of the same rows is a read, and needs no log of its own.
+ */
+export async function paymentsForOrganization(organizationId: string) {
+  const payments = await clientFor(organizationId).subscriptionPayment.findMany({
+    include: { recordedBy: { select: { id: true, name: true } } },
+    orderBy: { receivedAt: 'desc' },
+    take: 100,
+  });
+  return payments.map((payment) => ({
+    id: payment.id,
+    amount: money(payment.amount) ?? 0,
+    currency: payment.currency,
+    method: payment.method,
+    reference: payment.reference,
+    periodStart: payment.periodStart?.toISOString() ?? null,
+    periodEnd: payment.periodEnd?.toISOString() ?? null,
+    receivedAt: payment.receivedAt.toISOString(),
+    note: payment.note,
+    recordedBy: payment.recordedBy?.name ?? null,
+  }));
+}
+
 export async function recordPayment(organizationId: string, input: RecordPaymentInput, actorId: string) {
   const client = clientFor(organizationId);
   const subscription = await client.subscription.findFirst({ where: { organizationId }, include: { plan: true } });

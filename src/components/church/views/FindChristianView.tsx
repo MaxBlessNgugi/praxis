@@ -1,26 +1,24 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ParishMember } from '../../../types';
 import { LOCATIONS } from '../../../data/churchDomain';
-import { useDialog } from '../dialog';
 import { interactiveCard } from '../interactiveCard';
 import { useMemberReport } from '../../../lib/hooks/useReports';
 import { usePermissions } from '../../../lib/permissions';
 import { exportCsv } from '../../../lib/export';
 import { EmptyState } from '../../ui';
 import { useMembers, type ListMembersQuery } from '../../../lib/hooks/useMembers';
-import { ApiError } from '../../../lib/api';
-import { errorMessage } from '../../../hooks/useApi';
+import { MEMBER_STATUS_LABELS } from '../../../lib/adapters';
+import { MemberRecordDialog } from './MemberRecordDialog';
 import { useChurchIdentity } from '../../../hooks/useChurchIdentity';
-import { buildBaptismCertificate, buildDedicationCertificate, printDocument } from '../../../lib/documents';
-import { FileUpload } from '../FileUpload';
 import { ImportMembersDialog } from './ImportMembersDialog';
+import { useRouter } from '../../../lib/router';
 
 /** The columns the register leaves the app as, matching ECCLESIA's export panels. */
 const MEMBER_COLUMNS = [
   { label: 'Member ID', value: (m: ParishMember) => m.memberId },
   { label: 'Name', value: (m: ParishMember) => m.name },
   { label: 'Household', value: (m: ParishMember) => m.householdName },
-  { label: 'Tier', value: (m: ParishMember) => m.membershipTier },
+  { label: 'Congregation', value: (m: ParishMember) => m.church },
   { label: 'Status', value: (m: ParishMember) => m.statusLabel },
   { label: 'Envelope', value: (m: ParishMember) => m.envelopeNumber },
   { label: 'Phone', value: (m: ParishMember) => m.phone },
@@ -55,66 +53,59 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
   const shareOfRoll = (count: number) => (roll.total === 0 ? 0 : Math.round((count / roll.total) * 100));
   const { canEdit } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
-  const [tierFilter, setTierFilter] = useState('');
+  const [baptismFilter, setBaptismFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [parishFilter, setParishFilter] = useState('');
   const [density, setDensity] = useState<'compact' | 'comfortable'>('compact');
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeCareModalMember, setActiveCareModalMember] = useState<ParishMember | null>(null);
-  const activeCareModalMemberDialog = useDialog(() => setActiveCareModalMember(null), "Member Care Record");
-  // A photograph is uploaded first and attached second, because the upload is what can fail.
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const [photoSaved, setPhotoSaved] = useState(false);
-
-  // Certificates are printed from the care record, using the same identity every screen reads.
+  /** The member whose record dialog is open; every row action opens it. */
+  const [openRecord, setOpenRecord] = useState<ParishMember | null>(null);
   const { church } = useChurchIdentity();
-  const [printingCertificate, setPrintingCertificate] = useState(false);
-  const [certificateError, setCertificateError] = useState<string | null>(null);
 
-  /**
-   * Print the certificate this member's record calls for.
-   *
-   * Which document is right is decided by `baptismType`, not asked again — the register already
-   * knows, and a clerk who has to choose between "baptism" and "dedication" for somebody recorded as
-   * dedicated is being asked a question the system could answer.
-   */
-  const handlePrintCertificate = async (member: ParishMember) => {
-    setPrintingCertificate(true);
-    setCertificateError(null);
-    try {
-      const memberNumber = member.memberId.replace(/^#/, '');
-      const html =
-        member.baptismType === 'dedicated'
-          ? buildDedicationCertificate({
-              church,
-              childName: member.name,
-              parents: member.householdName || 'the parents',
-              dedicationDate: member.baptismDate ?? null,
-              officiant: member.baptismOfficiant ?? null,
-              memberNumber,
-              location: church.location,
-            })
-          : buildBaptismCertificate({
-              church,
-              fullName: member.name,
-              baptismDate: member.baptismDate ?? null,
-              officiant: member.baptismOfficiant ?? null,
-              memberNumber,
-              location: church.location,
-            });
-      await printDocument(html);
-    } catch (cause) {
-      setCertificateError(errorMessage(cause));
-    } finally {
-      setPrintingCertificate(false);
-    }
-  };
+  // The open record is a **deep link**: `/members/find?member=<id>` names the very file that is
+  // open, so a refresh reopens it and a shared link opens it for a colleague. `getMember` re-reads
+  // the record from the server by id, so the dialog holds the same data a click would have loaded.
+  const { route, navigate } = useRouter();
+  const deepLinkId = route.memberId;
+  const openRecordRef = useRef<ParishMember | null>(null);
+  openRecordRef.current = openRecord;
+  useEffect(() => {
+    if (!deepLinkId || openRecordRef.current?.id === deepLinkId) return;
+    let cancelled = false;
+    void getMember(deepLinkId)
+      .then((member) => {
+        if (!cancelled) setOpenRecord(member);
+      })
+      .catch(() => {
+        // A record that will not open (deleted, or not this church's) must not wedge the URL:
+        // drop the parameter so the register reads clean.
+        if (!cancelled) navigate({ ...route, memberId: null }, true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkId]);
+
+  /** Whatever the record dialog saved is written straight into the page it was opened from. */
+  const handleRecordSaved = useCallback((updated: ParishMember) => {
+    setMembers((rows) => rows.map((row) => (row.id === updated.id ? updated : row)));
+  }, []);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [sort, setSort] = useState<'name' | 'recent' | 'oldest'>('name');
+  const [sort, setSort] = useState<ListMembersQuery['sort']>('name');
   const [importing, setImporting] = useState(false);
 
-  const { listMembers, updateMember, isLoading, error } = useMembers();
+  const { listMembers, getMember, isLoading, error } = useMembers();
+
+  /** Opening a record names it in the URL; closing clears the parameter without a history entry. */
+  const openRecordFor = useCallback((member: ParishMember) => {
+    setOpenRecord(member);
+    navigate({ ...route, memberId: member.id }, true);
+  }, [navigate, route]);
+  const closeRecord = useCallback(() => {
+    setOpenRecord(null);
+    navigate({ ...route, memberId: null }, true);
+  }, [navigate, route]);
 
   const [members, setMembers] = useState<ParishMember[]>([]);
   const [total, setTotal] = useState(0);
@@ -125,7 +116,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
       const query: ListMembersQuery = {
         q: searchTerm || undefined,
         status: statusFilter || undefined,
-        baptismType: tierFilter === 'first-timer' ? 'none' : tierFilter === 'youth' ? 'dedicated' : undefined,
+        baptismType: baptismFilter || undefined,
         location: parishFilter || undefined,
         page,
         pageSize,
@@ -138,7 +129,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
     } catch (err) {
       console.error('Failed to fetch members:', err);
     }
-  }, [listMembers, searchTerm, tierFilter, statusFilter, parishFilter, page, pageSize, sort]);
+  }, [listMembers, searchTerm, baptismFilter, statusFilter, parishFilter, page, pageSize, sort]);
 
   useEffect(() => {
     fetchMembers();
@@ -146,21 +137,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, tierFilter, statusFilter, parishFilter, sort]);
-
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedIds(members.map((m) => m.id));
-    } else {
-      setSelectedIds([]);
-    }
-  };
-
-  const handleToggleRow = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
+  }, [searchTerm, baptismFilter, statusFilter, parishFilter, sort]);
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
@@ -171,7 +148,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
     if (isLoading) {
       return (
         <tr>
-          <td colSpan={9} className="px-4 py-12 text-center">
+          <td colSpan={7} className="px-4 py-12 text-center">
             <div className="flex flex-col items-center gap-3">
               <span className="material-symbols-outlined text-[48px] text-[#C2410C] animate-spin">progress_activity</span>
               <p className="font-headline text-lg text-[#57534E]">Loading members…</p>
@@ -183,7 +160,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
     if (error) {
       return (
         <tr>
-          <td colSpan={9} className="px-4 py-12 text-center">
+          <td colSpan={7} className="px-4 py-12 text-center">
             <div className="flex flex-col items-center gap-3">
               <span className="material-symbols-outlined text-[48px] text-[#B91C1C]">error</span>
               <p className="font-headline text-lg text-[#B91C1C]">Failed to load members</p>
@@ -203,37 +180,19 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
     if (members.length === 0) {
       return (
         <tr>
-          <td colSpan={9} className="px-4">
+          <td colSpan={7} className="px-4">
             <EmptyState
               icon="person_search"
               title="No members match this view"
-              description="Widen the search term, or clear the tier, status and location filters."
+              description="Widen the search term, or clear the sacraments, standing and congregation filters."
             />
           </td>
         </tr>
       );
     }
     return members.map((member) => {
-      const isSelected = selectedIds.includes(member.id);
       return (
-        <tr
-          key={member.id}
-          className={`group transition-colors ${
-            isSelected
-              ? 'bg-[#ffdbd0]/30'
-              : member.pastoralStatus === 'homebound'
-              ? 'bg-[#ffdcc3]/10 hover:bg-[#ffdcc3]/20'
-              : 'hover:bg-[#faf2ee]'
-          }`}
-        >
-          <td className={`px-4 text-center ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
-            <input aria-label="Select member"
-              type="checkbox"
-              checked={isSelected}
-              onChange={() => handleToggleRow(member.id)}
-              className="w-4 h-4 rounded bg-white accent-[#9b2f00] cursor-pointer"
-            />
-          </td>
+        <tr key={member.id} className="group transition-colors hover:bg-[#faf2ee]">
           <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-[#ffdbd0] text-[#390c00] flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
@@ -246,38 +205,16 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                 <div className="flex items-center gap-1.5 font-mono text-[11px] text-[#59413a]">
                   <span className="bg-[#f4ece8] px-1 rounded">{member.memberId}</span>
                   <span>•</span>
-                  <span>{member.roleDescription || member.church}</span>
+                  <span>{member.church}</span>
                 </div>
               </div>
             </div>
           </td>
           <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
-            {member.membershipTier === 'member' && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#c2410c] text-white font-headline text-xs font-semibold shadow-sm">
-                <span aria-hidden="true" className="material-symbols-outlined text-[14px]">verified</span> Member
-              </span>
-            )}
-            {member.membershipTier === 'active-member' && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#eee7e3] text-[#1e1b19] font-headline text-xs font-semibold border border-[#e1bfb5]/50">
-                <span aria-hidden="true" className="material-symbols-outlined text-[14px]">church</span> Active Member
-              </span>
-            )}
-            {member.membershipTier === 'youth' && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ffdcc3] text-[#2f1500] font-headline text-xs font-semibold">
-                <span aria-hidden="true" className="material-symbols-outlined text-[14px]">school</span> Youth Discipleship Class
-              </span>
-            )}
-            {member.membershipTier === 'first-timer' && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] font-headline text-xs font-semibold">
-                <span aria-hidden="true" className="material-symbols-outlined text-[14px]">help</span> First Timer / Visitor
-              </span>
-            )}
-          </td>
-          <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
             <div className="flex flex-col">
               <span className="font-headline text-xs text-[#1e1b19] font-bold flex items-center gap-1">
                 <span aria-hidden="true" className="material-symbols-outlined text-[15px] text-[#006243]">water_drop</span>
-                {member.baptismType === 'baptized' ? 'Baptized (Believer)' : member.baptismType === 'dedicated' ? 'Child Dedication' : 'Baptism & Communion Pending'}
+                {member.baptismLabel}
               </span>
               <span className="text-[#59413a] font-mono text-[11px]">
                 {member.baptismDate || 'Jan 12, 2025'} • {member.baptismOfficiant || 'Bishop Sammy'}
@@ -292,10 +229,12 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#fe932c]">home</span>
               <div className="flex flex-col">
                 <span className="font-headline text-xs text-[#1e1b19] font-bold group-hover/unit:text-[#9b2f00] underline decoration-dotted">
-                  {member.householdName}
+                  {member.householdName ?? 'No household recorded'}
                 </span>
                 <span className="text-[#59413a] text-[11px]">
-                  {member.householdId} ({member.householdRole})
+                  {member.householdUnitNumber
+                    ? `${member.householdUnitNumber} (${member.householdRole ?? 'Member'})`
+                    : 'Not yet linked to a household'}
                 </span>
               </div>
             </div>
@@ -310,8 +249,8 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                 <button
                   type="button"
                   className="opacity-0 group-hover/phone:opacity-100 text-[#9b2f00] cursor-pointer"
-                  title="Quick Call or SMS"
-                  onClick={() => alert(`Calling ${member.phone}`)}
+                  title="Open this member's record"
+                  onClick={() => openRecordFor(member)}
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[13px]">edit</span>
                 </button>
@@ -319,29 +258,18 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             </div>
           </td>
           <td className={`px-4 ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
-            {member.pastoralStatus === 'homebound' ? (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#ffdcc3]/80 text-[#6e3900] font-headline text-xs font-bold border border-[#fe932c]/40">
-                <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-[#904d00]">local_hospital</span>
-                Homebound Care
-              </div>
-            ) : (
-              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#006243]/10 text-[#006243] font-headline text-xs font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#006243] animate-pulse"></span>
-                {member.statusLabel}
-              </div>
-            )}
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#006243]/10 text-[#006243] font-headline text-xs font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#006243] animate-pulse"></span>
+              {member.statusLabel}
+            </div>
           </td>
           <td className={`px-4 text-right whitespace-nowrap ${density === 'compact' ? 'py-2.5' : 'py-4'}`}>
             <div className="flex items-center justify-end gap-1">
               <button
                 type="button"
-                onClick={() => {
-                  setPhotoError(null);
-                  setPhotoSaved(false);
-                  setActiveCareModalMember(member);
-                }}
+                onClick={() => openRecordFor(member)}
                 className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#9b2f00] transition-colors cursor-pointer"
-                title="View Care Log"
+                title="Open this member's record"
               >
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">clinical_notes</span>
               </button>
@@ -363,9 +291,9 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => alert(`Details for ${member.name}: Member ${member.memberId}, Envelope ${member.envelopeNumber || 'N/A'}`)}
+                onClick={() => openRecordFor(member)}
                 className="p-1 rounded hover:bg-[#f4ece8] text-[#59413a] hover:text-[#1e1b19] transition-colors cursor-pointer"
-                title="More Actions"
+                title="Open this member's record"
               >
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">more_vert</span>
               </button>
@@ -522,16 +450,30 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
           {/* Quick Filter Selects */}
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
             <div className="relative min-w-[155px] flex-1 sm:flex-initial">
-              <select aria-label="Membership tier filter"
-                value={tierFilter}
-                onChange={(e) => setTierFilter(e.target.value)}
+              <select aria-label="Order of the register"
+                value={sort}
+                onChange={(e) => setSort(e.target.value as ListMembersQuery['sort'])}
                 className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none"
               >
-                <option value="">All Tiers</option>
-                <option value="member">Member</option>
-                <option value="active-member">Active Member</option>
-                <option value="first-timer">First Timer / Visitor</option>
-                <option value="youth">Youth / Discipleship Class</option>
+                <option value="name">Name (A–Z)</option>
+                <option value="recent">Newest on the roll</option>
+                <option value="oldest">Longest on the roll</option>
+              </select>
+              <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
+                expand_more
+              </span>
+            </div>
+
+            <div className="relative min-w-[155px] flex-1 sm:flex-initial">
+              <select aria-label="Baptism & sacraments filter"
+                value={baptismFilter}
+                onChange={(e) => setBaptismFilter(e.target.value)}
+                className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none"
+              >
+                <option value="">All Sacraments</option>
+                <option value="baptized">Baptized (Believer)</option>
+                <option value="dedicated">Child Dedication</option>
+                <option value="none">Awaiting a Record</option>
               </select>
               <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
                 expand_more
@@ -539,15 +481,17 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             </div>
 
             <div className="relative min-w-[160px] flex-1 sm:flex-initial">
-              <select aria-label="Pastoral status filter"
+              <select aria-label="Standing on the register filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none"
               >
-                <option value="">All Statuses</option>
-                <option value="active">Active Regular</option>
-                <option value="care">Under Pastoral Care</option>
-                <option value="homebound">Homebound / Convalescent</option>
+                <option value="">All Standings</option>
+                {(Object.entries(MEMBER_STATUS_LABELS) as [string, string][]).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
               <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[#59413a]">
                 expand_more
@@ -606,19 +550,11 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
             </div>
 
             <span className="ml-2 hidden lg:inline-flex items-center gap-1 rounded-md bg-[#ffdcc3]/40 px-2 py-0.5 font-mono text-xs text-[#6e3900]">
-              Showing: Destiny Sanctuary Roll 2025
+              Showing: {church.name} roll
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#faf2ee] hover:bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] transition-colors shadow-sm cursor-pointer"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">view_column</span>
-              <span>Columns (7/7)</span>
-            </button>
-
             <div className="inline-flex items-center rounded-lg bg-[#faf2ee] shadow-sm border border-[#e1bfb5]/30">
               <button
                 type="button"
@@ -671,65 +607,15 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
 
       {/* Data Table Container */}
       <div className="rounded-xl bg-white shadow-sm border border-[#EAE1D7]/60 overflow-hidden flex flex-col">
-        {/* Floating Batch Tray */}
-        {selectedIds.length > 0 && (
-          <div className="bg-[#e9e1dd] px-4 py-2.5 flex items-center justify-between transition-all border-b border-[#e1bfb5]">
-            <div className="flex items-center gap-3 font-headline text-xs text-[#1e1b19]">
-              <span className="font-bold text-[#9b2f00]">{selectedIds.length}</span> selected congregants
-              <span className="text-[#8d7168]/40">|</span>
-              <button
-                type="button"
-                onClick={() => setSelectedIds(members.map((m) => m.id))}
-                className="text-[#9b2f00] hover:underline font-bold cursor-pointer"
-              >
-                Select all {members.length} on this page
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => alert(`Batch email composer initialized for ${selectedIds.length} members.`)}
-                className="px-2.5 py-1 rounded bg-white text-[#1e1b19] font-headline text-xs font-semibold hover:bg-[#fff8f5] shadow-sm flex items-center gap-1 cursor-pointer"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">mail</span> Batch Email
-              </button>
-              <button
-                type="button"
-                onClick={() => alert(`Printing nametags for ${selectedIds.length} members...`)}
-                className="px-2.5 py-1 rounded bg-white text-[#1e1b19] font-headline text-xs font-semibold hover:bg-[#fff8f5] shadow-sm flex items-center gap-1 cursor-pointer"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">label</span> Print Nametags
-              </button>
-              <button
-                type="button"
-                onClick={() => alert(`Marked attendance for ${selectedIds.length} selected believers.`)}
-                className="px-2.5 py-1 rounded bg-white text-[#1e1b19] font-headline text-xs font-semibold hover:bg-[#fff8f5] shadow-sm flex items-center gap-1 cursor-pointer"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">assignment_turned_in</span> Mark Attendance
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="w-full overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#f8f1e9] font-headline text-xs font-semibold text-[#59413a] uppercase tracking-wider select-none border-b border-[#EAE1D7]">
-                <th className="w-12 px-4 py-3 text-center">
-                  <input aria-label="Select all members"
-                    type="checkbox"
-                    checked={selectedIds.length > 0 && selectedIds.length === members.length}
-                    onChange={handleSelectAll}
-                    className="w-4 h-4 rounded bg-white border border-[#e1bfb5] accent-[#9b2f00] cursor-pointer"
-                  />
-                </th>
                 <th className="px-4 py-3">
-                  <div className="flex items-center gap-1 cursor-pointer hover:text-[#1e1b19]">
-                    <span>Member Name & ID</span>
-                    <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#9b2f00]">arrow_downward</span>
+                  <div className="flex items-center gap-1">
+                    <span>{sort === 'recent' ? 'Newest first' : sort === 'oldest' ? 'Longest on the roll first' : 'Member Name & ID (A–Z)'}</span>
                   </div>
                 </th>
-                <th className="px-4 py-3">Membership Tier</th>
                 <th className="px-4 py-3">Baptism & Sacraments</th>
                 <th className="px-4 py-3">Household / Unit</th>
                 <th className="px-4 py-3">Contact & Pastoral Care</th>
@@ -819,105 +705,12 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
         </div>
       </div>
 
-      {/* Quick Care Log View Modal */}
-      {activeCareModalMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs" {...activeCareModalMemberDialog}>
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-[#EAE1D7] relative animate-in fade-in zoom-in duration-150">
-            <button
-              type="button"
-              onClick={() => setActiveCareModalMember(null)}
-              className="absolute top-4 right-4 p-1 rounded-lg text-[#59413a] hover:bg-[#f4ece8] cursor-pointer"
-           aria-label="Close">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
-            </button>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[#ffdbd0] text-[#390c00] flex items-center justify-center font-bold">
-                {activeCareModalMember.initials}
-              </div>
-              <div>
-                <h3 className="font-headline text-base font-bold text-[#1e1b19]">
-                  {activeCareModalMember.name}
-                </h3>
-                <span className="text-xs text-[#59413a] font-mono">{activeCareModalMember.memberId}</span>
-              </div>
-            </div>
-
-            <div className="mb-4 pt-1">
-              <FileUpload
-                purpose="member_photo"
-                label="Photograph"
-                hint="Optional, and personal data: an usher checking who is at the door is the reason it exists. PNG, JPEG or WebP."
-                currentFileId={activeCareModalMember.photoFileId ?? null}
-                onUploaded={async (file) => {
-                  setPhotoError(null);
-                  try {
-                    const updated = await updateMember(activeCareModalMember.id, { photoFileId: file.id });
-                    setActiveCareModalMember(updated);
-                    setMembers((rows) => rows.map((row) => (row.id === updated.id ? updated : row)));
-                    setPhotoSaved(true);
-                  } catch (cause) {
-                    setPhotoError(errorMessage(cause));
-                  }
-                }}
-              />
-              {photoError && (
-                <p role="alert" className="mt-2 text-[11px] font-semibold text-[#B91C1C]">
-                  {photoError}
-                </p>
-              )}
-              {photoSaved && !photoError && (
-                <p role="status" className="mt-2 text-[11px] font-semibold text-[#006243]">
-                  Photograph saved to this member’s record.
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3 bg-[#faf2ee] rounded-lg">
-                <span className="font-bold text-[#1e1b19] block mb-1">Pastoral Triage & Notes:</span>
-                <p className="text-[#59413a] leading-relaxed">
-                  {activeCareModalMember.pastoralNotes || 'Active member in good standing. Assigned to Elder Circle #4 for quarterly pastoral communion visitation.'}
-                </p>
-              </div>
-              <div className="flex items-center justify-between text-[#59413a]">
-                <span>Membership Date:</span>
-                <span className="font-bold text-[#1e1b19]">{activeCareModalMember.baptismDate || 'Jan 12, 2025'}</span>
-              </div>
-              <div className="flex items-center justify-between text-[#59413a]">
-                <span>Household Unit:</span>
-                <span className="font-bold text-[#1e1b19]">{activeCareModalMember.householdName}</span>
-              </div>
-            </div>
-
-            {certificateError && (
-              <p role="alert" className="mt-4 text-[11px] font-semibold text-[#B91C1C]">
-                {certificateError}
-              </p>
-            )}
-
-            <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => void handlePrintCertificate(activeCareModalMember)}
-                disabled={printingCertificate}
-                className="px-4 py-2 rounded-lg border border-[#EAE1D7] bg-[#faf2ee] hover:bg-[#f4ece8] text-[#9b2f00] font-headline text-xs font-bold shadow-sm cursor-pointer disabled:opacity-70 disabled:cursor-wait transition-colors"
-              >
-                {printingCertificate
-                  ? 'Preparing…'
-                  : activeCareModalMember.baptismType === 'dedicated'
-                    ? 'Print Dedication Certificate'
-                    : 'Print Baptism Certificate'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveCareModalMember(null)}
-                className="px-4 py-2 rounded-lg bg-[#9b2f00] text-white font-headline text-xs font-bold shadow-sm cursor-pointer"
-              >
-                Close Care Log
-              </button>
-            </div>
-          </div>
-        </div>
+      {openRecord && (
+        <MemberRecordDialog
+          member={openRecord}
+          onClose={closeRecord}
+          onSaved={handleRecordSaved}
+        />
       )}
 
       {importing && (

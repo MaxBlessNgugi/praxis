@@ -1,10 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ParishNavTab, MembersSubTab } from '../../types';
 import { CHURCH, initialsOf } from '../../data/churchDomain';
 import { useAuth } from '../../lib/auth';
 import logoMark from '../../assets/brand/praxis-icon.webp';
 import logoWordmark from '../../assets/brand/praxis-wordmark.webp';
 import { AccountSecurityDialog } from './AccountSecurityDialog';
+import { ProfileDialog } from './ProfileDialog';
+import { AccountMenuBody, useDismissableMenu } from './AccountMenu';
 
 interface ChurchSidebarProps {
   activeTab: ParishNavTab;
@@ -16,7 +18,6 @@ interface ChurchSidebarProps {
 
 export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
   activeTab,
-  activeSubTab,
   onSelectTab,
   onSelectSubTab,
   collapsed = false,
@@ -24,38 +25,22 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
   // The church the session is acting for, and the account signed in to it, so the chrome names the
   // parish whose records are on screen and the person reading them. The mock names stay as the
   // fallback for a render outside a session.
-  const { user, organization, logout } = useAuth();
+  const { user, organization } = useAuth();
   const signedInName = user?.name ?? CHURCH.visionaryLeader;
-  /** Whether the account menu's "change password" dialog is open. */
-  const [changingPassword, setChangingPassword] = useState(false);
 
   /**
-   * The one place a session ends.
+   * The bottom-left account control.
    *
-   * It has to exist, and it has to be reachable: a console that can be signed into but not out of is
-   * a shared office computer nobody can hand over, and the second person to sit at it is looking at
-   * somebody else's records. It clears the token through `logout()` — which also tells the server —
-   * rather than dropping anything locally, so the next render is the sign-in screen.
+   * It sits inside `justify-between` so the navigation scrolls and this never does — the control a
+   * person needs to hand the machine over is anchored at the bottom of the sidebar on every screen.
+   * The menu it opens is the same body the header's avatar opens: one menu, two doors, so identity,
+   * church switching and sign-out cannot drift apart between the two surfaces.
    */
   const [menuOpen, setMenuOpen] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showingProfile, setShowingProfile] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  // Escape and a click anywhere else are the two ways anyone dismisses a popover.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenuOpen(false);
-    };
-    const onPointerDown = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuOpen(false);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('mousedown', onPointerDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('mousedown', onPointerDown);
-    };
-  }, [menuOpen]);
+  useDismissableMenu(menuOpen, () => setMenuOpen(false), menuRef);
   const isMembersActive = 
     activeTab === 'find-christian' || 
     activeTab === 'add-new-christian' || 
@@ -251,80 +236,57 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
       </div>
 
       {/* Bottom User Profile */}
-      <div className="p-3 border-t border-[#E7E5E4] bg-[#F8F1E9]" ref={menuRef}>
-        {menuOpen && !collapsed && (
-          <div
-            role="menu"
-            aria-label="Account menu"
-            className="mb-2 p-1.5 rounded-[12px] bg-[#FFFFFF] border border-[#E7E5E4] shadow-[0_8px_24px_rgba(87,83,78,0.14)]"
-          >
-            <div className="px-2.5 py-2 border-b border-[#E7E5E4]/70">
-              <p className="font-headline text-[12px] font-bold text-[#1C1917] truncate">{signedInName}</p>
-              <p className="text-[11px] text-[#57534E] truncate">{user?.email ?? ''}</p>
-              {organization && (
-                <p className="text-[10px] text-[#A8A29E] truncate mt-0.5">Signed in to {organization.name}</p>
-              )}
-            </div>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setMenuOpen(false);
-                setChangingPassword(true);
-              }}
-              className="w-full mt-1 px-2.5 py-2 rounded-[9px] flex items-center gap-2 text-left font-headline text-[12px] font-bold text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917] transition-colors cursor-pointer"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">password</span>
-              Change password
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setMenuOpen(false);
-                void logout();
-              }}
-              className="w-full px-2.5 py-2 rounded-[9px] flex items-center gap-2 text-left font-headline text-[12px] font-bold text-[#57534E] hover:bg-[#F5EDE4] hover:text-[#1C1917] transition-colors cursor-pointer"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">logout</span>
-              Sign out
-            </button>
+      <div className="p-3 border-t border-[#E7E5E4] bg-[#F8F1E9] relative" ref={menuRef}>
+        {/* The menu opens upward (bottom-full), so it clears the sidebar's footer and survives a
+            collapsed rail — where the control is the initials alone, and is the only account
+            surface visible. */}
+        {menuOpen && (
+          <div className="absolute bottom-full left-3 right-3 mb-2 z-40">
+            <AccountMenuBody
+              onDismiss={() => setMenuOpen(false)}
+              onOpenSecurity={() => setChangingPassword(true)}
+              onOpenProfile={() => setShowingProfile(true)}
+            />
           </div>
         )}
 
-        <div className="flex items-center gap-3 p-2.5 rounded-[14px] bg-[#FFFFFF] shadow-[0_2px_8px_rgba(87,83,78,0.06)] border border-[#E7E5E4]">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label={`Account menu for ${signedInName}`}
+          title={`Account menu — ${signedInName}`}
+          className="w-full flex items-center gap-3 p-2.5 rounded-[14px] bg-[#FFFFFF] shadow-[0_2px_8px_rgba(87,83,78,0.06)] border border-[#E7E5E4] hover:bg-[#FDF8F3] transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C2410C]/60"
+        >
           {/* The avatar is the user's initials, and the name beside it is read from the same
               record, so the two cannot drift apart. */}
-          <div aria-hidden="true" className="w-9 h-9 rounded-full bg-[#C2410C] flex items-center justify-center shrink-0 text-white shadow-sm font-headline text-[12px] font-bold tracking-tight">
+          <span
+            aria-hidden="true"
+            className="w-9 h-9 rounded-full bg-[#C2410C] flex items-center justify-center shrink-0 text-white shadow-sm font-headline text-[12px] font-bold tracking-tight"
+          >
             {initialsOf(signedInName)}
-          </div>
+          </span>
           {!collapsed && (
             <>
-              <div className="flex flex-col min-w-0 flex-1">
+              <span className="flex flex-col min-w-0 flex-1">
                 <span className="font-headline text-[13px] text-[#1C1917] font-bold truncate">
                   {signedInName}
                 </span>
                 <span className="font-headline text-[11px] text-[#57534E] truncate">
                   {user?.roleName ?? 'Church member'}
                 </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMenuOpen((open) => !open)}
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                aria-label="Account menu"
-                title="Account menu"
-                className="text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4] p-1 rounded-[9px] transition-colors cursor-pointer"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">unfold_more</span>
-              </button>
+              </span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#57534E] shrink-0">
+                {menuOpen ? 'expand_more' : 'unfold_more'}
+              </span>
             </>
           )}
-        </div>
+        </button>
       </div>
 
       {changingPassword && <AccountSecurityDialog onClose={() => setChangingPassword(false)} />}
+      {showingProfile && <ProfileDialog onClose={() => setShowingProfile(false)} />}
     </aside>
   );
 };

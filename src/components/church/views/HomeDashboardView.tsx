@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ParishNavTab, MembersSubTab, ParishMember } from '../../../types';
 import { DEFAULT_LOCATION, formatKes } from '../../../data/churchDomain';
 import { useDialog } from '../dialog';
@@ -60,7 +60,6 @@ interface ActivityItem {
 
 interface HomeDashboardViewProps {
   onNavigateTab?: (tab: ParishNavTab, subTab?: MembersSubTab | string) => void;
-  onAddMember?: (member: Partial<ParishMember>) => void;
 }
 
 /** Relative label for an audit entry, e.g. "3h ago". */
@@ -90,10 +89,7 @@ function formatTimestamp(iso: string): string {
   });
 }
 
-export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
-  onNavigateTab,
-  onAddMember,
-}) => {
+export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({ onNavigateTab }) => {
   // Cloud Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedTime, setLastSyncedTime] = useState('Just now');
@@ -1043,7 +1039,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </div>
                 <div>
                   <label htmlFor="home-meeting-datetime" className="font-bold text-[#1C1917] mb-1 block">Date & Time</label>
-                  <input id="home-meeting-datetime" aria-label="Date &amp; Time"
+                  <input id="home-meeting-datetime"
                     type="datetime-local"
                     value={meetingDate}
                     onChange={(e) => setMeetingDate(e.target.value)}

@@ -18,9 +18,11 @@ import { communicationsRouter } from './routes/communications.routes';
 import { ministryRouter } from './routes/ministry.routes';
 import { governanceRouter } from './routes/governance.routes';
 import { reportRouter } from './routes/report.routes';
+import { certificateRouter } from './routes/certificate.routes';
 import { settingsRouter } from './routes/settings.routes';
 import { adminRouter } from './routes/admin.routes';
 import { fileRouter } from './routes/file.routes';
+import { inventoryRouter } from './routes/inventory.routes';
 import { billingRouter } from './routes/billing.routes';
 import { vendorRouter } from './routes/vendor.routes';
 
@@ -121,8 +123,10 @@ export function createApp(): Express {
   app.use('/api/communications', communicationsRouter);
   app.use('/api/governance', governanceRouter);
   app.use('/api/reports', reportRouter);
+  app.use('/api/certificates', certificateRouter);
   app.use('/api/settings', settingsRouter);
   app.use('/api/files', fileRouter);
+  app.use('/api/inventory', inventoryRouter);
 
   app.use(notFound);
   app.use(errorHandler);

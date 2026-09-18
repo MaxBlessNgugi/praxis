@@ -101,13 +101,17 @@ export async function recordTithe(input: RecordTitheInput, actorId: string) {
   });
 }
 
-export async function listTithes(query: ListGivingQuery) {
-  const where: Prisma.TitheWhereInput = {
+/**
+ * The tithe ledger's filter, owned here so the CSV export composes the same one as the list — an
+ * export that re-typed these conditions could quietly disagree with the screen it mirrors.
+ */
+export function titheWhere(query: ListGivingQuery): Prisma.TitheWhereInput {
+  return {
     ...live,
     ...(query.memberId ? { memberId: query.memberId } : {}),
     ...(query.method ? { method: query.method } : {}),
     ...(query.category ? { category: query.category } : {}),
-    ...(query.minAmount === undefined ? {} : { amount: { gte: query.minAmount } }),
+    ...amountBetween(query),
     ...receivedBetween(query),
     ...(query.q
       ? {
@@ -120,6 +124,10 @@ export async function listTithes(query: ListGivingQuery) {
         }
       : {}),
   };
+}
+
+export async function listTithes(query: ListGivingQuery) {
+  const where = titheWhere(query);
 
   const orderBy: Prisma.TitheOrderByWithRelationInput =
     query.sort === 'recent' ? { receivedAt: 'desc' } : query.sort === 'oldest' ? { receivedAt: 'asc' } : { amount: 'desc' };
@@ -200,12 +208,14 @@ export async function recordOffering(input: RecordOfferingInput, actorId: string
   });
 }
 
-export async function listOfferings(query: ListGivingQuery) {
-  const where: Prisma.OfferingWhereInput = {
+/** The offering ledger's filter, same owner-and-reason as `titheWhere`. */
+export function offeringWhere(query: ListGivingQuery): Prisma.OfferingWhereInput {
+  return {
     ...live,
     ...(query.method ? { method: query.method } : {}),
     ...(query.category ? { category: query.category } : {}),
-    ...(query.minAmount === undefined ? {} : { amount: { gte: query.minAmount } }),
+    ...(query.serviceId ? { serviceId: query.serviceId } : {}),
+    ...amountBetween(query),
     ...receivedBetween(query),
     ...(query.q
       ? {
@@ -217,6 +227,10 @@ export async function listOfferings(query: ListGivingQuery) {
         }
       : {}),
   };
+}
+
+export async function listOfferings(query: ListGivingQuery) {
+  const where = offeringWhere(query);
 
   const orderBy: Prisma.OfferingOrderByWithRelationInput =
     query.sort === 'recent' ? { receivedAt: 'desc' } : query.sort === 'oldest' ? { receivedAt: 'asc' } : { amount: 'desc' };
@@ -243,6 +257,17 @@ export async function listOfferings(query: ListGivingQuery) {
 export async function getOffering(id: string) {
   const offering = await findLive(prisma.offering, id, 'That offering record does not exist', { include: offeringInclude });
   return toPublicOffering(offering);
+}
+
+/** An amount range the clerk typed: either end may be left out, and neither is a filter on its own. */
+function amountBetween(query: { minAmount?: number; maxAmount?: number }) {
+  if (query.minAmount === undefined && query.maxAmount === undefined) return {};
+  return {
+    amount: {
+      ...(query.minAmount === undefined ? {} : { gte: query.minAmount }),
+      ...(query.maxAmount === undefined ? {} : { lte: query.maxAmount }),
+    },
+  };
 }
 
 /** Either end of the window may be left open; both together are inclusive. */

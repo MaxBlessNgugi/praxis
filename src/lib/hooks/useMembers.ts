@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 import { api, ApiError } from '../api';
+import type { HouseholdDto, ListEnvelope, MemberDto } from '../api';
+import { toHouseholdUnit, toParishMember } from '../adapters';
 import type { ParishMember, HouseholdUnit, SoftDeleteRecord } from '../../types';
 
 export interface ListMembersQuery {
@@ -46,7 +48,7 @@ export interface CreateMemberInput {
   photoFileId?: string | null;
 }
 
-export interface UpdateMemberInput extends Partial<CreateMemberInput> {}
+export type UpdateMemberInput = Partial<CreateMemberInput>;
 
 export interface RetireMemberInput {
   reason: 'transferred' | 'relocated' | 'deceased' | 'request' | 'disciplinary' | 'duplicate' | 'other';
@@ -132,7 +134,7 @@ export interface CreateHouseholdInput {
   address?: string;
 }
 
-export interface UpdateHouseholdInput extends Partial<CreateHouseholdInput> {}
+export type UpdateHouseholdInput = Partial<CreateHouseholdInput>;
 
 export interface LinkMemberInput {
   memberId: string;
@@ -159,8 +161,8 @@ export function useMembers() {
         }
       });
       const path = `/api/members${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await api.get<ListMembersResponse>(path);
-      return response;
+      const response = await api.get<ListEnvelope<MemberDto>>(path);
+      return { data: response.data.map(toParishMember), meta: response.meta };
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to load members';
       setError(message);
@@ -170,12 +172,34 @@ export function useMembers() {
     }
   }, []);
 
+  /**
+   * Every page of a list, for the screens that need the whole thing rather than one page of it — a
+   * picker that has to hold everybody, a card that counts households.
+   *
+   * The API caps a page at 100 and refuses a larger one outright, so "ask for 1000" is a request that
+   * never arrives; walking the pages is how a caller gets all of them. The first page's count decides
+   * how many more there are, so the list cannot shift under the reader between one page and the next.
+   */
+  const listAll = useCallback(
+    async <T>(fetchPage: (page: number) => Promise<{ data: T[]; meta: { pages: number } }>): Promise<T[]> => {
+      const first = await fetchPage(1);
+      const rest: T[] = [];
+      for (let page = 2; page <= first.meta.pages; page += 1) {
+        rest.push(...(await fetchPage(page)).data);
+      }
+      return [...first.data, ...rest];
+    },
+    [],
+  );
+
   const getMember = useCallback(async (id: string): Promise<ParishMember> => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.get<{ data: ParishMember }>(`/api/members/${id}`);
-      return response.data;
+      // The single-record read is the one that carries the member's ministries, which the row above
+      // does not: the register lists people, not their service.
+      const response = await api.get<{ data: MemberDto }>(`/api/members/${id}`);
+      return toParishMember(response.data);
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to load member';
       setError(message);
@@ -189,8 +213,8 @@ export function useMembers() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.post<{ data: ParishMember }>('/api/members', input);
-      return response.data;
+      const response = await api.post<{ data: MemberDto }>('/api/members', input);
+      return toParishMember(response.data);
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to create member';
       setError(message);
@@ -204,8 +228,8 @@ export function useMembers() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.patch<{ data: ParishMember }>(`/api/members/${id}`, input);
-      return response.data;
+      const response = await api.patch<{ data: MemberDto }>(`/api/members/${id}`, input);
+      return toParishMember(response.data);
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to update member';
       setError(message);
@@ -241,8 +265,10 @@ export function useMembers() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.post<{ data: { entityName: string; entityId: string; restoredAt: string; record: ParishMember } }>(`/api/members/trash/${id}/restore`, {});
-      return response.data;
+      const response = await api.post<{
+        data: { entityName: string; entityId: string; restoredAt: string; record: MemberDto };
+      }>(`/api/members/trash/${id}/restore`, {});
+      return { ...response.data, record: toParishMember(response.data.record) };
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to restore member';
       setError(message);
@@ -287,8 +313,8 @@ export function useMembers() {
         }
       });
       const path = `/api/households${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await api.get<ListHouseholdsResponse>(path);
-      return response;
+      const response = await api.get<ListEnvelope<HouseholdDto>>(path);
+      return { data: response.data.map(toHouseholdUnit), meta: response.meta };
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to load households';
       setError(message);
@@ -302,8 +328,8 @@ export function useMembers() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.get<{ data: HouseholdUnit }>(`/api/households/${id}`);
-      return response.data;
+      const response = await api.get<{ data: HouseholdDto }>(`/api/households/${id}`);
+      return toHouseholdUnit(response.data);
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to load household';
       setError(message);
@@ -317,8 +343,8 @@ export function useMembers() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.post<{ data: HouseholdUnit }>('/api/households', input);
-      return response.data;
+      const response = await api.post<{ data: HouseholdDto }>('/api/households', input);
+      return toHouseholdUnit(response.data);
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to create household';
       setError(message);
@@ -332,8 +358,8 @@ export function useMembers() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.patch<{ data: HouseholdUnit }>(`/api/households/${id}`, input);
-      return response.data;
+      const response = await api.patch<{ data: HouseholdDto }>(`/api/households/${id}`, input);
+      return toHouseholdUnit(response.data);
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to update household';
       setError(message);
@@ -347,8 +373,8 @@ export function useMembers() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.post<{ data: HouseholdUnit }>(`/api/households/${householdId}/members`, input);
-      return response.data;
+      const response = await api.post<{ data: HouseholdDto }>(`/api/households/${householdId}/members`, input);
+      return toHouseholdUnit(response.data);
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to link member';
       setError(message);
@@ -362,8 +388,8 @@ export function useMembers() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.post<{ data: HouseholdUnit }>(`/api/households/${householdId}/head`, input);
-      return response.data;
+      const response = await api.post<{ data: HouseholdDto }>(`/api/households/${householdId}/head`, input);
+      return toHouseholdUnit(response.data);
     } catch (err) {
       const message = err instanceof ApiError ? err.body.error : 'Failed to set head';
       setError(message);
@@ -406,10 +432,26 @@ export function useMembers() {
     }
   }, []);
 
+  /** The whole register, for the screens that choose a member rather than page through them. */
+  const listAllMembers = useCallback(
+    (query: Omit<ListMembersQuery, 'page' | 'pageSize'> = {}) =>
+      listAll((page) => listMembers({ ...query, page, pageSize: 100 })),
+    [listAll, listMembers],
+  );
+
+  /** Every household, for the household register and the record dialog's picker. */
+  const listAllHouseholds = useCallback(
+    (query: Omit<ListHouseholdsQuery, 'page' | 'pageSize'> = {}) =>
+      listAll((page) => listHouseholds({ ...query, page, pageSize: 100 })),
+    [listAll, listHouseholds],
+  );
+
   return {
     isLoading,
     error,
     listMembers,
+    listAllMembers,
+    listAllHouseholds,
     getMember,
     createMember,
     importMembers,

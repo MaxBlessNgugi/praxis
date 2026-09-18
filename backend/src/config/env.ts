@@ -18,6 +18,10 @@ const schema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
   BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
+  /// How long a password-reset link stays good. Short because it is a key to an account arriving in
+  /// an inbox: an hour is long enough to walk to the office machine and short enough that a mail left
+  /// in a shared sent folder is not a standing invitation tomorrow.
+  RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(60),
   /// How many proxy hops sit in front of the API. Zero by default, deliberately: trusting
   /// `X-Forwarded-For` when nothing sets it lets a client write its own address and walk straight
   /// past the rate limiter below. Set it to 1 behind Railway, Render, Fly or a single nginx.
@@ -104,6 +108,15 @@ if (!parsed.success) {
 // signing key, so the process refuses to start instead.
 if (parsed.data.NODE_ENV === 'production' && parsed.data.JWT_SECRET.includes('replace-me')) {
   throw new Error('JWT_SECRET is still the placeholder value. Set a real secret before running in production.');
+}
+
+// A production service that still sends mail through the `console` driver cannot deliver a password
+// reset, and the person locked out on a Sunday evening has nobody to ask. That is a configuration
+// mistake worth stopping for, not a warning in a log nobody reads.
+if (parsed.data.NODE_ENV === 'production' && parsed.data.EMAIL_DRIVER === 'console') {
+  throw new Error(
+    'EMAIL_DRIVER is still "console" in production, so no password-reset link could ever be delivered. Set EMAIL_DRIVER=resend and RESEND_API_KEY.',
+  );
 }
 
 export const env = parsed.data;

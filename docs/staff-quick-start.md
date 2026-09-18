@@ -16,15 +16,16 @@ Tick it only on a computer that is yours.
 **Before the church starts using this properly, two things must change:**
 
 1. The starting passwords (`praxis-demo-2025`) are in the README and are therefore **public**. Every
-   account needs its own password before real records go in — see the note below, because this is not
-   something you can do from inside the console yet.
+   account needs its own password before real records go in.
 2. Everyone should have their **own** account. A shared login means the audit log says "bishop" when
    the treasurer recorded a payment, and the whole point of the log is that it does not.
 
-> **Passwords are set for you, not by you.** A password is chosen when an account is created, and there
-> is no "change password" screen in the console yet. Until there is, a password is changed by whoever
-> runs the Praxis server. Set that expectation with your team before they start using their own
-> logins, so nobody discovers it on a busy Monday morning.
+> **Changing your own password.** Press your name at the bottom of the sidebar and choose **Security**.
+> It asks for your current password — the point of that is a copied token, not your memory — and when
+> it saves, **every other session on your account ends**, including anything left signed in on another
+> machine. If you have forgotten it, *Forgot your password?* on the sign-in screen emails you a link
+> that can be used once. Whoever administers the system can also set a password for somebody who has
+> lost access entirely, at `Admin → Users & Rights`.
 
 ## Who can see what
 
@@ -46,17 +47,18 @@ If a button you expect is missing, it is almost always a permission, not a fault
 
 ---
 
-## What is live today, and what is not
+## What is live
 
-Praxis is being switched on a section at a time, so that nothing is entered twice and nothing is typed
-into a screen that cannot keep it. **This is the table to check before entering a real record.**
+Everything. Every panel reads and writes the church's own records: nothing in the console saves a
+typed-in note to itself any more, and nothing you enter needs entering twice.
 
-| Live — it is saved | Not yet — sample data, it saves nothing |
+**This is the table to check before entering a real record.** The two rows that are still waiting on
+somebody outside the office are the ones about sending:
+
+| Panel | State |
 | --- | --- |
-| Signing in · **Home** (the figures, the activity list, and all three quick actions) · **Members** (find, add, retire, families) · `Communications → Announcements / Broadcasts / Events & Calendar / Prayer Requests / Birthdays & Milestones` · **Reports & Certificates** (certificates and both summaries) · `Giving → Tithes / Offerings / Project Funding / Welfare / Charity` · `Admin → Finance Audit / Users & Rights / Trash / Audit Log` · the **Settings** panels that save | **Inventory & Assets** · assorted reporting and customisation panels still carrying sample figures · `Settings → Customization` |
-
-A screen that is not live still works as a preview: it is how the office decides what to change before
-a section is switched on. Nothing you type into one is lost or half-saved — it simply is not saved.
+| Signing in · **Home** · **Members** · **Ministries** (departments and roles) · **Services & Worship** (planner, attendance, roster, reports) · **Church Council** (meetings, resolutions, documents) · `Giving → Tithes / Offerings / Project Funding / Welfare / Charity` · `Communications → Announcements / Events & Calendar / Prayer Requests / Birthdays & Milestones` · **Reports & Certificates** · `Admin → Finance Audit / Users & Rights / Trash / Audit Log` · **Settings** | Live — saved to the church's database, with the reason and the account that made each change in the Audit Log |
+| `Communications → Broadcasts` (SMS and email) | Composed and recorded, and **refused rather than marked sent** until the church's email or SMS provider is connected. A notice sheet still prints and keeps the office's own count. Ask whoever runs the server when the provider will be live |
 
 ---
 
@@ -103,19 +105,29 @@ the same moment.
 ## Services & Worship
 
 - **Service Planner** — the services and the order of service: call to worship, praise, sermon,
-  dismissal, with times. Print it for the platform.
-- **Attendance** — record who was present.
-- **Volunteer Roster** — who is serving at which service, and swap requests when someone cannot.
-- **Service Reports** — the summary of a service once it is done.
+  dismissal, with times. Schedule a service here and say what kind of gathering it is; **Edit**
+  changes it, and the order is added beside it, one element at a time and in the order it runs.
+  Print it for the platform.
+- **Attendance** — the census: adults and youth, then children, recorded against the service. A named
+  first-time visitor is recorded with their name rather than counted, because a name is somebody the
+  church can follow up. Recording the census again corrects it rather than counting the congregation
+  twice.
+- **Volunteer Roster** — who is serving at which service, and swap requests when someone cannot. A
+  volunteer asks for cover on their own duty from here; approving or declining the request is an
+  administrator's decision, and approving moves the duty to the replacement.
+- **Service Reports** — the write-up of a service once it is done. The census recorded against the
+  service is shown beside it as a cross-check; the figures filed are the church's own. **Sign it off**
+  closes the service and makes the report read-only — an administrator can still revise it afterwards,
+  and the record says so.
 
 ---
 
 ## Giving & Stewardship
 
-**Where to record today: the Record Tithe button on Home.** It posts to the ledger, and the Giving
-totals on Home move at the same moment. Record the tender used (cash, M-PESA, cheque, card) with it.
-The **Tithes** and **Offerings** ledgers under Giving are not live yet, so do not enter Sunday's
-collection there.
+**Where to record today: the Record Tithe button on Home, or the Tithes ledger under Giving.** Both
+post to the same ledger, and the Giving totals on Home move at the same moment. Record the tender
+used (cash, M-PESA, cheque, card) with it. Sunday's plate and envelopes go in the **Offerings**
+ledger, filed against the service they were taken at.
 
 - **Project Funding** shows what has been banked and what is only pledged, separately and on purpose:
   a pledge is a promise, not money in the account.
@@ -136,7 +148,17 @@ screen in the console performs it yet: ask whoever runs the Praxis server.
 
 Board meeting logs, the resolutions tracker (proposed → voted → implementing → closed) and the
 constitution, policies and other documents. A resolution's vote is a separate act from editing it, and
-is recorded as such with the counts.
+is recorded as such with the counts — the screen offers the Next Step the record is at, never a stage to
+set.
+
+Two things the screen states rather than asks. **Quorum is counted**: a sitting needs a majority of the
+council roll, which is the people holding a named office in **Groups & Fellowships** — so recording
+those offices is what gives the council its figure. And **sealing the minutes closes the sitting**: once
+an administrator seals them the register and the minute are fixed, and only an administrator may change
+them afterwards. A sitting or a document is retired to the **Trash** with a reason, never deleted.
+
+A scanned copy of a by-law can be attached when the document is filed, which is what makes the
+reference in a minute openable.
 
 ---
 
@@ -246,7 +268,9 @@ All four panels are live:
   voiding and restoring money are separate acts with reasons, kept out of the screen that reports on
   them. It also prints the treasury summary.
 - **Users & Rights** — the accounts that can sign in, the role each holds, and what each role may see
-  and do. Accounts still need whoever runs the server to create a password for them.
+  and do. What a role may see and do is enforced by the server, not only hidden on screen. An
+  administrator can create an account and set a password for somebody who has lost access; everyone
+  else changes their own under the account menu.
 - **Trash** — everything retired in the last thirty days, each with the reason and by whom, and a
   restore button. Restoring puts the record back where it was; nothing is ever erased by retiring it.
 - **Audit Log** — who changed what, when, and from where. This is the screen that answers "who
@@ -263,7 +287,7 @@ All four panels are live:
 | You retired the wrong record | Nothing was erased. Open `Admin → Trash` and press **Restore** on the row; the record goes back where it was. After thirty days it leaves the Trash but is still in the audit log. |
 | You posted the wrong amount | Leave it. Open `Admin → Finance Audit` and read what happened, then ask whoever runs the server to **void** it with a reason. Do not record a correcting entry as if it were real giving. |
 | You cannot see a panel | It is a permission. Ask for the role you need. |
-| You cannot sign in | Tell whoever runs the Praxis server. A password is chosen when your account is created, and there is nothing in the console that changes one. |
+| You cannot sign in | Use *Forgot your password?* on the sign-in screen — a link arrives by email and can be used once. If no email arrives (the church's mail provider may not be connected yet), ask whoever runs the Praxis server to set a password for you at `Admin → Users & Rights`. |
 | The screen says something went wrong | The console has stopped drawing that screen on purpose and your data has not changed. Reload; if it repeats, tell whoever runs the server and send them the technical detail behind the message. |
 
 ---

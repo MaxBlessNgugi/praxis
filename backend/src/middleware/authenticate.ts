@@ -72,7 +72,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
     if (!header?.startsWith('Bearer ')) throw unauthorizedError('Send an Authorization: Bearer <token> header');
 
     const token = header.slice('Bearer '.length).trim();
-    const { sub, org, imp } = verifyAccessToken(token);
+    const { sub, org, imp, ver } = verifyAccessToken(token);
 
     const user = await prisma.user.findFirst({
       where: { id: sub, ...live },
@@ -82,6 +82,13 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
     if (!user.isActive) throw unauthorizedError('That account has been deactivated');
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       throw new AppError(423, 'This account is temporarily locked after repeated failed sign-ins', 'locked');
+    }
+
+    // The password this token was minted against has been replaced since — by the account holder, by
+    // a reset, or by an administrator. Every session except the one that made the change is over, and
+    // the caller is told to sign in again rather than being left holding a token that half works.
+    if ((ver ?? 0) !== user.tokenVersion) {
+      throw new AppError(401, 'Your password was changed, so this session has ended. Sign in again.', 'session_ended');
     }
 
     // A support session: a Praxis operator acting inside a church they do not belong to. Resolved

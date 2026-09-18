@@ -104,6 +104,7 @@ export const VendorChurchesPanel: React.FC = () => {
   const [manageTarget, setManageTarget] = useState<VendorOrganizationDto | null>(null);
   const [stats, setStats] = useState<VendorOrganizationStatsDto | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [payments, setPayments] = useState<SubscriptionPaymentDto[] | null>(null);
   const [reason, setReason] = useState('');
   const [working, setWorking] = useState(false);
   const manageDialog = useDialog(() => setManageTarget(null), 'Church on Praxis');
@@ -160,9 +161,12 @@ export const VendorChurchesPanel: React.FC = () => {
     setReason('');
     setProblem(null);
     setStats(null);
+    setPayments(null);
     setLoadingStats(true);
     try {
-      setStats((await vendorApi.stats(row.id)).data);
+      const [statsAnswer, paymentsAnswer] = await Promise.all([vendorApi.stats(row.id), vendorApi.payments(row.id)]);
+      setStats(statsAnswer.data);
+      setPayments(paymentsAnswer.data);
     } catch (err) {
       setProblem(errorMessage(err));
     } finally {
@@ -478,6 +482,29 @@ export const VendorChurchesPanel: React.FC = () => {
                 </p>
               )}
 
+              {payments !== null && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#A8A29E]">Payments</span>
+                  {payments.length === 0 ? (
+                    <p className="text-[11px] text-[#57534E] mt-1">No payment has been recorded — the church is on its trial, or Praxis is billing by invoice.</p>
+                  ) : (
+                    <ul className="mt-1 space-y-1">
+                      {payments.slice(0, 5).map((payment) => (
+                        <li key={payment.id} className="flex items-baseline justify-between gap-2 text-[11px] text-[#1C1917]">
+                          <span className="font-semibold">
+                            {money(payment.amount, payment.currency)} · {payment.method.replace('_', ' ')}
+                            {payment.reference ? ` · ${payment.reference}` : ''}
+                          </span>
+                          <span className="text-[#57534E] whitespace-nowrap">
+                            {day(payment.receivedAt)} → {day(payment.periodEnd)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label htmlFor="vendor-reason" className={LABEL}>
                   Reason <span className="font-normal text-[#A8A29E]">(written into their audit log)</span>
@@ -620,7 +647,7 @@ export const VendorChurchesPanel: React.FC = () => {
                 </div>
                 <div>
                   <label htmlFor="vendor-period" className={LABEL}>
-                    Months already paid <span className="font-normal text-[#A8A29E]">(optional)</span>
+                    Months already paid <span className="font-normal text-[#A8A29E]">(required for Active / Payment due)</span>
                   </label>
                   <input
                     id="vendor-period"

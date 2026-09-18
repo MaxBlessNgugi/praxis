@@ -1,8 +1,22 @@
 import { Prisma } from '@prisma/client';
 import { hashPassword } from '../src/lib/auth';
+import { env } from '../src/config/env';
+import { PANEL_KEYS } from '../src/lib/panels';
 import { basePrisma, money, prisma } from '../src/lib/prisma';
 import { appendFinanceEntry } from '../src/lib/financeAudit';
+import { quorumMet, quorumRequired } from '../src/lib/quorum';
 import { enterTenant, requireTenantId } from '../src/lib/tenant';
+
+/**
+ * The password this file writes for its two accounts, and the guard that keeps it out of production.
+ *
+ * These credentials are printed in the README, so they are public: they are fine for a laptop and a
+ * demonstration, and they are a back door on a parish's live database. The seed therefore refuses to
+ * run with `NODE_ENV=production` unless an operator says `ALLOW_DEMO_SEED=true` on that one command,
+ * and it takes `SEED_ADMIN_PASSWORD` when one is given — so a real installation can be provisioned
+ * with a real password in the first place rather than being told to change it afterwards.
+ */
+const DEMO_PASSWORD = 'praxis-demo-2025';
 
 /**
  * Loads the church this system was built for: Destiny Sanctuary Int'L, Nyahururu.
@@ -60,6 +74,14 @@ const ANNEX = 'Nyahururu Annex';
 
 async function clearDomain(): Promise<void> {
   // Children before parents: the foreign keys are the reason for this order, not taste.
+  await prisma.stockMovement.deleteMany();
+  await prisma.stockTake.deleteMany();
+  await prisma.purchaseLine.deleteMany();
+  await prisma.purchase.deleteMany();
+  await prisma.issue.deleteMany();
+  await prisma.transfer.deleteMany();
+  await prisma.inventoryItem.deleteMany();
+  await prisma.supplier.deleteMany();
   await prisma.attendance.deleteMany();
   await prisma.tithe.deleteMany();
   await prisma.offering.deleteMany();
@@ -71,6 +93,7 @@ async function clearDomain(): Promise<void> {
   await prisma.resolution.deleteMany();
   await prisma.governanceDocument.deleteMany();
   await prisma.meeting.deleteMany();
+  await prisma.certificate.deleteMany();
   await prisma.prayerRequest.deleteMany();
   await prisma.ministryMember.deleteMany();
   await prisma.swapRequest.deleteMany();
@@ -192,6 +215,22 @@ async function seedPlans(): Promise<Record<string, string>> {
 }
 
 async function main(): Promise<void> {
+  if (env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_SEED !== 'true') {
+    throw new Error(
+      'Refusing to seed a production database with demo data. This command clears the domain tables ' +
+        'and writes accounts whose password is published in the README. If that is really what you want ' +
+        'for a brand-new install, run it with ALLOW_DEMO_SEED=true and SEED_ADMIN_PASSWORD=<a real one>.',
+    );
+  }
+
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || DEMO_PASSWORD;
+  if (env.NODE_ENV === 'production' && adminPassword === DEMO_PASSWORD) {
+    console.warn(
+      'WARNING: seeding with the published demo password. Change it from the console immediately ' +
+        '(Account menu → Security) or the installation is open to anyone who has read the README.',
+    );
+  }
+
   const organization = await ensureOrganization();
   // The seed serves exactly one church for its whole life, so the context is entered once rather
   // than wrapped around every statement. `enterWith` is legitimate here and nowhere in the request
@@ -264,8 +303,9 @@ async function main(): Promise<void> {
   // -------------------------------------------------------------------------------------------
   // The console's `PanelKey` union, not this file's inventiveness: a right granted under a key the
   // console does not read is a right nobody has.
-  const panelKeys = ['home', 'members', 'services', 'council', 'giving', 'inventory', 'groups', 'reports', 'communications', 'settings', 'admin'];
-  const fullPanels = Object.fromEntries(panelKeys.map((key) => [key, true]));
+  // Read from the module the authorisation gate reads, so a panel added there cannot be granted here
+  // under a key no gate asks about — or gated there under a key no role grants.
+  const fullPanels = Object.fromEntries(PANEL_KEYS.map((key) => [key, true]));
   // Staff run the office but not the platform: every panel except the rights editor.
   const staffPanels = { ...fullPanels, admin: false };
   // A viewer is granted its four panels explicitly. The console **denies any key the API does not
@@ -291,7 +331,7 @@ async function main(): Promise<void> {
     data: {
       name: 'Bishop Sammy',
       email: 'bishop@destinysanctuary.co.ke',
-      passwordHash: await hashPassword('praxis-demo-2025'),
+      passwordHash: await hashPassword(adminPassword),
       roleId: superAdmin.id,
       lastLoginAt: new Date(),
       // The operator's flag, and the only account in the fixture that carries it: it is what opens the
@@ -307,7 +347,7 @@ async function main(): Promise<void> {
     data: {
       name: 'Rev. Alice',
       email: 'alice@destinysanctuary.co.ke',
-      passwordHash: await hashPassword('praxis-demo-2025'),
+      passwordHash: await hashPassword(adminPassword),
       roleId: admin.id,
       memberships: { create: { roleId: admin.id, isDefault: true } },
     },
@@ -523,29 +563,42 @@ async function main(): Promise<void> {
 
   // One row per person per department, with the office each holds. `associate` is the role the
   // console prints under a department's leader: a named deputy, not a second leader.
-  await prisma.ministryMember.createMany({
-    data: [
-      { ministryId: department('Visionary Leadership & Church Council'), memberId: bishopRecord.id, roleTitle: 'Moderator' },
-      { ministryId: department('Visionary Leadership & Church Council'), memberId: aliceRecord.id, roleTitle: 'Church Administrator' },
-      { ministryId: department('Worship & Word Ministry'), memberId: caleb.id, roleTitle: 'Director of Music & Service' },
-      { ministryId: department('Worship & Word Ministry'), memberId: person('MBR-1014'), roleTitle: 'Member' },
-      { ministryId: department("Women's Fellowship"), memberId: person('MBR-1007'), roleTitle: 'Women\u2019s Ministry Coordinator' },
-      { ministryId: department("Women's Fellowship"), memberId: mary.id, roleTitle: 'Member' },
-      { ministryId: department("Women's Fellowship"), memberId: person('MBR-1010'), roleTitle: 'Member' },
-      { ministryId: department("Women's Fellowship"), memberId: person('MBR-1013'), roleTitle: 'Member' },
-      { ministryId: department('Destiny Youth'), memberId: person('MBR-1008'), roleTitle: 'Youth Coordinator' },
-      { ministryId: department('Destiny Youth'), memberId: daniel.id, roleTitle: 'Member' },
-      { ministryId: department('Destiny Youth'), memberId: person('MBR-1015'), roleTitle: 'Member' },
-      { ministryId: department('Destiny Youth'), memberId: person('MBR-1016'), roleTitle: 'Member' },
-      { ministryId: department('Next Generation & Children'), memberId: person('MBR-1014'), roleTitle: "Children\u2019s Director" },
-      { ministryId: department('Next Generation & Children'), memberId: person('MBR-1018'), roleTitle: 'Member' },
-      { ministryId: department('Groups & Discipleship'), memberId: person('MBR-1009'), roleTitle: 'Discipleship & Bible Study Dean' },
-      { ministryId: department('Groups & Discipleship'), memberId: mary.id, roleTitle: 'Member' },
-      { ministryId: department('Missions, Mercy & Church Planting'), memberId: person('MBR-1011'), roleTitle: 'Outreach Almoner' },
-      { ministryId: department('Missions, Mercy & Church Planting'), memberId: daniel.id, roleTitle: 'Member' },
-      { ministryId: department('Missions, Mercy & Church Planting'), memberId: person('MBR-1012'), roleTitle: 'Member' },
-    ],
-  });
+  const ministryRoll = [
+    { ministryId: department('Visionary Leadership & Church Council'), memberId: bishopRecord.id, roleTitle: 'Moderator' },
+    { ministryId: department('Visionary Leadership & Church Council'), memberId: aliceRecord.id, roleTitle: 'Church Administrator' },
+    { ministryId: department('Worship & Word Ministry'), memberId: caleb.id, roleTitle: 'Director of Music & Service' },
+    { ministryId: department('Worship & Word Ministry'), memberId: person('MBR-1014'), roleTitle: 'Member' },
+    { ministryId: department("Women's Fellowship"), memberId: person('MBR-1007'), roleTitle: 'Women\u2019s Ministry Coordinator' },
+    { ministryId: department("Women's Fellowship"), memberId: mary.id, roleTitle: 'Member' },
+    { ministryId: department("Women's Fellowship"), memberId: person('MBR-1010'), roleTitle: 'Member' },
+    { ministryId: department("Women's Fellowship"), memberId: person('MBR-1013'), roleTitle: 'Member' },
+    { ministryId: department('Destiny Youth'), memberId: person('MBR-1008'), roleTitle: 'Youth Coordinator' },
+    { ministryId: department('Destiny Youth'), memberId: daniel.id, roleTitle: 'Member' },
+    { ministryId: department('Destiny Youth'), memberId: person('MBR-1015'), roleTitle: 'Member' },
+    { ministryId: department('Destiny Youth'), memberId: person('MBR-1016'), roleTitle: 'Member' },
+    { ministryId: department('Next Generation & Children'), memberId: person('MBR-1014'), roleTitle: "Children\u2019s Director" },
+    { ministryId: department('Next Generation & Children'), memberId: person('MBR-1018'), roleTitle: 'Member' },
+    { ministryId: department('Groups & Discipleship'), memberId: person('MBR-1009'), roleTitle: 'Discipleship & Bible Study Dean' },
+    { ministryId: department('Groups & Discipleship'), memberId: mary.id, roleTitle: 'Member' },
+    { ministryId: department('Missions, Mercy & Church Planting'), memberId: person('MBR-1011'), roleTitle: 'Outreach Almoner' },
+    { ministryId: department('Missions, Mercy & Church Planting'), memberId: daniel.id, roleTitle: 'Member' },
+    { ministryId: department('Missions, Mercy & Church Planting'), memberId: person('MBR-1012'), roleTitle: 'Member' },
+  ];
+  await prisma.ministryMember.createMany({ data: ministryRoll });
+
+  /**
+   * The Session's roll, and what a sitting of it needs.
+   *
+   * Counted from the rows just written, by the rule in `src/lib/quorum` rather than by a number typed
+   * here, so a seeded sitting carries the quorum figure the API arrives at for the same church. The
+   * attendance and the division are derived from that roll for the same reason: a minute claiming
+   * fourteen votes in a council of eight is not a record, it is a contradiction.
+   */
+  const officerRoll = new Set(
+    ministryRoll.filter((row) => row.roleTitle !== 'Member').map((row) => row.memberId),
+  ).size;
+  const sittingQuorum = quorumRequired(officerRoll);
+  const sittingAttendance = officerRoll - 1;
 
   // -------------------------------------------------------------------------------------------
   // Six Sundays of history, ending on the day the console pretends is today
@@ -901,7 +954,7 @@ async function main(): Promise<void> {
       {
         title: 'Annual General Conference \u2014 Registration Now Open',
         body: 'Registration for the Annual General Conference is open at the office desk. Delegates from the outstations should register through their group leader so travel can be arranged together.',
-        audience: 'Everyone', authorId: bishop.id, isPinned: true,
+        audience: 'Everyone', authorId: bishop.id, isPinned: true, priority: 'urgent',
         publishedAt: new Date('2025-02-08T09:00:00+03:00'),
       },
       {
@@ -916,6 +969,21 @@ async function main(): Promise<void> {
         audience: 'Ministry Leaders', authorId: bishop.id,
         publishedAt: new Date('2025-02-03T08:15:00+03:00'),
       },
+      // A notice the office has written ahead of the date it goes up, and one already taken down: the
+      // console's three states, so a new church sees what they look like rather than an empty column.
+      {
+        title: 'Harvest Thanksgiving \u2014 Service Times Move Forward',
+        body: 'From the first Sunday of March the morning service begins at 8:00 AM and the second at 10:30 AM, so the thanksgiving procession has room.',
+        audience: 'Everyone', authorId: alice.id, priority: 'urgent',
+        publishedAt: new Date('2025-03-01T06:00:00+03:00'),
+      },
+      {
+        title: 'Baptismal Class Registration Closed',
+        body: 'Registration for the February baptismal class is now closed. The next intake is announced in April.',
+        audience: 'Everyone', authorId: bishop.id,
+        publishedAt: new Date('2025-01-20T09:00:00+03:00'),
+        expiresAt: new Date('2025-02-01T00:00:00+03:00'),
+      },
     ],
   });
 
@@ -928,11 +996,26 @@ async function main(): Promise<void> {
         channel: 'sms', body: 'Destiny Sanctuary: Sunday service begins 8:00 AM. All are welcome.',
         audience: 'Members', status: 'sent', sentAt: new Date('2025-02-08T18:00:00+03:00'),
         recipients: 412, createdById: bishop.id,
+        // The provider's own account of the send, which is what the console shows. The eight numbers
+        // that bounced are kept as shortages, not quietly rounded away.
+        lastReport: {
+          attempted: 412, delivered: 404, failed: 8,
+          failures: [
+            { recipient: '+2547\u2022\u2022\u2022\u2022281', reason: 'Number not reachable' },
+            { recipient: '+2547\u2022\u2022\u2022\u2022904', reason: 'Number not reachable' },
+          ],
+        },
       },
       {
         channel: 'sms',
         body: 'Destiny Sanctuary: the Annual General Conference runs 16\u201319 April. Register at the office before 31 March.',
         audience: 'Members', status: 'draft', createdById: alice.id,
+      },
+      {
+        channel: 'sms',
+        body: 'Destiny Sanctuary: the women\u2019s fellowship meets this Saturday at 3:00 PM in the fellowship hall.',
+        audience: 'Women\u2019s Fellowship', status: 'scheduled',
+        scheduledFor: new Date('2025-02-14T17:00:00+03:00'), createdById: alice.id,
       },
     ],
   });
@@ -946,26 +1029,39 @@ async function main(): Promise<void> {
     data: [
       {
         title: 'Family Dedication Sunday', kind: 'service', venue: NYAHURURU,
-        startsAt: new Date('2025-02-23T09:00:00+03:00'), endsAt: new Date('2025-02-23T12:00:00+03:00'),
+        organizerId: person('MBR-1001'), startsAt: new Date('2025-02-23T09:00:00+03:00'),
+        endsAt: new Date('2025-02-23T12:00:00+03:00'),
         description: 'Families present their children before the congregation and commit to raising them in the Lord.',
       },
       {
         title: 'Annual General Conference', kind: 'conference', venue: conferenceVenue,
+        organizerId: person('MBR-1001'),
         startsAt: new Date('2025-04-16T08:00:00+03:00'), endsAt: new Date('2025-04-19T17:30:00+03:00'),
         description: 'A powerful gathering of believers for spiritual renewal, prophetic teachings and community fellowship \u2014 uplifting sessions, impactful worship and transformative discussions designed to inspire and equip you for the year ahead.',
       },
       {
         title: 'National Women\u2019s Conference', kind: 'conference', venue: conferenceVenue,
+        organizerId: person('MBR-1010'),
         startsAt: new Date('2025-08-15T18:00:00+03:00'), endsAt: new Date('2025-08-19T20:30:00+03:00'),
         description: 'A time for women from all walks of life to come together in unity, empowerment and spiritual growth \u2014 with anointed speakers, dynamic workshops and powerful worship.',
       },
       {
+        // Called off, and left on the calendar saying so: the people who had already been told the
+        // date need to see that it moved rather than find it missing.
+        title: 'Outreach Medical Camp', kind: 'outreach', venue: 'Nyahururu Town Hall',
+        organizerId: person('MBR-1016'), status: 'cancelled',
+        startsAt: new Date('2025-10-04T08:00:00+03:00'), endsAt: new Date('2025-10-04T16:00:00+03:00'),
+        description: 'Postponed to the new year \u2014 the county health team could not release the nurses for the day.',
+      },
+      {
         title: 'Thanksgiving Service', kind: 'service', venue: conferenceVenue,
+        organizerId: person('MBR-1001'),
         startsAt: new Date('2025-11-24T08:00:00+03:00'), endsAt: new Date('2025-11-24T18:30:00+03:00'),
         description: 'A time to reflect on the blessings of the year, offer heartfelt thanks, and experience a powerful time of worship, prayer and fellowship as we honour God for His goodness.',
       },
       {
         title: 'National Youth Conference', kind: 'conference', venue: conferenceVenue,
+        organizerId: person('MBR-1004'),
         startsAt: new Date('2025-12-16T07:00:00+03:00'), endsAt: new Date('2025-12-19T20:30:00+03:00'),
         description: 'An exciting event designed for young people to experience spiritual growth, build lasting friendships and engage in vibrant discussions on faith, purpose and leadership.',
       },
@@ -979,6 +1075,10 @@ async function main(): Promise<void> {
       { requesterName: 'A visitor', request: 'Guidance on a new job.', status: 'open', isPrivate: true },
       { memberId: person('MBR-1010'), requesterName: 'Esther Muthoni', request: 'Journey mercies for the family travelling to Nakuru this week.', status: 'praying' },
       { memberId: person('MBR-1016'), requesterName: 'Ruth Adhiambo', request: 'Thanksgiving for a place in the nursing course she applied for.', status: 'answered' },
+      {
+        requesterName: 'A family in the fellowship', request: 'Reconciliation between two brothers over their father\u2019s estate.',
+        status: 'archived', isPrivate: true,
+      },
     ],
   });
 
@@ -989,7 +1089,9 @@ async function main(): Promise<void> {
     data: {
       title: 'Q1 Stated Council Conclave #2025-03', kind: 'stated', status: 'held',
       heldAt: new Date('2025-02-06T19:00:00+03:00'), venue: 'Nyahururu Main Church - Council Chamber',
-      chairId: bishopRecord.id, secretaryId: aliceRecord.id, attendees: 14, quorumMet: true,
+      chairId: bishopRecord.id, secretaryId: aliceRecord.id,
+      attendees: sittingAttendance, quorumRequired: sittingQuorum,
+      quorumMet: quorumMet(sittingAttendance, sittingQuorum),
       agenda: [
         'Opening devotion and roll call',
         'Minutes of the previous stated conclave',
@@ -999,7 +1101,10 @@ async function main(): Promise<void> {
         'Any other business',
       ],
       minutes:
-        'The Moderator opened in prayer at 7:05 PM. Fourteen of fifteen members were present, so the meeting was quorate. The HVAC contract was awarded and referred to the trustees for implementation. The 2025 operating budget was carried with one abstention. The bus grant was held over for the fourteen-day elder review.',
+        `The Moderator opened in prayer at 7:05 PM. ${sittingAttendance} of the church's ${officerRoll} officers were present, against a quorum of ${sittingQuorum}, so the sitting was quorate. The HVAC contract was awarded and referred to the trustees for implementation. The 2025 operating budget was carried with one abstention. The bus grant was held over for the fourteen-day elder review.`,
+      // Sealed a few days later, the way the clerk would have filed it.
+      minutesFinalizedAt: new Date('2025-02-10T09:30:00+03:00'),
+      minutesFinalizedById: bishop.id,
     },
   });
 
@@ -1008,7 +1113,23 @@ async function main(): Promise<void> {
       title: 'Ordinary Council Conclave', kind: 'stated', status: 'scheduled',
       heldAt: new Date('2025-02-27T19:00:00+03:00'), venue: 'Nyahururu Main Church - Council Chamber',
       chairId: bishopRecord.id, secretaryId: aliceRecord.id,
+      // Still to come, so it carries the figure it needs and no register to judge it against.
+      quorumRequired: sittingQuorum,
       agenda: ['Roll call', 'Youth ministry bus fleet replacement grant', 'Annex and outreach reports', 'Closing prayer'],
+    },
+  });
+
+  // Held, minuted, not yet sealed: the state that shows what sealing a minute does.
+  await prisma.meeting.create({
+    data: {
+      title: 'Executive Committee Session', kind: 'executive', status: 'held',
+      heldAt: new Date('2025-02-20T18:30:00+03:00'), venue: 'Nyahururu Main Church - Annex Boardroom',
+      chairId: bishopRecord.id, secretaryId: aliceRecord.id,
+      attendees: sittingAttendance - 1, quorumRequired: sittingQuorum,
+      quorumMet: quorumMet(sittingAttendance - 1, sittingQuorum),
+      agenda: ['Devotion', 'Annex roof repairs', 'Outstation transport'],
+      minutes:
+        'The committee met after devotion. The annex roof repair was costed and left with the trustees for a second quotation; transport for the Ndaragwa outstation was approved within the existing vote.',
     },
   });
 
@@ -1019,7 +1140,7 @@ async function main(): Promise<void> {
         summary: 'Award the sanctuary climate and acoustic contract and refer implementation to the trustees.',
         sponsor: 'Trustee Board', sponsorOfficer: 'Arthur Wanjala', meetingId: statedConclave.id,
         councilDate: new Date('2025-02-06T19:00:00+03:00'), stage: 'implementing',
-        voteSummary: '13 Yea - 0 Nay', votesFor: 13, votesAgainst: 0, votesAbstain: 0,
+        voteSummary: `${sittingAttendance} Yea - 0 Nay`, votesFor: sittingAttendance, votesAgainst: 0, votesAbstain: 0,
         lead: 'Elder Marcus Kamau', leadNote: '2 of 4 milestones; due Dec 31, 2025', decidedAt: new Date('2025-02-06T20:10:00+03:00'),
       },
       {
@@ -1027,7 +1148,7 @@ async function main(): Promise<void> {
         summary: 'Adopt the 2025 operating budget as presented by the Finance Committee.',
         sponsor: 'Finance Committee', sponsorOfficer: 'Clara Wambui', meetingId: statedConclave.id,
         councilDate: new Date('2025-02-06T19:00:00+03:00'), stage: 'voted_approved',
-        voteSummary: '12 Yea - 1 Abstain', votesFor: 12, votesAgainst: 0, votesAbstain: 1,
+        voteSummary: `${sittingAttendance - 1} Yea - 1 Abstain`, votesFor: sittingAttendance - 1, votesAgainst: 0, votesAbstain: 1,
         lead: 'Bishop Sammy', leadNote: 'Awaiting Council enactment', decidedAt: new Date('2025-02-06T20:25:00+03:00'),
       },
       {
@@ -1042,7 +1163,7 @@ async function main(): Promise<void> {
         summary: 'Raise the operating cap on the benevolence fund to fifty thousand shillings.',
         sponsor: 'Missions, Mercy & Church Planting', sponsorOfficer: 'Clara Wambui',
         councilDate: new Date('2025-01-15T19:00:00+03:00'), stage: 'closed',
-        voteSummary: '14 Yea - 0 Nay', votesFor: 14, votesAgainst: 0, votesAbstain: 0,
+        voteSummary: `${officerRoll} Yea - 0 Nay`, votesFor: officerRoll, votesAgainst: 0, votesAbstain: 0,
         lead: 'Clara Wambui', leadNote: 'Fully audited, completed Jan 30, 2025', decidedAt: new Date('2025-01-15T20:00:00+03:00'),
       },
     ],
@@ -1080,6 +1201,320 @@ async function main(): Promise<void> {
 
   await prisma.auditLog.create({
     data: { actorId: bishop.id, action: 'create', entityName: 'Member', entityId: bishopRecord.id, summary: 'Seeded the parish register' },
+  });
+
+  // -------------------------------------------------------------------------------------------
+  // The certificate register: what the church has officially issued
+  // -------------------------------------------------------------------------------------------
+  // Two ceremonies the register actually holds, recorded the way issuance would have happened —
+  // wording as celebrated, serial from the church's year series, issued by the moderator.
+  await prisma.certificate.createMany({
+    data: [
+      {
+        organizationId: organization.id,
+        serial: 'BAP-2025-0001',
+        kind: 'baptism',
+        fullName: 'Caleb Timothy Mwangi',
+        memberId: caleb.id,
+        memberNumber: 'MBR-1003',
+        ceremonyDate: new Date('2025-06-15T11:00:00+03:00'),
+        officiant: 'Bishop Sammy',
+        scripture: 'Romans 6:4',
+        issuedById: bishop.id,
+        issuedAt: new Date('2025-06-15T15:00:00+03:00'),
+      },
+      {
+        organizationId: organization.id,
+        serial: 'DED-2025-0001',
+        kind: 'dedication',
+        fullName: 'Joy Wanjiru Kariuki',
+        memberId: mary.id,
+        memberNumber: 'MBR-1004',
+        parents: 'Mr & Mrs Kariuki',
+        ceremonyDate: new Date('2025-08-03T10:30:00+03:00'),
+        officiant: 'Rev. Alice',
+        issuedById: bishop.id,
+        issuedAt: new Date('2025-08-03T14:00:00+03:00'),
+      },
+    ],
+  });
+
+  // -------------------------------------------------------------------------------------------
+  // Inventory and assets: what the church owns, and how the shelf got that way
+  // -------------------------------------------------------------------------------------------
+  // Two suppliers, six register lines spanning both kinds, and a ledger that shows the life a
+  // register has: bought, issued to a ministry, counted, and corrected by an approved take. Every
+  // movement names its actor so the "who authorized this" question the register exists to answer has
+  // an answer from line one.
+  const [soundHouse, harvestBookshop] = await Promise.all([
+    prisma.supplier.create({
+      data: {
+        organizationId: organization.id,
+        name: 'Sound House Kenya',
+        phone: '+254 722 118 404',
+        email: 'sales@soundhouse.co.ke',
+        notes: 'PA systems, microphones and cabling. Delivers to Nyahururu on Thursdays.',
+      },
+    }),
+    prisma.supplier.create({
+      data: {
+        organizationId: organization.id,
+        name: 'Harvest Bookshop Nakuru',
+        phone: '+254 51 221 7703',
+        email: 'orders@harvestbooks.co.ke',
+        notes: 'Bookshop lines: Bibles, hymnals and Sunday school materials.',
+      },
+    }),
+  ]);
+
+  const item = async (data: {
+    sku: string;
+    name: string;
+    kind: 'consumable' | 'asset';
+    category: string;
+    unit: string;
+    location: string;
+    quantity: number;
+    reorderAt?: number;
+    cost?: string;
+    condition?: 'good' | 'fair' | 'poor';
+    status?: 'active' | 'in_service' | 'maintenance' | 'lost' | 'damaged' | 'disposed';
+    supplierId?: string;
+    purchasedAt?: Date;
+    custodianId?: string;
+    openingQuantity: number;
+  }) => {
+    const { openingQuantity, ...fields } = data;
+    const row = await prisma.inventoryItem.create({
+      data: { ...fields, organizationId: organization.id, quantity: openingQuantity },
+    });
+    await prisma.stockMovement.create({
+      data: {
+        organizationId: organization.id,
+        itemId: row.id,
+        kind: 'adjustment',
+        delta: openingQuantity,
+        balanceAfter: openingQuantity,
+        note: 'Opening count when the item joined the register',
+        actorId: alice.id,
+        occurredAt: new Date('2026-08-02T09:00:00+03:00'),
+      },
+    });
+    return row;
+  };
+
+  const yamahaMixer = await item({
+    sku: 'AST-0001',
+    name: 'Yamaha MG16XU Mixing Desk',
+    kind: 'asset',
+    category: 'Sound & Media',
+    unit: 'pcs',
+    location: NYAHURURU,
+    quantity: 1,
+    cost: '82000.00',
+    condition: 'good',
+    status: 'in_service',
+    supplierId: soundHouse.id,
+    purchasedAt: new Date('2025-03-14T10:00:00+03:00'),
+    custodianId: bishopRecord.id,
+    openingQuantity: 1,
+  });
+  const shureMic = await item({
+    sku: 'AST-0002',
+    name: 'Shure SM58 Microphone',
+    kind: 'asset',
+    category: 'Sound & Media',
+    unit: 'pcs',
+    location: NYAHURURU,
+    quantity: 4,
+    cost: '13500.00',
+    condition: 'good',
+    supplierId: soundHouse.id,
+    purchasedAt: new Date('2025-03-14T10:00:00+03:00'),
+    openingQuantity: 5,
+  });
+  await prisma.stockMovement.create({
+    data: {
+      organizationId: organization.id,
+      itemId: shureMic.id,
+      kind: 'loss',
+      delta: -1,
+      balanceAfter: 4,
+      note: 'Not returned after the outdoor crusade — written off by council minute RES-2026-0011',
+      actorId: bishop.id,
+      occurredAt: new Date('2026-07-19T18:30:00+03:00'),
+    },
+  });
+  await item({
+    sku: 'AST-0003',
+    name: 'Epson EB-X500 Projector',
+    kind: 'asset',
+    category: 'Sound & Media',
+    unit: 'pcs',
+    location: ANNEX,
+    quantity: 1,
+    cost: '58000.00',
+    condition: 'fair',
+    status: 'maintenance',
+    supplierId: soundHouse.id,
+    purchasedAt: new Date('2024-11-08T10:00:00+03:00'),
+    openingQuantity: 1,
+  });
+  const bibles = await item({
+    sku: 'BKS-0001',
+    name: 'NIV Bible (hardcover)',
+    kind: 'consumable',
+    category: 'Bookshop',
+    unit: 'pcs',
+    location: NYAHURURU,
+    quantity: 22,
+    reorderAt: 10,
+    cost: '1450.00',
+    supplierId: harvestBookshop.id,
+    purchasedAt: new Date('2026-06-30T10:00:00+03:00'),
+    openingQuantity: 30,
+  });
+  await prisma.stockMovement.create({
+    data: {
+      organizationId: organization.id,
+      itemId: bibles.id,
+      kind: 'issue',
+      delta: -8,
+      balanceAfter: 22,
+      note: 'Sold at the bookstall after the youth service',
+      actorId: alice.id,
+      occurredAt: new Date('2026-08-16T12:30:00+03:00'),
+    },
+  });
+  const hymnals = await item({
+    sku: 'BKS-0002',
+    name: 'Nyimbo Standard Hymnal',
+    kind: 'consumable',
+    category: 'Bookshop',
+    unit: 'pcs',
+    location: NYAHURURU,
+    quantity: 6,
+    reorderAt: 12,
+    cost: '900.00',
+    supplierId: harvestBookshop.id,
+    openingQuantity: 18,
+  });
+  await prisma.stockMovement.createMany({
+    data: [
+      {
+        organizationId: organization.id,
+        itemId: hymnals.id,
+        kind: 'issue',
+        delta: -10,
+        balanceAfter: 8,
+        note: 'Distributed to the new converts\' class',
+        actorId: alice.id,
+        occurredAt: new Date('2026-08-09T11:00:00+03:00'),
+      },
+      {
+        organizationId: organization.id,
+        itemId: hymnals.id,
+        kind: 'return',
+        delta: 8,
+        balanceAfter: 16,
+        note: 'Class ended — copies brought back to the cupboard',
+        actorId: alice.id,
+        occurredAt: new Date('2026-09-06T13:00:00+03:00'),
+      },
+    ],
+  });
+  await prisma.stockMovement.create({
+    data: {
+      organizationId: organization.id,
+      itemId: hymnals.id,
+      kind: 'issue',
+      delta: -10,
+      balanceAfter: 6,
+      note: 'Choir copies for Friday rehearsal season',
+      actorId: bishop.id,
+      occurredAt: new Date('2026-09-10T17:00:00+03:00'),
+    },
+  });
+  const teaSupplies = await item({
+    sku: 'KIT-0001',
+    name: 'Tea Supplies Crate (sugar, leaves, milk powder)',
+    kind: 'consumable',
+    category: 'Kitchen',
+    unit: 'crate',
+    location: ANNEX,
+    quantity: 3,
+    reorderAt: 2,
+    cost: '4200.00',
+    openingQuantity: 5,
+  });
+  await prisma.stockMovement.create({
+    data: {
+      organizationId: organization.id,
+      itemId: teaSupplies.id,
+      kind: 'issue',
+      delta: -2,
+      balanceAfter: 3,
+      note: 'Fellowship tea after the combined service',
+      actorId: alice.id,
+      occurredAt: new Date('2026-09-13T12:00:00+03:00'),
+    },
+  });
+
+  // One approved stock take with a variance, so the review workflow and the report's variance list
+  // both have a real example: counted 5 against 6 on the books, approved, one hymnal written off.
+  const septemberTake = await prisma.stockTake.create({
+    data: {
+      organizationId: organization.id,
+      itemId: hymnals.id,
+      status: 'approved',
+      bookQuantity: 6,
+      countedQuantity: 5,
+      variance: -1,
+      countedById: alice.id,
+      approvedById: bishop.id,
+      approvedAt: new Date('2026-09-13T14:00:00+03:00'),
+      note: 'September shelf count — one copy found with a torn spine',
+      createdAt: new Date('2026-09-13T13:30:00+03:00'),
+    },
+  });
+  await prisma.stockMovement.create({
+    data: {
+      organizationId: organization.id,
+      itemId: hymnals.id,
+      kind: 'adjustment',
+      delta: -1,
+      balanceAfter: 5,
+      reference: `stock-take:${septemberTake.id}`,
+      note: 'Stock take approved: counted 5 against 6 on the books',
+      actorId: bishop.id,
+      occurredAt: new Date('2026-09-13T14:00:00+03:00'),
+    },
+  });
+
+  // A purchase, priced the way the lines price it: the total is computed from them, never typed in.
+  await prisma.purchase.create({
+    data: {
+      organizationId: organization.id,
+      supplierId: harvestBookshop.id,
+      reference: 'INV-2026-0731',
+      total: new Prisma.Decimal('21750.00'),
+      purchasedAt: new Date('2026-06-30T10:00:00+03:00'),
+      recordedById: alice.id,
+      lines: {
+        create: [{ itemId: bibles.id, quantity: 15, unitCost: new Prisma.Decimal('1450.00') }],
+      },
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      organizationId: organization.id,
+      actorId: alice.id,
+      action: 'create',
+      entityName: 'InventoryItem',
+      entityId: yamahaMixer.id,
+      summary: 'Seeded the asset & stock register (6 lines, 2 suppliers)',
+    },
   });
 
   // -------------------------------------------------------------------------------------------

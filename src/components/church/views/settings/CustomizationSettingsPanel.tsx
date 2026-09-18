@@ -1,23 +1,76 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CustomizationSettings } from '../../../../types';
-import { INITIAL_CUSTOMIZATION_SETTINGS } from '../../../../data/churchMockData';
+import { settingsApi } from '../../../../lib/api';
+import { errorMessage, usePreference } from '../../../../hooks/useApi';
+import { usePermissions } from '../../../../lib/permissions';
+import { ErrorBlock, LoadingBlock } from '../../DataState';
 import { interactiveCard } from '../../interactiveCard';
 
-export const CustomizationSettingsPanel: React.FC = () => {
-  const [settings, setSettings] = useState<CustomizationSettings>(INITIAL_CUSTOMIZATION_SETTINGS);
-  const [isSaved, setIsSaved] = useState<boolean>(false);
+const DEFAULTS: CustomizationSettings = {
+  themeColor: '#C2410C',
+  memberTerminology: 'Members',
+  leadershipTerminology: 'Church Council',
+  givingTerminology: 'Tithes & Offerings',
+  currencySymbol: 'KSh',
+  dateFormat: 'MMM D, YYYY',
+  compactMode: false,
+};
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3500);
+/**
+ * Terminology and interface preferences, stored under the `customization` preference key.
+ *
+ * What each field honestly does: the three terminology picks and the currency symbol are the words
+ * the office wants to see, saved per church; the date format and density are recorded for the
+ * console to honour as screens adopt them; and the theme colour is a stored preference only — the
+ * console renders Warm Ember, and a palette that lied about changing itself would be worse than an
+ * honest one that says it cannot.
+ */
+export const CustomizationSettingsPanel: React.FC = () => {
+  const preference = usePreference('customization');
+  const { canEdit } = usePermissions();
+  const canWrite = canEdit('settings');
+
+  const [settings, setSettings] = useState<CustomizationSettings>(DEFAULTS);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!preference.loading && !preference.error) {
+      setSettings({ ...DEFAULTS, ...(preference.value as Partial<CustomizationSettings>) });
+    }
+  }, [preference.loading, preference.error, preference.value]);
+
+  const update = (patch: Partial<CustomizationSettings>) => {
+    setSettings((previous) => ({ ...previous, ...patch }));
+    setSaved(false);
   };
 
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await settingsApi.updatePreference('customization', settings as unknown as Record<string, unknown>);
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 3500);
+      await preference.refetch();
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (preference.loading && !preference.value) {
+    return <LoadingBlock label="Reading the customisation preferences…" />;
+  }
+  if (preference.error) {
+    return <ErrorBlock message={preference.error} onRetry={() => void preference.refetch()} />;
+  }
+
   const themeColors = [
-    { id: '#C2410C', label: 'Warm Ember (Official Default)', bg: 'bg-[#C2410C]' },
-    { id: '#881337', label: 'Westminster Crimson', bg: 'bg-[#881337]' },
-    { id: '#1E3A8A', label: 'Genevan Navy', bg: 'bg-[#1E3A8A]' },
-    { id: '#14532D', label: 'Cedars Olive', bg: 'bg-[#14532D]' },
+    { id: '#C2410C', label: 'Warm Ember (official default)', bg: 'bg-[#C2410C]' },
   ];
 
   return (
@@ -26,26 +79,28 @@ export const CustomizationSettingsPanel: React.FC = () => {
         <div>
           <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
             <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">palette</span>
-            Church Nomenclature & Visual Customization
+            Terminology &amp; Interface Preferences
           </h3>
           <p className="text-xs text-[#57534E] mt-0.5">
-            Adapt terminology to your tradition (Presbyterian, Anglican, Baptist, Reformed) and customize interface density.
+            The words this church uses for its people, its council and its giving — saved to the church&apos;s own record, so every administrator sees the same.
           </p>
         </div>
 
-        {isSaved && (
-          <div className="px-3 py-1 rounded-[8px] bg-[#059669]/10 border border-[#059669]/30 text-[#059669] text-xs font-bold flex items-center gap-1.5">
+        {saved && (
+          <div role="status" className="px-3 py-1 rounded-[8px] bg-[#059669]/10 border border-[#059669]/30 text-[#059669] text-xs font-bold flex items-center gap-1.5">
             <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span>
             Preferences Saved
           </div>
         )}
       </div>
 
+      {error && <ErrorBlock message={error} />}
+
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Color Theme Selector */}
+        {/* Accent */}
         <div className="space-y-3">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Service Theme & Accent Palette
+            Appearance
           </h4>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -54,7 +109,7 @@ export const CustomizationSettingsPanel: React.FC = () => {
               return (
                 <div
                   key={theme.id}
-                  {...interactiveCard(() => setSettings({ ...settings, themeColor: theme.id }))}
+                  {...interactiveCard(() => update({ themeColor: theme.id }))}
                   className={`p-3.5 rounded-[12px] border transition-all cursor-pointer flex items-center justify-between ${
                     isSelected
                       ? 'bg-[#FDF8F3] border-[#C2410C] ring-2 ring-[#C2410C]/20 shadow-xs'
@@ -75,90 +130,96 @@ export const CustomizationSettingsPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Denominational Vocabulary Configuration */}
+        {/* Terminology */}
         <div className="space-y-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Denominational Nomenclature & Terminology
+            Denominational vocabulary
           </h4>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label htmlFor="terminology-congregant" className="block text-xs font-bold text-[#1C1917] mb-1">
-                Congregant Terminology
+                Congregants are called
               </label>
-              <select id="terminology-congregant" aria-label="Congregant Terminology"
+              <select id="terminology-congregant" aria-label="Congregants are called"
                 value={settings.memberTerminology}
-                onChange={(e) => setSettings({ ...settings, memberTerminology: e.target.value as any })}
+                onChange={(e) => update({ memberTerminology: e.target.value })}
+                disabled={!canWrite}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
               >
-                <option value="Members">Members (Reformed/Presbyterian)</option>
-                <option value="Parishioners">Parishioners (Anglican/Episcopal)</option>
-                <option value="Members">Members (General Evangelical)</option>
-                <option value="Communicants">Communicants (Historic Liturgical)</option>
+                <option value="Members">Members</option>
+                <option value="Parishioners">Parishioners</option>
+                <option value="Communicants">Communicants</option>
               </select>
             </div>
 
             <div>
               <label htmlFor="terminology-council" className="block text-xs font-bold text-[#1C1917] mb-1">
-                Church Council Body
+                The council is called
               </label>
-              <select id="terminology-council" aria-label="Church Council Body"
+              <select id="terminology-council" aria-label="The council is called"
                 value={settings.leadershipTerminology}
-                onChange={(e) => setSettings({ ...settings, leadershipTerminology: e.target.value as any })}
+                onChange={(e) => update({ leadershipTerminology: e.target.value })}
+                disabled={!canWrite}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
               >
-                <option value="Church Council">Church Council (Presbyterian)</option>
-                <option value="Board of Deacons">Board of Deacons (Baptist)</option>
-                <option value="Vestry">Vestry / Wardens (Anglican)</option>
-                <option value="Council of Stewards">Council of Stewards (Methodist)</option>
+                <option value="Church Council">Church Council</option>
+                <option value="Board of Deacons">Board of Deacons</option>
+                <option value="Vestry">Vestry / Wardens</option>
+                <option value="Council of Stewards">Council of Stewards</option>
               </select>
             </div>
 
             <div>
               <label htmlFor="terminology-stewardship" className="block text-xs font-bold text-[#1C1917] mb-1">
-                Stewardship Terminology
+                Giving is called
               </label>
-              <select id="terminology-stewardship" aria-label="Stewardship Terminology"
+              <select id="terminology-stewardship" aria-label="Giving is called"
                 value={settings.givingTerminology}
-                onChange={(e) => setSettings({ ...settings, givingTerminology: e.target.value as any })}
+                onChange={(e) => update({ givingTerminology: e.target.value })}
+                disabled={!canWrite}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
               >
-                <option value="Tithes & Offerings">Tithes & Offerings (Traditional)</option>
-                <option value="Contributions">Contributions (General)</option>
-                <option value="Pledges & Stewardship">Pledges & Stewardship (Liturgical)</option>
-                <option value="Kingdom Giving">Kingdom Giving (Contemporary)</option>
+                <option value="Tithes & Offerings">Tithes &amp; Offerings</option>
+                <option value="Contributions">Contributions</option>
+                <option value="Pledges & Stewardship">Pledges &amp; Stewardship</option>
+                <option value="Kingdom Giving">Kingdom Giving</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Formatting & UI Density */}
+        {/* Formatting */}
         <div className="space-y-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Locale & Interface Preferences
+            Locale &amp; interface
           </h4>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="settings-currency-code" className="block text-xs font-bold text-[#1C1917] mb-1">Currency Code</label>
-              <input id="settings-currency-code" aria-label="Currency Code"
+              <label htmlFor="settings-currency-code" className="block text-xs font-bold text-[#1C1917] mb-1">Currency symbol</label>
+              <input id="settings-currency-code" aria-label="Currency symbol"
                 type="text"
+                maxLength={4}
                 value={settings.currencySymbol}
-                onChange={(e) => setSettings({ ...settings, currencySymbol: e.target.value })}
+                onChange={(e) => update({ currencySymbol: e.target.value })}
+                disabled={!canWrite}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono"
               />
+              <p className="mt-1 text-[10px] text-[#57534E]">The ledgers themselves are kept in KES; this is the symbol the office prefers to read.</p>
             </div>
 
             <div>
-              <label htmlFor="settings-date-format" className="block text-xs font-bold text-[#1C1917] mb-1">Date Display Format</label>
-              <select id="settings-date-format" aria-label="Date Display Format"
+              <label htmlFor="settings-date-format" className="block text-xs font-bold text-[#1C1917] mb-1">Date display format</label>
+              <select id="settings-date-format" aria-label="Date display format"
                 value={settings.dateFormat}
-                onChange={(e) => setSettings({ ...settings, dateFormat: e.target.value })}
+                onChange={(e) => update({ dateFormat: e.target.value })}
+                disabled={!canWrite}
                 className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
               >
-                <option value="MMM D, YYYY">MMM D, YYYY (Oct 14, 2025)</option>
-                <option value="YYYY-MM-DD">YYYY-MM-DD (2025-10-14)</option>
-                <option value="DD/MM/YYYY">DD/MM/YYYY (14/10/2025)</option>
+                <option value="MMM D, YYYY">MMM D, YYYY (Oct 14, 2026)</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD (2026-10-14)</option>
+                <option value="DD/MM/YYYY">DD/MM/YYYY (14/10/2026)</option>
               </select>
             </div>
           </div>
@@ -168,11 +229,12 @@ export const CustomizationSettingsPanel: React.FC = () => {
               type="checkbox"
               id="compactToggle"
               checked={settings.compactMode}
-              onChange={(e) => setSettings({ ...settings, compactMode: e.target.checked })}
+              onChange={(e) => update({ compactMode: e.target.checked })}
+              disabled={!canWrite}
               className="rounded text-[#C2410C] focus:ring-[#C2410C]"
             />
             <label htmlFor="compactToggle" className="text-xs font-bold text-[#1C1917] cursor-pointer">
-              Enable high-density census tables (Optimized for administrative laptops)
+              Prefer high-density tables (administrative laptops)
             </label>
           </div>
         </div>
@@ -180,10 +242,11 @@ export const CustomizationSettingsPanel: React.FC = () => {
         <div className="pt-4 border-t border-[#E7E5E4] flex items-center justify-end">
           <button
             type="submit"
-            className="px-5 py-2.5 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+            disabled={saving || !canWrite}
+            className="px-5 py-2.5 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <span aria-hidden="true" className="material-symbols-outlined text-[18px]">save</span>
-            Save Customizations
+            {saving ? 'Saving…' : 'Save Customisations'}
           </button>
         </div>
       </form>

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { booleanQuery, window } from './common';
 
+export const announcementPrioritySchema = z.enum(['normal', 'urgent']);
 export const broadcastChannelSchema = z.enum(['sms', 'email', 'notice_sheet']);
 export const broadcastStatusSchema = z.enum(['draft', 'scheduled', 'sent', 'cancelled']);
 export const eventKindSchema = z.enum(['service', 'conference', 'meeting', 'outreach']);
+export const eventStatusSchema = z.enum(['scheduled', 'cancelled']);
 export const prayerStatusSchema = z.enum(['open', 'praying', 'answered', 'archived']);
 
 // -------------------------------------------------------------------------------------------
@@ -14,6 +16,7 @@ const announcementFields = z.object({
   title: z.string().trim().min(3, 'Give the announcement a title').max(160),
   body: z.string().trim().min(3, 'Write the announcement').max(8000),
   audience: z.string().trim().min(2).max(60).default('Everyone'),
+  priority: announcementPrioritySchema.default('normal'),
   isPinned: z.boolean().default(false),
   publishedAt: z.coerce.date().optional(),
   expiresAt: z.coerce.date().optional(),
@@ -86,6 +89,8 @@ const eventFields = z.object({
   title: z.string().trim().min(3, 'Name the event').max(160),
   description: z.string().trim().max(4000).optional(),
   kind: eventKindSchema.default('service'),
+  organizerId: z.string().uuid().nullish(),
+  status: eventStatusSchema.default('scheduled'),
   venue: z.string().trim().min(2, 'Say where it is held').max(160),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),

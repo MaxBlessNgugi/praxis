@@ -15,8 +15,12 @@ const householdInclude = {
   },
 } satisfies Prisma.HouseholdInclude;
 
-export async function listHouseholds(query: ListHouseholdsQuery) {
-  const where: Prisma.HouseholdWhereInput = {
+/**
+ * The household register's filter, owned here so the CSV export composes the same one as the list —
+ * an export that re-typed these conditions could quietly disagree with the screen it mirrors.
+ */
+export function householdWhere(query: ListHouseholdsQuery): Prisma.HouseholdWhereInput {
+  return {
     ...live,
     ...(query.location ? { location: query.location } : {}),
     ...(query.q
@@ -29,12 +33,18 @@ export async function listHouseholds(query: ListHouseholdsQuery) {
         }
       : {}),
   };
+}
+
+export async function listHouseholds(query: ListHouseholdsQuery) {
+  const where = householdWhere(query);
 
   const [total, data] = await Promise.all([
     prisma.household.count({ where }),
     prisma.household.findMany({
       where,
-      include: { _count: { select: { members: true } } },
+      // The rolls come back with the rows: a household screen that shows a head and their
+      // dependents needs them, and a count on its own would leave those cards empty.
+      include: { ...householdInclude, _count: { select: { members: true } } },
       orderBy: { unitNumber: 'asc' },
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,

@@ -1,177 +1,181 @@
 import React, { useMemo, useState } from 'react';
-import { PrayerRequestItem, PrayerPrivacyLevel } from '../../../../types';
 import { useDialog } from '../../dialog';
-import { prayerApi } from '../../../../lib/api';
-import { toPrayerRequestItem } from '../../../../lib/adapters';
+import { prayerApi, type PrayerRequestDto } from '../../../../lib/api';
+import { formatDate } from '../../../../lib/adapters';
 import { usePrayerRequests, useMutation } from '../../../../hooks/useApi';
 import { usePermissions } from '../../../../lib/permissions';
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 
+/**
+ * The prayer wall — petitions the church holds together, and the ones it holds quietly.
+ *
+ * A petition carries one flag, `isPrivate`, and the server decides who may read it: a private request
+ * is pastoral correspondence and only an administrator receives it, in the list and by id alike. The
+ * old screen offered three levels of confidentiality against that one flag, so "ministry leaders only"
+ * was stored as strictly private, and it printed "Pastors & Elders only" over a rule nobody enforced.
+ * The console now offers the two levels the record has and says who the second one actually reaches.
+ *
+ * Statuses are the four the table stores — open, being prayed for, answered, archived — and the
+ * buttons below walk a petition through them rather than showing a stage that only exists on screen.
+ */
+
+const STATUS_LABELS: Record<PrayerRequestDto['status'], string> = {
+  open: 'Open',
+  praying: 'Being prayed for',
+  answered: 'Answered',
+  archived: 'Off the wall',
+};
+
+const FIELD =
+  'w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]';
+const LABEL = 'block text-xs font-bold text-[#1C1917] mb-1';
+
+const whoAsked = (prayer: PrayerRequestDto) =>
+  prayer.requesterName ?? (prayer.member ? `${prayer.member.firstName} ${prayer.member.lastName}` : 'Anonymous');
+
 export const PrayerRequestsPanel: React.FC = () => {
-  const { items, loading, error, refetch } = usePrayerRequests();
+  const { items, loading, error, refetch } = usePrayerRequests({ pageSize: 100 });
   const createPrayer = useMutation(prayerApi.create);
+  const updatePrayer = useMutation(prayerApi.update);
   const answerPrayer = useMutation(prayerApi.answer);
-  const { canEdit } = usePermissions();
+  const retirePrayer = useMutation(prayerApi.retire);
+  const { canEdit, canDelete, role } = usePermissions();
 
-  const prayers = useMemo(() => items.map(toPrayerRequestItem), [items]);
+  const [statusFilter, setStatusFilter] = useState<'all' | PrayerRequestDto['status']>('all');
 
-  const [selectedPrivacy, setSelectedPrivacy] = useState<string>('all');
-  const [isSubmittingPrayer, setIsSubmittingPrayer] = useState<boolean>(false);
-  const submittingPrayerDialog = useDialog(() => setIsSubmittingPrayer(false), "Submit Prayer Petition");
-  const [answeringPrayer, setAnsweringPrayer] = useState<PrayerRequestItem | null>(null);
-  const answeringPrayerDialog = useDialog(() => setAnsweringPrayer(null), "Record Answered Prayer");
-  const [praiseText, setPraiseText] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingDialog = useDialog(() => setIsSubmitting(false), 'Log a prayer request');
+  const [answering, setAnswering] = useState<PrayerRequestDto | null>(null);
+  const answeringDialog = useDialog(() => setAnswering(null), 'Record an answered prayer');
+  const [praiseNote, setPraiseNote] = useState('');
 
-  // New Prayer Form State. The prayer_requests table stores the request itself, who asked and
-  // whether it is private — so the form asks for that and nothing it would have to discard.
-  const [details, setDetails] = useState('');
+  const [request, setRequest] = useState('');
   const [requestedBy, setRequestedBy] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
-  const [privacyLevel, setPrivacyLevel] = useState<PrayerPrivacyLevel>('public');
+  const [isPrivate, setIsPrivate] = useState(false);
 
-  const filteredPrayers = prayers.filter((p) => {
-    if (selectedPrivacy !== 'all' && p.privacyLevel !== selectedPrivacy) return false;
-    return true;
-  });
+  const { beingPrayedFor, answered, shared, offTheWall, shown } = useMemo(() => {
+    const onWall = items.filter((prayer) => prayer.status !== 'archived');
+    return {
+      beingPrayedFor: onWall.filter((prayer) => prayer.status !== 'answered').length,
+      answered: items.filter((prayer) => prayer.status === 'answered').length,
+      shared: onWall.filter((prayer) => !prayer.isPrivate).length,
+      offTheWall: items.filter((prayer) => prayer.status === 'archived').length,
+      shown: statusFilter === 'all' ? items : items.filter((prayer) => prayer.status === statusFilter),
+    };
+  }, [items, statusFilter]);
 
-  const handleCreatePrayer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!details.trim()) return;
+  const isAdministrator = role === 'admin' || role === 'super_admin';
+
+  const openComposer = () => {
+    setRequest('');
+    setRequestedBy('');
+    setIsAnonymous(false);
+    setIsPrivate(false);
+    setIsSubmitting(true);
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!request.trim()) return;
 
     try {
       await createPrayer.run({
-        request: details.trim(),
+        request: request.trim(),
         ...(isAnonymous ? {} : { requesterName: requestedBy.trim() || undefined }),
-        isPrivate: privacyLevel !== 'public',
+        isPrivate,
       });
       await refetch();
-      setIsSubmittingPrayer(false);
-      setDetails('');
-      setRequestedBy('');
+      setIsSubmitting(false);
     } catch {
-      // createPrayer.error is rendered inside the modal.
+      // The write's own error is rendered inside the dialog.
     }
   };
 
-  const handleMarkAnswered = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!answeringPrayer) return;
+  const walk = async (prayer: PrayerRequestDto, status: PrayerRequestDto['status']) => {
+    await updatePrayer.run(prayer.id, { status });
+    await refetch();
+  };
+
+  const markAnswered = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!answering) return;
 
     try {
-      await answerPrayer.run(answeringPrayer.id, { note: praiseText.trim() || undefined });
+      await answerPrayer.run(answering.id, { note: praiseNote.trim() || undefined });
       await refetch();
-      setAnsweringPrayer(null);
-      setPraiseText('');
+      setAnswering(null);
+      setPraiseNote('');
     } catch {
-      // answerPrayer.error is rendered inside the modal.
+      // The write's own error is rendered inside the dialog.
     }
   };
 
-  const writeError = createPrayer.error ?? answerPrayer.error;
+  const retire = async (prayer: PrayerRequestDto) => {
+    await retirePrayer.run(prayer.id, {
+      reason: 'other',
+      reasonLabel: 'Taken off the prayer wall by the pastoral office',
+    });
+    await refetch();
+  };
+
+  const writeError = updatePrayer.error ?? answerPrayer.error ?? retirePrayer.error;
 
   return (
     <div className="flex flex-col space-y-6">
-      {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Active Petitions</span>
-            <div className="text-2xl font-black text-[#1C1917] mt-0.5">
-              {prayers.filter((p) => !p.isAnswered).length} Petitions
-            </div>
-            <span className="text-xs text-[#C2410C] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">local_fire_department</span>
-              24/7 Prayer Vigil Active
-            </span>
+        {[
+          { label: 'Being prayed for', value: `${beingPrayedFor} On the wall`, hint: 'Open and in prayer' },
+          { label: 'Answered', value: `${answered} Testimonies`, hint: 'Answered and dated' },
+          { label: 'Shared openly', value: `${shared} Public`, hint: 'Read by the whole office' },
+          { label: 'Off the wall', value: `${offTheWall} Archived`, hint: 'Kept for the record' },
+        ].map((card) => (
+          <div key={card.label} className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">{card.label}</span>
+            <div className="text-2xl font-black text-[#1C1917] mt-0.5">{card.value}</div>
+            <span className="text-xs text-[#57534E]">{card.hint}</span>
           </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">favorite</span>
-          </div>
-        </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Public Prayer Chain</span>
-            <div className="text-2xl font-black text-[#059669] mt-0.5">
-              {prayers.filter((p) => p.privacyLevel === 'public').length} Shared
-            </div>
-            <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">volunteer_activism</span>
-              Visible to the whole church
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">volunteer_activism</span>
-          </div>
-        </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Answered & Praises</span>
-            <div className="text-2xl font-black text-[#2563EB] mt-0.5">
-              {prayers.filter((p) => p.isAnswered).length} Testimonies
-            </div>
-            <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">celebration</span>
-              Glory to God
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#2563EB]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">workspace_premium</span>
-          </div>
-        </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Pastoral & Leaders</span>
-            <div className="text-2xl font-black text-[#D97706] mt-0.5">
-              {prayers.filter((p) => p.privacyLevel !== 'public').length} Held Privately
-            </div>
-            <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">lock</span>
-              Pastors & Elders only
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#D97706]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">shield_person</span>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Prayer Requests Directory */}
       <div className="bg-[#FFFFFF] rounded-[14px] p-5 border border-[#E7E5E4] shadow-warm-card">
-        {/* Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4] mb-4">
           <div>
             <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">volunteer_activism</span>
-              Church Prayer Chain & Intercession Wall
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">
+                volunteer_activism
+              </span>
+              Church Prayer Wall
             </h3>
             <p className="text-xs text-[#57534E] mt-0.5">
-              Submit petitions, stand in the gap, and celebrate answered prayers with the church community.
+              {isAdministrator
+                ? 'Requests marked private are included here, because an administrator is the only account the server releases them to.'
+                : 'Requests marked private are not sent to this account at all; only an administrator receives them.'}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select aria-label="Privacy level filter"
-              value={selectedPrivacy}
-              onChange={(e) => setSelectedPrivacy(e.target.value)}
+            <select
+              aria-label="Filter by where a request has got to"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as 'all' | PrayerRequestDto['status'])}
               className="px-3 py-1.5 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
             >
-              <option value="all">All Privacy Levels</option>
-              <option value="public">Public Prayer Chain</option>
-              <option value="leaders-only">Ministry Leaders Only</option>
-              <option value="pastoral-private">Pastoral Confidential</option>
+              <option value="all">Every request</option>
+              <option value="open">Open</option>
+              <option value="praying">Being prayed for</option>
+              <option value="answered">Answered</option>
+              <option value="archived">Off the wall</option>
             </select>
 
             {canEdit && (
               <button
                 type="button"
-                onClick={() => setIsSubmittingPrayer(true)}
+                onClick={openComposer}
                 className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
                 <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
-                Submit Petition
+                Log a request
               </button>
             )}
           </div>
@@ -179,151 +183,193 @@ export const PrayerRequestsPanel: React.FC = () => {
 
         {writeError && <ErrorBlock message={writeError} onRetry={() => void refetch()} className="mb-4" />}
 
-        {/* Prayer Requests Cards */}
         {loading && items.length === 0 ? (
-          <LoadingBlock label="Loading prayer requests…" />
+          <LoadingBlock label="Reading the prayer wall…" />
         ) : error ? (
           <ErrorBlock message={error} onRetry={() => void refetch()} />
-        ) : filteredPrayers.length === 0 ? (
+        ) : shown.length === 0 ? (
           <EmptyBlock
             icon="volunteer_activism"
-            title="No prayer requests here"
-            hint="Submit a petition and the prayer chain can stand with you."
+            title={items.length === 0 ? 'Nothing on the prayer wall' : 'Nothing at that stage'}
+            hint={
+              items.length === 0
+                ? 'Log a request and the church can stand with the person who asked.'
+                : 'Choose another stage, or look at every request.'
+            }
           />
         ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredPrayers.map((pr) => (
-            <div
-              key={pr.id}
-              className={`p-4 rounded-[12px] border transition-all flex flex-col justify-between ${
-                pr.isAnswered
-                  ? 'bg-[#059669]/5 border-[#059669]/30 ring-1 ring-[#059669]/20'
-                  : 'bg-[#FDF8F3] border-[#E7E5E4] hover:border-[#C2410C]/40'
-              }`}
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span
-                      className={`px-2 py-0.2 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        pr.privacyLevel === 'public'
-                          ? 'bg-[#059669]/10 text-[#059669]'
-                          : pr.privacyLevel === 'leaders-only'
-                          ? 'bg-[#2563EB]/10 text-[#2563EB]'
-                          : 'bg-[#DC2626]/10 text-[#DC2626]'
-                      }`}
-                    >
-                      {pr.privacyLevel.replace('-', ' ')}
-                    </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {shown.map((prayer) => (
+              <div
+                key={prayer.id}
+                className={`p-4 rounded-[12px] border flex flex-col justify-between ${
+                  prayer.status === 'answered'
+                    ? 'bg-[#059669]/5 border-[#059669]/30 ring-1 ring-[#059669]/20'
+                    : 'bg-[#FDF8F3] border-[#E7E5E4] hover:border-[#C2410C]/40'
+                }`}
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          prayer.status === 'answered'
+                            ? 'bg-[#059669]/10 text-[#059669]'
+                            : prayer.status === 'archived'
+                              ? 'bg-[#57534E]/10 text-[#57534E]'
+                              : 'bg-[#C2410C]/10 text-[#C2410C]'
+                        }`}
+                      >
+                        {STATUS_LABELS[prayer.status]}
+                      </span>
+                      {prayer.isPrivate && (
+                        <span className="px-2 py-0.5 rounded-full bg-[#1C1917]/5 text-[#1C1917] text-[10px] font-bold uppercase tracking-wider">
+                          Private
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="text-[11px] font-mono text-[#A8A29E]">{formatDate(prayer.submittedAt)}</span>
                   </div>
 
-                  <span className="text-[11px] font-mono text-[#A8A29E]">{pr.dateSubmitted}</span>
-                </div>
+                  <div className="text-xs text-[#57534E] mb-2 font-medium">
+                    Asked by <strong className="text-[#1C1917]">{whoAsked(prayer)}</strong>
+                  </div>
 
-                <h4 className="font-headline text-sm font-bold text-[#1C1917] mb-1">
-                  {pr.title}
-                </h4>
+                  <p className="text-xs text-[#57534E] leading-relaxed mb-3">{prayer.request}</p>
 
-                <div className="text-xs text-[#57534E] mb-2 font-medium">
-                  Requested by: <strong className="text-[#1C1917]">{pr.requestedBy}</strong>
-                </div>
-
-                <p className="text-xs text-[#57534E] leading-relaxed line-clamp-3 mb-3">
-                  {pr.details}
-                </p>
-
-                {pr.isAnswered && pr.answerDate && (
-                  <div className="p-2.5 rounded-[8px] bg-[#059669]/10 border border-[#059669]/30 text-xs text-[#059669] mb-3">
-                    <div className="font-bold flex items-center gap-1">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[15px]">celebration</span>
-                      Answered on {pr.answerDate}
+                  {prayer.answeredAt && (
+                    <div className="p-2.5 rounded-[8px] bg-[#059669]/10 border border-[#059669]/30 text-xs text-[#047857] mb-3">
+                      <div className="font-bold flex items-center gap-1">
+                        <span aria-hidden="true" className="material-symbols-outlined text-[15px]">celebration</span>
+                        Answered {formatDate(prayer.answeredAt)}
+                      </div>
                     </div>
+                  )}
+                </div>
+
+                {canEdit && (
+                  <div className="pt-3 border-t border-[#E7E5E4]/80 flex flex-wrap items-center justify-end gap-1 text-[11px]">
+                    {prayer.status === 'open' && (
+                      <button
+                        type="button"
+                        onClick={() => void walk(prayer, 'praying')}
+                        className="px-2 py-1 rounded-[6px] font-bold text-[#C2410C] hover:bg-[#C2410C]/10 cursor-pointer"
+                      >
+                        Taken to prayer
+                      </button>
+                    )}
+                    {prayer.status !== 'answered' && prayer.status !== 'archived' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPraiseNote('');
+                          setAnswering(prayer);
+                        }}
+                        className="px-2 py-1 rounded-[6px] font-bold text-[#059669] hover:bg-[#059669]/10 cursor-pointer"
+                      >
+                        Answered
+                      </button>
+                    )}
+                    {prayer.status !== 'archived' && (
+                      <button
+                        type="button"
+                        onClick={() => void walk(prayer, 'archived')}
+                        className="px-2 py-1 rounded-[6px] font-bold text-[#57534E] hover:bg-[#F5EDE4] cursor-pointer"
+                      >
+                        Take off the wall
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => void retire(prayer)}
+                        title="Move to the Trash"
+                        className="p-1 rounded text-[#DC2626] hover:text-[#B91C1C] cursor-pointer"
+                      >
+                        <span aria-hidden="true" className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
-
-              {!pr.isAnswered && canEdit && (
-                <div className="pt-3 border-t border-[#E7E5E4]/80 flex items-center justify-end text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setAnsweringPrayer(pr)}
-                    className="px-2.5 py-1 rounded-[6px] bg-[#059669]/10 hover:bg-[#059669] hover:text-white text-[#059669] text-xs font-bold border border-[#059669]/30 transition-all cursor-pointer"
-                  >
-                    Answered!
-                  </button>
-                </div>
-              )}
-            </div>          ))}
-        </div>
+            ))}
+          </div>
         )}
-
       </div>
 
-      {/* MODAL: Submit Prayer Petition */}
-      {isSubmittingPrayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...submittingPrayerDialog}>
+      {isSubmitting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...submittingDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
-              <h3 className="font-headline text-base font-bold text-[#1C1917]">Submit Prayer Petition</h3>
+              <h3 className="font-headline text-base font-bold text-[#1C1917]">Log a prayer request</h3>
               <button
                 type="button"
-                onClick={() => setIsSubmittingPrayer(false)}
-                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              aria-label="Close">
+                onClick={() => setIsSubmitting(false)}
+                aria-label="Close"
+                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md cursor-pointer"
+              >
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
-            <form onSubmit={handleCreatePrayer} className="mt-4 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="prayer-requested-by" className="block text-xs font-bold text-[#1C1917] mb-1">Requested By</label>
-                  <input id="prayer-requested-by" aria-label="Requested By"
-                    type="text"
-                    disabled={isAnonymous}
-                    placeholder="Your name"
-                    value={requestedBy}
-                    onChange={(e) => setRequestedBy(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] disabled:opacity-50"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="prayer-privacy" className="block text-xs font-bold text-[#1C1917] mb-1">Privacy Level</label>
-                  <select id="prayer-privacy" aria-label="Privacy Level"
-                    value={privacyLevel}
-                    onChange={(e) => setPrivacyLevel(e.target.value as PrayerPrivacyLevel)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  >
-                    <option value="public">Public Prayer Chain</option>
-                    <option value="leaders-only">Ministry Leaders Only</option>
-                    <option value="pastoral-private">Pastoral Confidential (Elders/Pastors)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="anonCheck"
-                  checked={isAnonymous}
-                  onChange={(e) => setIsAnonymous(e.target.checked)}
-                  className="rounded text-[#C2410C] focus:ring-[#C2410C]"
-                />
-                <label htmlFor="anonCheck" className="text-xs font-bold text-[#1C1917] cursor-pointer">
-                  Submit Anonymously (Hide name from prayer list)
+            <form onSubmit={submit} className="mt-4 space-y-4">
+              <div>
+                <label htmlFor="prayer-requested-by" className={LABEL}>
+                  Asked by
                 </label>
+                <input
+                  id="prayer-requested-by"
+                  type="text"
+                  disabled={isAnonymous}
+                  value={requestedBy}
+                  onChange={(event) => setRequestedBy(event.target.value)}
+                  placeholder="Their name, or leave it anonymous"
+                  className={`${FIELD} disabled:opacity-50`}
+                />
               </div>
 
               <div>
-                <label htmlFor="prayer-details" className="block text-xs font-bold text-[#1C1917] mb-1">Prayer Request *</label>
-                <textarea id="prayer-details" aria-label="Prayer Details"
-                  rows={3}
+                <label htmlFor="prayer-request" className={LABEL}>
+                  The request *
+                </label>
+                <textarea
+                  id="prayer-request"
+                  rows={4}
                   required
-                  placeholder="Share details so intercessors can pray specifically..."
-                  value={details}
-                  onChange={(e) => setDetails(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                  value={request}
+                  onChange={(event) => setRequest(event.target.value)}
+                  placeholder="Enough detail for the church to pray specifically, and no more."
+                  className={FIELD}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="prayer-anonymous"
+                    checked={isAnonymous}
+                    onChange={(event) => setIsAnonymous(event.target.checked)}
+                    className="rounded text-[#C2410C] focus:ring-[#C2410C]"
+                  />
+                  <label htmlFor="prayer-anonymous" className="text-xs font-bold text-[#1C1917] cursor-pointer">
+                    Leave the name off the wall
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="prayer-private"
+                    checked={isPrivate}
+                    onChange={(event) => setIsPrivate(event.target.checked)}
+                    className="rounded text-[#C2410C] focus:ring-[#C2410C]"
+                  />
+                  <label htmlFor="prayer-private" className="text-xs font-bold text-[#1C1917] cursor-pointer">
+                    Keep it private — administrators only
+                  </label>
+                </div>
               </div>
 
               {createPrayer.error && <ErrorBlock message={createPrayer.error} />}
@@ -331,7 +377,7 @@ export const PrayerRequestsPanel: React.FC = () => {
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
                 <button
                   type="button"
-                  onClick={() => setIsSubmittingPrayer(false)}
+                  onClick={() => setIsSubmitting(false)}
                   className="px-4 py-2 text-xs font-bold text-[#57534E] hover:text-[#1C1917] cursor-pointer"
                 >
                   Cancel
@@ -341,7 +387,7 @@ export const PrayerRequestsPanel: React.FC = () => {
                   disabled={createPrayer.pending}
                   className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-60"
                 >
-                  {createPrayer.pending ? 'Submitting…' : 'Submit Prayer'}
+                  {createPrayer.pending ? 'Saving…' : 'Log request'}
                 </button>
               </div>
             </form>
@@ -349,37 +395,38 @@ export const PrayerRequestsPanel: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Record Praise / Answered Prayer */}
-      {answeringPrayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...answeringPrayerDialog}>
+      {answering && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...answeringDialog}>
           <div className="bg-[#FFFFFF] rounded-[14px] max-w-md w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
-              <h3 className="font-headline text-base font-bold text-[#1C1917]">Record Answered Prayer</h3>
+              <h3 className="font-headline text-base font-bold text-[#1C1917]">Record an answered prayer</h3>
               <button
                 type="button"
-                onClick={() => setAnsweringPrayer(null)}
-                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              aria-label="Close">
+                onClick={() => setAnswering(null)}
+                aria-label="Close"
+                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md cursor-pointer"
+              >
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
-            <form onSubmit={handleMarkAnswered} className="mt-4 space-y-4">
+            <form onSubmit={markAnswered} className="mt-4 space-y-4">
               <div className="p-3 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4]">
-                <div className="text-[10px] font-bold text-[#A8A29E] uppercase">Petition</div>
-                <div className="font-bold text-xs text-[#1C1917] mt-0.5">{answeringPrayer.title}</div>
+                <div className="text-[10px] font-bold text-[#A8A29E] uppercase">Request</div>
+                <div className="text-xs text-[#1C1917] mt-0.5">{answering.request}</div>
               </div>
 
               <div>
-                <label htmlFor="praise-testimony" className="block text-xs font-bold text-[#1C1917] mb-1">
+                <label htmlFor="praise-note" className={LABEL}>
                   Note for the record
                 </label>
-                <textarea id="praise-testimony" aria-label="Note for the record"
+                <textarea
+                  id="praise-note"
                   rows={3}
-                  placeholder="How was this prayer answered? Kept in the audit trail beside the date."
-                  value={praiseText}
-                  onChange={(e) => setPraiseText(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                  value={praiseNote}
+                  onChange={(event) => setPraiseNote(event.target.value)}
+                  placeholder="How it was answered. Kept beside the date and in the audit trail."
+                  className={FIELD}
                 />
               </div>
 
@@ -388,7 +435,7 @@ export const PrayerRequestsPanel: React.FC = () => {
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
                 <button
                   type="button"
-                  onClick={() => setAnsweringPrayer(null)}
+                  onClick={() => setAnswering(null)}
                   className="px-4 py-2 text-xs font-bold text-[#57534E] hover:text-[#1C1917] cursor-pointer"
                 >
                   Cancel
@@ -398,7 +445,7 @@ export const PrayerRequestsPanel: React.FC = () => {
                   disabled={answerPrayer.pending}
                   className="px-4 py-2 rounded-[8px] bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-60"
                 >
-                  {answerPrayer.pending ? 'Saving…' : 'Mark as Answered'}
+                  {answerPrayer.pending ? 'Saving…' : 'Mark as answered'}
                 </button>
               </div>
             </form>

@@ -1,5 +1,7 @@
 import { prisma } from '../lib/prisma';
-import { hashPassword } from '../lib/auth';
+import { generateResetToken, hashPassword, hashResetToken } from '../lib/auth';
+import { emailStatus, sendEmail } from '../lib/email';
+import { env } from '../config/env';
 import { AppError, forbiddenError } from '../middleware/errorHandler';
 import type { AuthenticatedUser } from '../middleware/authenticate';
 import { toPublicUser } from './auth.service';
@@ -9,7 +11,7 @@ import { findLive, live } from '../lib/live';
 import { requireTenantId } from '../lib/tenant';
 import { assertWithinPlan } from './billing.service';
 import type { RetireReason } from '../schemas/common';
-import type { CreateUserInput, ListUsersQuery, RoleKey, UpdateUserInput } from '../schemas/user.schema';
+import type { CreateUserInput, InviteUserInput, ListUsersQuery, RoleKey, UpdateUserInput } from '../schemas/user.schema';
 
 async function roleIdFor(roleKey: RoleKey): Promise<string> {
   const role = await prisma.role.findFirst({ where: { key: roleKey, ...live } });
@@ -62,8 +64,10 @@ export async function listUsers(query: ListUsersQuery) {
       include: {
         role: true,
         memberships: {
-          where: { organizationId: requireTenantId(), isActive: true, ...live },
-          include: { role: true },
+          // The screen shows every church the account serves, not only this one — that is the point
+          // of the column — so the list is deliberately not narrowed to the active tenant.
+          where: { isActive: true, ...live, organization: { deletedAt: null } },
+          include: { role: true, organization: { select: { name: true } } },
         },
       },
       orderBy: [{ name: 'asc' }],
@@ -73,10 +77,23 @@ export async function listUsers(query: ListUsersQuery) {
   ]);
 
   return {
-    // The membership's role, falling back to the account's own for a login created before
-    // memberships existed. One person can administer one parish and only read another, and this
-    // screen belongs to one of them.
-    data: rows.map((row) => toPublicUser(row, row.memberships[0]?.role ?? row.role)),
+    // The membership's role **in this church** — found by the tenant, not by array order, because
+    // the include above deliberately spans every church the account serves — falling back to the
+    // account's own for a login created before memberships existed. One person can administer one
+    // parish and only read another, and this screen belongs to one of them.
+    data: rows.map((row) => ({
+      ...toPublicUser(
+        row,
+        row.memberships.find((membership) => membership.organizationId === requireTenantId())?.role ?? row.role,
+      ),
+      // The churches this account serves, with its role in each — what the accounts screen shows
+      // beside a name so an office knows who they are looking at before they pick up the phone.
+      churches: row.memberships.map((membership) => ({
+        id: membership.organizationId,
+        name: membership.organization.name,
+        roleKey: membership.role?.key ?? null,
+      })),
+    })),
     meta: page(total, query),
   };
 }
@@ -104,6 +121,93 @@ export async function createUser(input: CreateUserInput, actorId: string) {
   });
   await audit(actorId, 'create', created.id, `Created the account for ${created.name} as ${input.roleKey}`);
   return toPublicUser(created);
+}
+
+/**
+ * Invite an account: create it with no password and let its owner choose one through an emailed
+ * activation link.
+ *
+ * This is the flow the office actually wants — "give the treasurer access" — and it replaces the
+ * administrator-invents-a-password habit, where a password chosen by somebody who will never use it
+ * is then handed across a desk and often never changed. The activation link reuses the password
+ * reset machinery exactly: the same single-use, expiring, hashed token rows and the same `/?reset=`
+ * screen, so there is one way into an account and it is already audited.
+ *
+ * The answer reports whether a link could be emailed; when no provider is configured the administrator
+ * is shown the link itself in development, and in production is told to hand it over in person —
+ * the same honest posture the reset request takes.
+ */
+export async function inviteUser(
+  input: InviteUserInput,
+  actor: AuthenticatedUser,
+): Promise<{ user: ReturnType<typeof toPublicUser>; canSendEmail: boolean; devLink?: string }> {
+  await assertWithinPlan('maxUsers');
+  if (input.memberId) await assertMemberExists(input.memberId);
+  const roleId = await roleIdFor(input.roleKey);
+
+  // The account exists the moment it is invited — the email address must be reserved now, or two
+  // invitations could race — but its password is a value that verifies nothing. The hash is of a
+  // discarded random string, so the account cannot be signed into until its owner finishes the link.
+  const created = await prisma.user.create({
+    data: {
+      name: input.name,
+      email: input.email.toLowerCase(),
+      passwordHash: await hashPassword(generateResetToken()),
+      roleId,
+      memberId: input.memberId ?? null,
+      memberships: { create: { organizationId: requireTenantId(), roleId, isDefault: true } },
+    },
+    include: { role: true },
+  });
+  await audit(actor.id, 'create', created.id, `Invited ${created.name} (${input.roleKey}); an activation link was issued`);
+
+  // Any outstanding row is swept first, so the newest link is the only one that works.
+  await prisma.passwordResetToken.deleteMany({ where: { userId: created.id, usedAt: null } });
+  const token = generateResetToken();
+  await prisma.passwordResetToken.create({
+    data: {
+      userId: created.id,
+      tokenHash: hashResetToken(token),
+      // Two days rather than the reset link's hour: an invitation may sit unread over a weekend,
+      // and a parish office is not a password-reset emergency. It is still single-use and hashed.
+      expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60_000),
+    },
+  });
+
+  const link = `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/?reset=${encodeURIComponent(token)}`;
+  const canSendEmail = emailStatus().configured;
+  if (canSendEmail) {
+    const report = await sendEmail({
+      to: [created.email],
+      subject: `${env.APP_NAME}: you have been invited to ${env.APP_NAME}`,
+      text: [
+        `Hello ${created.name},`,
+        '',
+        `${actor.name} has made you an account for this church's records. Choose your own password here:`,
+        '',
+        link,
+        '',
+        'The link can be used once and expires in two days.',
+        'If you were not expecting this, you can ignore the message — no account works until the password is chosen.',
+      ].join('\n'),
+    });
+    if (report.delivered === 0) throw new AppError(502, 'The email provider refused the invitation — the account exists, but the link was not delivered', 'email_send_failed');
+  } else {
+    await audit(
+      actor.id,
+      'update',
+      created.id,
+      'An activation link was issued but could not be emailed (no email provider is configured)',
+    );
+  }
+
+  return {
+    user: toPublicUser(created),
+    canSendEmail,
+    // Development only, exactly like the reset request: a link in a response body is a handover aid
+    // on a laptop, and a leak in production.
+    ...(canSendEmail || env.NODE_ENV !== 'development' ? {} : { devLink: link }),
+  };
 }
 
 export async function updateUser(id: string, input: UpdateUserInput, actorId: string) {
@@ -171,9 +275,17 @@ export async function resetPassword(id: string, password: string, actor: Authent
 
   await prisma.user.update({
     where: { id },
-    data: { passwordHash: await hashPassword(password), failedAttempts: 0, lockedUntil: null },
+    data: {
+      passwordHash: await hashPassword(password),
+      failedAttempts: 0,
+      lockedUntil: null,
+      // An administrator setting a password is the office's "somebody else may have the old one"
+      // case, so every session the account had is ended by it — including any the account holder
+      // left open on a machine the administrator cannot see.
+      tokenVersion: { increment: 1 },
+    },
   });
-  await audit(actor.id, 'update', id, `Reset the password for ${target.name}`);
+  await audit(actor.id, 'update', id, `Reset the password for ${target.name}; their other sessions were ended`);
 }
 
 /**

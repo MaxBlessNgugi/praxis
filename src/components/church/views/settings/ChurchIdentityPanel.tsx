@@ -122,6 +122,16 @@ export const ChurchIdentityPanel: React.FC = () => {
     }
   };
 
+  /** Detach the mark from the profile; the file itself sits in the Trash for thirty days. */
+  const handleLogoRemoved = async () => {
+    try {
+      await attachLogo.run({ logoFileId: null });
+      await profile.refetch();
+    } catch {
+      // attachLogo.error is rendered below.
+    }
+  };
+
   if (profile.loading && !record) {
     return (
       <div className="bg-white rounded-[14px] p-6 border border-[#E7E5E4] shadow-warm-card">
@@ -173,6 +183,7 @@ export const ChurchIdentityPanel: React.FC = () => {
         currentFileId={record?.logoFileId ?? null}
         disabled={!canWrite || attachLogo.pending}
         onUploaded={handleLogoUploaded}
+        onRemoved={record?.logoFileId ? handleLogoRemoved : undefined}
       />
 
       {writeError && <ErrorBlock message={writeError} onRetry={() => void profile.refetch()} />}

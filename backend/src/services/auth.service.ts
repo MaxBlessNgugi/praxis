@@ -1,13 +1,21 @@
 import type { Organization, Role, User } from '@prisma/client';
 import { basePrisma, clientFor, prisma } from '../lib/prisma';
-import { hashPassword, signAccessToken, verifyPassword } from '../lib/auth';
+import { generateResetToken, hashPassword, hashResetToken, signAccessToken, verifyPassword } from '../lib/auth';
 import { emailStatus, sendEmail } from '../lib/email';
 import { env } from '../config/env';
+import { requireTenantId } from '../lib/tenant';
 import { AppError, forbiddenError, unauthorizedError } from '../middleware/errorHandler';
 import { live } from '../lib/live';
 import { defaultPlan, subscriptionForOrganization, currentSubscription } from './billing.service';
 import type { AuthenticatedUser } from '../middleware/authenticate';
-import type { ChangePasswordInput, LoginInput, SignupInput } from '../schemas/auth.schema';
+import type {
+  ChangePasswordInput,
+  LoginInput,
+  PasswordResetConfirmInput,
+  PasswordResetRequestInput,
+  SignupInput,
+  UpdateOwnProfileInput,
+} from '../schemas/auth.schema';
 
 /**
  * Lockout policy. These belong in `config/env.ts` once the church has an opinion on them; they are
@@ -185,7 +193,7 @@ export async function login(input: LoginInput, ip?: string) {
   });
 
   return {
-    token: signAccessToken({ sub: signedIn.id, org: membership.organizationId }),
+    token: signAccessToken({ sub: signedIn.id, org: membership.organizationId, ver: signedIn.tokenVersion }),
     expiresIn: env.JWT_EXPIRES_IN,
     user: toPublicUser(signedIn, role),
     organization: toPublicOrganization(membership.organization),
@@ -281,7 +289,7 @@ export async function signup(input: SignupInput, ip?: string) {
   // The same shape `login` answers, so the console's sign-in and sign-up paths converge immediately
   // and a new church is inside its own console with no second step.
   return {
-    token: signAccessToken({ sub: created.user.id, org: created.organization.id }),
+    token: signAccessToken({ sub: created.user.id, org: created.organization.id, ver: created.user.tokenVersion }),
     expiresIn: env.JWT_EXPIRES_IN,
     user: toPublicUser({ ...created.user, role }),
     organization: toPublicOrganization(created.organization),
@@ -364,33 +372,55 @@ export async function switchOrganization(userId: string, organizationId: string)
       ...live,
       organization: { isActive: true, deletedAt: null },
     },
-    include: { role: true, organization: true },
+    include: { role: true, organization: true, user: { include: { role: true } } },
   });
   if (!membership) throw forbiddenError('That account does not serve this church');
 
+  // Written the way sign-in is: the move between churches is an act worth a line in the church's own
+  // log, in the log of the church being moved *into*.
+  await clientFor(membership.organizationId).auditLog.create({
+    data: {
+      actorId: userId,
+      action: 'login',
+      entityName: 'User',
+      entityId: userId,
+      summary: `${membership.user.name} switched this session to ${membership.organization.name}`,
+      ipAddress: null,
+    },
+  });
+
   return {
-    token: signAccessToken({ sub: userId, org: membership.organizationId }),
+    token: signAccessToken({ sub: userId, org: membership.organizationId, ver: membership.user.tokenVersion }),
     expiresIn: env.JWT_EXPIRES_IN,
     organization: toPublicOrganization(membership.organization),
     rights: rightsForRole(membership.role),
     subscription: await subscriptionForOrganization(membership.organizationId),
+    user: toPublicUser(membership.user, membership.role),
+    organizations: await organizationsFor(userId),
   };
 }
 
 /**
  * Changing your own password.
  *
- * Three decisions are worth stating. The current password is checked even though the caller holds a
+ * Four decisions are worth stating. The current password is checked even though the caller holds a
  * valid token, because a token is exactly the thing that gets copied off a shared parish machine and
- * the account owner is who must still be able to end that. A successful change also clears any
- * lockout, which is the honest reading of it: the person who can prove they know the password is the
- * person the lock was protecting. And the new password may not be the old one, because "change it"
- * that leaves it unchanged is a false sense of having done something.
+ * the account owner is who must still be able to end that. A successful change clears any lockout,
+ * which is the honest reading of it: the person who can prove they know the password is the person
+ * the lock was protecting. The new password may not be the old one, because "change it" that leaves
+ * it unchanged is a false sense of having done something. And it bumps `tokenVersion`, which ends
+ * every other session on the account — so the copy of the token that prompted the change stops
+ * working.
  *
- * The session is not refreshed and no token is revoked — see `logout` for why there is nothing to
- * revoke. The caller keeps working with the token they have.
+ * The caller's own session is not ended by that bump: a fresh token is minted from the new version
+ * and returned, which is the difference between "you are still signed in here" and "that other
+ * machine is not".
  */
-export async function changeOwnPassword(userId: string, input: ChangePasswordInput, ip?: string): Promise<void> {
+export async function changeOwnPassword(
+  userId: string,
+  input: ChangePasswordInput,
+  ip?: string,
+): Promise<{ token: string; expiresIn: string }> {
   const user = await prisma.user.findFirst({ where: { id: userId, ...live } });
   if (!user) throw unauthorizedError();
 
@@ -401,13 +431,14 @@ export async function changeOwnPassword(userId: string, input: ChangePasswordInp
     throw new AppError(400, 'That is already your password — choose a different one', 'password_unchanged');
   }
 
-  await prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: user.id },
     data: {
       passwordHash: await hashPassword(input.newPassword),
       // A lockout is lifted by the person proving they know the password it was guarding.
       failedAttempts: 0,
       lockedUntil: null,
+      tokenVersion: { increment: 1 },
     },
   });
 
@@ -417,19 +448,184 @@ export async function changeOwnPassword(userId: string, input: ChangePasswordInp
       action: 'update',
       entityName: 'User',
       entityId: user.id,
-      summary: `${user.name} changed their own password`,
+      summary: `${user.name} changed their own password; every other session was ended`,
       ipAddress: ip ?? null,
     },
   });
+
+  return {
+    token: signAccessToken({ sub: updated.id, org: requireTenantId(), ver: updated.tokenVersion }),
+    expiresIn: env.JWT_EXPIRES_IN,
+  };
+}
+
+/**
+ * A reset link, requested from the sign-in screen by somebody who is not signed in.
+ *
+ * Three things are deliberate. The answer is **the same whether or not the address is registered**,
+ * because a different one turns this endpoint into a way to find out who has an account here — which
+ * is why the response carries nothing about the *send*: a field saying "delivered" would say
+ * "delivered" for a registered address and nothing for a stranger, and the oracle would be back.
+ * What it does carry is whether this *installation* can send mail at all, which is the same answer
+ * for every caller. Asking again **replaces** the previous link rather than adding a second, so a
+ * stolen old email is not a second key. And a send that cannot happen is never reported as one: with
+ * no provider configured nothing is delivered, and in development the link comes back in the
+ * response so the flow can still be finished on a laptop.
+ */
+export interface PasswordResetRequestResult {
+  message: string;
+  /**
+   * Whether this server has an email provider at all. A property of the installation, deliberately
+   * not of the address: nothing in this answer may differ between a known account and a stranger.
+   */
+  canSendEmail: boolean;
+  /** How long a link stays good, so the screen can say it without hard-coding the policy. */
+  expiresInMinutes: number;
+  /** Development only, and only when nothing could be sent. Never present in production. */
+  devLink?: string;
+}
+
+export async function requestPasswordReset(
+  input: PasswordResetRequestInput,
+  ip?: string,
+): Promise<PasswordResetRequestResult> {
+  const canSendEmail = emailStatus().configured;
+  const answer: PasswordResetRequestResult = {
+    message: 'If that address belongs to an account, a reset link is on its way.',
+    canSendEmail,
+    expiresInMinutes: env.RESET_TOKEN_TTL_MINUTES,
+  };
+
+  const user = await basePrisma.user.findFirst({ where: { email: input.email.toLowerCase(), ...live } });
+  // No account, or a deactivated one: the same answer, no token, no mail. A deactivated account
+  // cannot be reset into working order by whoever holds the address — that is an administrator's act.
+  if (!user || !user.isActive) return answer;
+
+  await basePrisma.passwordResetToken.deleteMany({ where: { userId: user.id, usedAt: null } });
+  const token = generateResetToken();
+  await basePrisma.passwordResetToken.create({
+    data: {
+      userId: user.id,
+      tokenHash: hashResetToken(token),
+      expiresAt: new Date(Date.now() + env.RESET_TOKEN_TTL_MINUTES * 60_000),
+      requestedIp: ip ?? null,
+    },
+  });
+
+  const link = `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/?reset=${encodeURIComponent(token)}`;
+
+  if (!canSendEmail) {
+    if (env.NODE_ENV === 'development') answer.devLink = link;
+    await auditAcrossMemberships(user.id, 'Password reset requested (no email provider is configured, so nothing was sent)', ip);
+    return answer;
+  }
+
+  const report = await sendEmail({
+    to: [user.email],
+    subject: `${env.APP_NAME}: reset your password`,
+
+    text: [
+      `Hello ${user.name},`,
+      '',
+      'Somebody asked to reset the password for this Praxis account. If that was you, open this link:',
+      '',
+      link,
+      '',
+      `The link can be used once and expires in ${env.RESET_TOKEN_TTL_MINUTES} minutes.`,
+      'If it was not you, nothing has changed and you can ignore this message.',
+    ].join('\n'),
+  });
+
+  // The provider's own result goes to the audit log rather than to the caller: it would otherwise be
+  // the same oracle under a different name.
+  await auditAcrossMemberships(
+    user.id,
+    report.delivered > 0
+      ? 'Password reset requested; the link was emailed'
+      : 'Password reset requested; the provider refused the send',
+    ip,
+  );
+  return answer;
+}
+
+/**
+ * Spending a reset link.
+ *
+ * The row is the authority, not the request: a link that is unknown, already spent or past its expiry
+ * is refused with one sentence that says none of those things in particular. A successful reset bumps
+ * `tokenVersion` like a password change, so every session that existed before it is over — which is
+ * the point of resetting a password you believe somebody else has.
+ */
+export async function confirmPasswordReset(input: PasswordResetConfirmInput, ip?: string): Promise<void> {
+  const row = await basePrisma.passwordResetToken.findUnique({
+    where: { tokenHash: hashResetToken(input.token) },
+    include: { user: true },
+  });
+
+  if (!row || row.usedAt || row.expiresAt <= new Date() || row.user.deletedAt) {
+    throw new AppError(400, 'That reset link is no longer valid. Ask for a new one.', 'invalid_reset_token');
+  }
+  if (!row.user.isActive) throw new AppError(403, 'This account has been deactivated', 'deactivated');
+  if (await verifyPassword(input.password, row.user.passwordHash)) {
+    throw new AppError(400, 'That is already your password — choose a different one', 'password_unchanged');
+  }
+
+  const passwordHash = await hashPassword(input.password);
+  const now = new Date();
+
+  await basePrisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: row.userId },
+      data: { passwordHash, tokenVersion: { increment: 1 }, failedAttempts: 0, lockedUntil: null },
+    });
+    await tx.passwordResetToken.update({ where: { id: row.id }, data: { usedAt: now } });
+    // Any other link that was outstanding dies with this one: the password has just been replaced, so
+    // a second email from ten minutes ago must not be a way back in.
+    await tx.passwordResetToken.deleteMany({ where: { userId: row.userId, usedAt: null } });
+  });
+
+  await auditAcrossMemberships(row.userId, `${row.user.name} reset their password with an emailed link`, ip);
+}
+
+/**
+ * One audit line in every church the account serves.
+ *
+ * A password event on an account that belongs to a parish office is the parish's business, and the
+ * audit log is per church — so the line is written where somebody will actually read it rather than
+ * in one arbitrary church. Both reset paths run outside a request context (the caller is not signed
+ * in), which is why each line names its church explicitly through `clientFor`.
+ */
+async function auditAcrossMemberships(userId: string, summary: string, ip?: string): Promise<void> {
+  const memberships = await basePrisma.organizationMember.findMany({
+    where: { userId, isActive: true, ...live },
+    select: { organizationId: true },
+  });
+
+  await Promise.all(
+    memberships.map((membership) =>
+      clientFor(membership.organizationId).auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'update',
+          entityName: 'User',
+          entityId: userId,
+          summary,
+          ipAddress: ip ?? null,
+        },
+      }),
+    ),
+  );
 }
 
 /**
  * Sign out.
  *
- * There is nothing to revoke. The token is a signed statement that lives on the client until it
- * expires, and this endpoint cannot unsign it — so it records the intent and tells the truth. Making
- * logout real means either a denylist or a short-lived token with a refresh flow; until one of those
- * exists, a stolen token remains valid for up to its full lifetime, and the frontend must discard it.
+ * This discards the caller's token on the client and records the intent; it cannot unsign a token
+ * that is already in somebody's browser. What *does* end sessions server-side is a password change or
+ * a reset, which bump the account's `tokenVersion` and are refused by `authenticate` from then on. So
+ * the honest statement is: sign out here, change your password if you believe a token was copied, and
+ * "sign out everywhere" is the latter. A denylist would make the former real as well; it is not built
+ * yet, and this comment is the place that says so.
  */
 export async function logout(userId: string, ip?: string): Promise<void> {
   await prisma.auditLog.create({
@@ -438,7 +634,7 @@ export async function logout(userId: string, ip?: string): Promise<void> {
       action: 'update',
       entityName: 'User',
       entityId: userId,
-      summary: 'Signed out (client discards the token; it is not revocable server-side)',
+      summary: 'Signed out (this browser discards its token; change the password to end every session)',
       ipAddress: ip ?? null,
     },
   });
@@ -502,4 +698,33 @@ export async function organizationsFor(userId: string) {
     roleKey: membership.role?.key ?? null,
     isDefault: membership.isDefault,
   }));
+}
+
+/**
+ * A signed-in account renaming itself.
+ *
+ * The email is deliberately absent from this endpoint — it is the account's identity across every
+ * church it serves, and how its password mail is addressed, so changing it is an administrator's act
+ * through the accounts screen. The name is cosmetic and self-owned.
+ */
+export async function updateOwnProfile(
+  userId: string,
+  input: UpdateOwnProfileInput,
+  ip?: string,
+): Promise<{ name: string }> {
+  const user = await prisma.user.findFirst({ where: { id: userId, ...live } });
+  if (!user) throw new AppError(404, 'That account no longer exists', 'not_found');
+
+  await prisma.user.update({ where: { id: userId }, data: { name: input.name } });
+  await prisma.auditLog.create({
+    data: {
+      actorId: userId,
+      action: 'update',
+      entityName: 'User',
+      entityId: userId,
+      summary: `Changed the name on their own account from "${user.name}" to "${input.name}"`,
+      ipAddress: ip ?? null,
+    },
+  });
+  return { name: input.name };
 }

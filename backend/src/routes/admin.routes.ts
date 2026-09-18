@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as adminController from '../controllers/admin.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { moduleGate } from '../middleware/authorize';
 import { requireAuth, requireRole } from '../middleware/authenticate';
 
 /**
@@ -22,7 +23,7 @@ export const adminRouter = Router();
 
 const SUPERS = requireRole('super_admin');
 
-adminRouter.use(requireAuth, requireRole('admin'));
+adminRouter.use(requireAuth, requireRole('admin'), moduleGate('admin'));
 
 // The Trash
 adminRouter.get('/trash', asyncHandler(adminController.listTrash));

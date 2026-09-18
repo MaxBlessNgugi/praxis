@@ -15,3 +15,6 @@ export function actor(req: Request): string {
 
 /** A path parameter, which Express types as possibly-an-array and possibly-undefined. */
 export const id = (req: Request): string => req.params.id as string;
+
+/** The signed-in account's role, for the few reads whose scope depends on who is asking. */
+export const roleKey = (req: Request): string | null => req.user?.roleKey ?? null;

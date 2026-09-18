@@ -181,13 +181,24 @@ const MEASURE_DIALOG = `(() => {
   const el = document.querySelector('[data-dialog-probe]');
   const active = document.activeElement;
   if (!el || !active) return { gone: true };
-  // The accessible name a screen reader would use: aria-label wins, and an aria-hidden icon
-  // subtree contributes nothing — reading a ligature glyph as text would pass a nameless button.
+  // The accessible name a screen reader would use, in the spec's order: aria-labelledby, aria-label,
+  // a <label> associated with the control, title. The label step is not optional — every form field
+  // in this console is labelled with \`<label htmlFor>\`, so a name computed without it reads as
+  // "unnamed" about a field a screen reader names perfectly well. An aria-hidden icon subtree
+  // contributes nothing, so a ligature glyph cannot pass as a name.
   const accName = (node) => {
+    const by = (node.getAttribute('aria-labelledby') || '').trim();
+    if (by) {
+      const text = by.split(/\\s+/).map((id) => { const t = document.getElementById(id); return t ? t.textContent : ''; }).join(' ').replace(/\\s+/g, ' ').trim();
+      if (text) return text;
+    }
     const direct = (node.getAttribute('aria-label') || '').trim();
     if (direct) return direct;
-    const by = (node.getAttribute('aria-labelledby') || '').trim();
-    if (by) return by.split(/\\s+/).map((id) => { const t = document.getElementById(id); return t ? t.textContent : ''; }).join(' ').replace(/\\s+/g, ' ').trim();
+    const labels = node.labels ? [...node.labels] : [];
+    const fromLabel = labels.map((l) => (l.textContent || '').trim()).join(' ').replace(/\\s+/g, ' ').trim();
+    if (fromLabel) return fromLabel;
+    const title = (node.getAttribute('title') || '').trim();
+    if (title) return title;
     const clone = node.cloneNode(true);
     clone.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
     return (clone.textContent || '').replace(/\\s+/g, ' ').trim();

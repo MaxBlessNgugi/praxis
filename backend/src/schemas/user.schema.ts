@@ -14,6 +14,12 @@ export const createUserSchema = z.object({
   memberId: z.string().uuid().optional(),
 });
 
+/**
+ * An invitation is the same payload without the password: the whole point is that nobody invents
+ * one for the person being invited — they choose their own through the activation link.
+ */
+export const inviteUserSchema = createUserSchema.omit({ password: true });
+
 export const updateUserSchema = z
   .object({
     name: z.string().trim().min(2).max(120).optional(),
@@ -46,6 +52,7 @@ export const removeUserSchema = retireReasonSchema.extend({
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type InviteUserInput = z.infer<typeof inviteUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
 export type RoleKey = z.infer<typeof roleKeySchema>;
