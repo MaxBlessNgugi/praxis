@@ -1,6 +1,5 @@
 import React from 'react';
 import { useOrgProfile } from '../../../../hooks/useApi';
-import { CHURCH } from '../../../../data/churchDomain';
 import { ChurchIdentityPanel } from './ChurchIdentityPanel';
 import { ErrorBlock, LoadingBlock } from '../../DataState';
 
@@ -75,7 +74,6 @@ export const OrgProfileSettingsPanel: React.FC = () => {
             ) : (
               <p className="text-xs text-[#57534E]">No service times recorded yet — they are set through the welcome wizard or an administrator.</p>
             )}
-            <p className="text-[11px] text-[#A8A29E]">Office hours: {CHURCH.officeHours}</p>
           </div>
 
           {/* Social channels */}

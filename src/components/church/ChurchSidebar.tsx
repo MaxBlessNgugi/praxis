@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { ParishNavTab, MembersSubTab } from '../../types';
-import { CHURCH, initialsOf } from '../../data/churchDomain';
+import { initialsOf } from '../../data/churchDomain';
 import { useAuth } from '../../lib/auth';
 import logoMark from '../../assets/brand/praxis-icon.webp';
 import logoWordmark from '../../assets/brand/praxis-wordmark.webp';
@@ -23,10 +23,10 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
   collapsed = false,
 }) => {
   // The church the session is acting for, and the account signed in to it, so the chrome names the
-  // parish whose records are on screen and the person reading them. The mock names stay as the
-  // fallback for a render outside a session.
+  // parish whose records are on screen and the person reading them. Nothing is invented: before a
+  // session resolves there is no name to show, and the control is not rendered until there is one.
   const { user, organization } = useAuth();
-  const signedInName = user?.name ?? CHURCH.visionaryLeader;
+  const signedInName = user?.name ?? '';
 
   /**
    * The bottom-left account control.
@@ -61,7 +61,7 @@ export const ChurchSidebar: React.FC<ChurchSidebarProps> = ({
                   the full product name available to a screen reader. */}
               <img src={logoWordmark} alt="Praxis Church OS" className="h-5 w-auto self-start" />
               <span className="font-headline text-[11px] font-semibold text-[#57534E] truncate">
-                {organization?.name ?? CHURCH.name}
+                {organization?.name ?? ''}
               </span>
             </div>
           )}

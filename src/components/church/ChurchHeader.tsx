@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { CHURCH, initialsOf } from '../../data/churchDomain';
+import { initialsOf } from '../../data/churchDomain';
 import { useAuth } from '../../lib/auth';
 import { useAnnouncements } from '../../hooks/useApi';
 import { AccountMenuBody, useDismissableMenu } from './AccountMenu';
@@ -95,7 +95,8 @@ const HeaderAccountMenu: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   useDismissableMenu(open, () => setOpen(false), containerRef);
 
-  const signedInName = user?.name ?? CHURCH.visionaryLeader;
+  const signedInName = user?.name ?? '';
+  if (!signedInName) return null;
 
   return (
     <div className="relative" ref={containerRef}>

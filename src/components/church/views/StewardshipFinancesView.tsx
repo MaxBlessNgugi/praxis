@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FinancesSubTab } from '../../../types';
-import { CHURCH, formatKes } from '../../../data/churchDomain';
-import { useFinanceSummary } from '../../../hooks/useApi';
+import { formatKes } from '../../../data/churchDomain';
+import { useFinanceSummary, useOrgProfile } from '../../../hooks/useApi';
 import { day, describeWindow, PERIOD_LABELS, rangeFor, type DateWindow, type RangePreset } from '../../../lib/period';
 import { FinancesTithesPanel } from './FinancesTithesPanel';
 import { FinancesOfferingsPanel } from './FinancesOfferingsPanel';
@@ -42,6 +42,11 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
   const window: DateWindow = preset === CUSTOM ? custom : rangeFor(preset);
   const summary = useFinanceSummary(window);
 
+  // The give-online link is the church's own — read from its profile record like every other
+  // published fact, and hidden while there is no address to go to.
+  const profile = useOrgProfile();
+  const givingUrl = profile.data?.data?.website ?? null;
+
   const handleTabChange = (tab: FinancesSubTab) => {
     setActiveTab(tab);
     onSubTabChange?.(tab);
@@ -72,15 +77,17 @@ export const StewardshipFinancesView: React.FC<StewardshipFinancesViewProps> = (
             <p className="text-xs text-[#57534E] mt-0.5">
               Member tithes, counted plate collections, capital campaigns, and confidential deacon welfare.
             </p>
-            <a
-              href={CHURCH.givingUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-2 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">volunteer_activism</span>
-              Give Online
-            </a>
+            {givingUrl && (
+              <a
+                href={givingUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-2 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">volunteer_activism</span>
+                Give Online
+              </a>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5 p-1.5 bg-[#F8F1E9] rounded-[14px] border border-[#E7E5E4] self-start md:self-auto overflow-x-auto max-w-full">
