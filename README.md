@@ -357,6 +357,8 @@ API (from `backend/`):
 | `npm run migrate:deploy` | Apply committed migrations (what the release step runs) |
 | `npm run seed` | Load the demo data — one church (Destiny Sanctuary, its leadership and its records), the three subscription plans, and that church's own subscription and first payment |
 | `npm run check:isolation` | Proves one church cannot reach another's records — every list, every by-id read, files, and a member of staff serving two churches (needs the API running) |
+| `npm run check:people` | Households and ministries end to end: a household staffed, headed, emptied before it may retire and put back from the trash; a ministry that refuses retirement while anybody still serves; the viewer/staff/admin role boundaries (needs the API running) |
+| `npm run check:launch` | A church nobody has heard of signs itself up, finishes the welcome wizard, enrols somebody, records money, plans a service and publishes a notice — the whole first Sunday (needs the API running) |
 | `npm run check:security` | The posture itself: refusals without a token, security headers, CORS, upload checks, password policy, lockout and rate limits (needs the API running, and leaves the calling address throttled for up to a minute) |
 | `npm run check:auth` | Drives the account lifecycle on a throwaway account: a password change that ends the other sessions and keeps this one, a reset link that is single-use, expiring and stored only as a hash (needs the API running) |
 | `npm run check:finance` | The giving ledger: recording, voiding and restoring with the totals moving exactly, the hash chain catching a hand-edited row, and another church reaching none of it (needs the API running) |

@@ -25,7 +25,7 @@ Two things are worth knowing before anything else:
 | **Church Council** | Meetings, resolutions with their decision workflow, the constitution and by-laws | The secretary and the council |
 | **Giving & Stewardship** | Tithes, offerings, project funding, welfare, charity, the giving ledger | The treasurer (and the pastor, to read) |
 | **Inventory & Assets** | Church property and its state | The administrator |
-| **Groups & Fellowships** | Departments, leadership roles, volunteers | The ministry coordinators |
+| **Groups & Fellowships** | Departments, leadership roles, volunteers, and the midweek circles (cell groups and fellowships) with their rolls and meeting records | The ministry coordinators |
 | **Reports & Certs** | Overview and filtered reports, certificates, the AGM dossier | The secretary and the pastor |
 | **Communications** | Announcements, broadcasts (email/SMS), events, prayer requests, birthdays | The office |
 | **Settings & Profile** | The church's own details, service times, subscription, integrations, data & backup | Owners and administrators |

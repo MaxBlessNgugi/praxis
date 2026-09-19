@@ -116,6 +116,29 @@ that have not been applied, and does nothing once the database is current.
 
 ---
 
+## Releasing, in order
+
+The routine for every deploy that touches a live church:
+
+1. **Back up.** `npm run backup` (or `node tools/backup-db.mjs --out /somewhere/safe`) from the
+   repository root, against the production `DIRECT_URL`. Do not skip this — it is the rollback.
+2. **Deploy.** Push the release (Railway redeploys on the branch; `fly deploy` elsewhere).
+3. **Migrate.** The release command and the Docker entrypoint both run `prisma migrate deploy`
+   before the server starts. If a migration fails, the container does not boot and the old version
+   keeps serving — that is the safe direction for it to fail in.
+4. **Health check.** `curl https://<your-api-domain>/health` until it answers `200`.
+5. **Smoke test.** Sign in on the console; Home totals render; record a tithe on a test member and
+   confirm it appears in the giving ledger, then void it with a reason.
+6. **Monitor.** Watch the first hour of logs (`railway logs` / the host's equivalent) for 5xx lines.
+
+**Rolling back** means redeploying the previous release — Railway keeps every deployment, and one
+click reinstates it. The database is *not* rolled back: migrations that have already applied stay
+applied, which is why step 1 exists. If a migration itself caused the damage, restore the dump from
+step 1 into a new database per [`backups.md`](backups.md), point the API at it, and accept the loss
+of everything after the dump.
+
+---
+
 ## 6. Anywhere else: Docker
 
 `backend/Dockerfile` builds the same service for any host that runs containers — Fly, Render, a VPS,
@@ -132,6 +155,8 @@ Three variables the container needs that a local run does not: `NODE_ENV=product
 database URLs, and `TRUST_PROXY_HOPS` set to the number of proxies in front of it (`1` for a single
 load balancer). That last one is not optional behind a proxy: the client address decides every
 rate-limit bucket, and an unset hop count means every request looks like it came from the balancer.
+For a Kenyan church also set `DISPLAY_TIMEZONE=Africa/Nairobi` — it is the zone every CSV ledger and
+printed register names its dates in, so exported days match the office wall calendar.
 
 The image carries the Prisma CLI, because the boot command is a migration. That is deliberate — see
 the note at the top of the Dockerfile — and it is why `--omit=dev` is *not* used. The container

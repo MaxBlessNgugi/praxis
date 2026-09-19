@@ -78,9 +78,10 @@ const schema = z.object({
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_FROM: z.string().optional(),
 
-  // -------------------------------------------------------------------------------------------
-  // Monitoring
-  // -------------------------------------------------------------------------------------------
+  /// The IANA zone the church's office lives in, used wherever a date is shown or exported as a
+  /// calendar day rather than an instant. `UTC` by default only because something has to be: for
+  /// Kenya set `Africa/Nairobi`, and the ledgers then agree with the wall calendar.
+  DISPLAY_TIMEZONE: z.string().default('UTC'),
   /// A Sentry-compatible DSN. Unset — the default — means failures are logged and go no further, and
   /// nothing is sent to a third party unless somebody deliberately configured one.
   SENTRY_DSN: z.string().optional(),
@@ -137,3 +138,21 @@ export const corsOrigins = env.CORS_ORIGIN.split(',')
 export const uploadBodyLimit = Math.ceil(env.UPLOAD_MAX_BYTES * 1.4) + 64 * 1024;
 
 export const isProduction = env.NODE_ENV === 'production';
+
+// An unparseable zone makes every Intl call below silently fall back to UTC, which is exactly the
+// kind of drift this setting exists to prevent — so a typo fails at boot, loudly.
+if (!Number.isNaN(new Date().getTimezoneOffset()) && !isValidTimeZone(env.DISPLAY_TIMEZONE)) {
+  throw new Error(`DISPLAY_TIMEZONE "${env.DISPLAY_TIMEZONE}" is not an IANA time zone (e.g. Africa/Nairobi).`);
+}
+
+function isValidTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The church's own calendar: the zone every exported or printed date is named in. */
+export const displayTimeZone = env.DISPLAY_TIMEZONE;

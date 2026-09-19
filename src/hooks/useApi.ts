@@ -15,6 +15,7 @@ import {
   financeApi,
   governanceApi,
   inventoryApi,
+  groupsApi,
   ministriesApi,
   offeringsApi,
   prayerApi,
@@ -54,16 +55,20 @@ import {
   type InventoryItemDto,
   type InventoryKind,
   type InventoryReportDto,
+  type MaintenanceRecordDto,
   type InventoryStatus,
   type IssueDto,
   type ListEnvelope,
   type MemberRefWithPhone,
   type MeetingDto,
+  type GroupDto,
+  type GroupMeetingDto,
   type MinistryDto,
   type MinistryMemberDto,
   type OfferingDto,
   type OrganizationProfileDto,
   type PageMeta,
+  type MemberReportDto,
   type PrayerRequestDto,
   type ProjectDto,
   type PurchaseDto,
@@ -427,6 +432,31 @@ export function useMinistries(params?: { q?: string; isActive?: boolean }) {
   return useList<MinistryDto>(() => ministriesApi.list(params), [params?.q, params?.isActive]);
 }
 
+/** The fellowships that meet midweek — the Groups & Fellowships screen's rows. */
+export function useGroups(params?: { q?: string; isActive?: boolean }) {
+  return useList<GroupDto>(() => groupsApi.list(params), [params?.q, params?.isActive]);
+}
+
+/**
+ * One circle's own record: its roll and its recent gatherings, which the list endpoint deliberately
+ * does not carry. Null while no circle is open, so a closed panel costs no request.
+ */
+export function useGroupDetail(groupId: string | null) {
+  return useResource(() => (groupId ? groupsApi.get(groupId) : Promise.resolve(null)), [groupId]);
+}
+
+/** The record of group gatherings across every circle, newest first. */
+export function useGroupMeetings(params?: { groupId?: string }) {
+  const resource = useResource(() => groupsApi.meetings(params), [params?.groupId]);
+  return {
+    items: resource.data?.data ?? ([] as GroupMeetingDto[]),
+    totals: resource.data?.totals ?? { meetings: 0, attendance: 0 },
+    loading: resource.loading,
+    error: resource.error,
+    refetch: resource.refetch,
+  };
+}
+
 /** Both Leadership Roles and Volunteer Roles: the same roll, read with and without `leadershipOnly`. */
 export function useMinistryRoster(params?: { q?: string; ministryId?: string; leadershipOnly?: boolean }) {
   const resource = useResource(() => ministriesApi.roster(params), [params?.q, params?.ministryId, params?.leadershipOnly]);
@@ -474,12 +504,21 @@ export function useGovernanceDocuments(params?: Parameters<typeof governanceApi.
 
 // ==================== REPORTS ====================
 /** The home screen's cards plus its activity feed, in one request. */
-export function useReportOverview(params?: { from?: string; to?: string }) {
-  return useResource(() => reportsApi.overview(params), [params?.from, params?.to]);
+/**
+ * The home screen's cards and activity feed, in the one request the dashboard is built around.
+ */
+export function useOverviewReport(): Resource<ReportOverviewDto> {
+  return useResource(() => reportsApi.overview().then((r) => r.data), []);
 }
 
-export function useMemberReport() {
-  return useResource(() => reportsApi.members(), []);
+/**
+ * The register's own counts, for the census cards above the Members screens.
+ *
+ * Those cards report the whole roll, so they cannot read the page of rows underneath them: that
+ * list is filtered by the search box and paged, and a filtered page is not a census.
+ */
+export function useMemberReport(): Resource<MemberReportDto> {
+  return useResource(() => reportsApi.members().then((r) => r.data), []);
 }
 
 export function useGivingReport(params?: { from?: string; to?: string }) {
@@ -525,6 +564,10 @@ export function useInventoryIssues(params?: { page?: number; pageSize?: number }
 
 export function useInventoryTransfers(params?: { page?: number; pageSize?: number }) {
   return useList<TransferDto>(() => inventoryApi.transfers(params), [params?.page, params?.pageSize]);
+}
+
+export function useMaintenance(params?: { itemId?: string; due?: 'true'; page?: number; pageSize?: number }) {
+  return useList<MaintenanceRecordDto>(() => inventoryApi.maintenance(params), [params?.itemId, params?.due, params?.page, params?.pageSize]);
 }
 
 export function useInventoryReport() {

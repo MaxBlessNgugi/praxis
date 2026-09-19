@@ -232,6 +232,7 @@ export async function inviteUser(
 
 export async function updateUser(id: string, input: UpdateUserInput, actorId: string) {
   await findLive(prisma.user, id, 'That account does not exist');
+  await assertServesChurch(id);
 
   // Deactivating the last active administrator would leave the installation with nobody able to
   // administer it, and no way back in through the UI.
@@ -254,6 +255,7 @@ export async function updateUser(id: string, input: UpdateUserInput, actorId: st
 
 export async function assignRole(id: string, roleKey: RoleKey, actorId: string) {
   const existing = await findLive(prisma.user, id, 'That account does not exist', { include: { role: true } });
+  await assertServesChurch(id);
   if (existing.role?.key === 'super_admin' && roleKey !== 'super_admin') await assertNotLastAdministrator(id);
 
   const roleId = await roleIdFor(roleKey);
@@ -289,6 +291,7 @@ export async function assignRole(id: string, roleKey: RoleKey, actorId: string) 
  */
 export async function resetPassword(id: string, password: string, actor: AuthenticatedUser): Promise<void> {
   const target = await findLive(prisma.user, id, 'That account does not exist', { include: { role: true } });
+  await assertServesChurch(id);
   if (target.role?.key === 'super_admin' && actor.roleKey !== 'super_admin') {
     throw forbiddenError('Only a super administrator can reset another super administrator’s password');
   }
@@ -316,6 +319,7 @@ export async function resetPassword(id: string, password: string, actor: Authent
  */
 export async function removeUser(id: string, input: RetireReason, actorId: string) {
   const existing = await findLive(prisma.user, id, 'That account does not exist', { include: { role: true } });
+  await assertServesChurch(id);
   if (id === actorId) throw new AppError(400, 'You cannot retire your own account', 'self_delete');
   await assertNotLastAdministrator(id);
 
@@ -401,6 +405,23 @@ export async function resendInvitation(id: string, actor: AuthenticatedUser): Pr
 async function assertMemberExists(memberId: string): Promise<void> {
   const member = await prisma.member.findFirst({ where: { id: memberId, ...live } });
   if (!member) throw new AppError(400, 'That member is not on the register', 'unknown_member');
+}
+
+/**
+ * Refuses an administrative action on an account that does not serve this church.
+ *
+ * `User` is a global model — one account may serve two parishes — so the tenant-scoped client
+ * deliberately does not scope it, and the **membership** is the tenant boundary. Without this check,
+ * an administrator of one church who learned (or guessed) an id could rename, re-role, retire, or
+ * reset the password of an account that belongs to another church — the last of these is a complete
+ * account takeover. The unknown-account refusal stays a 404 from `findLive`; an account that exists
+ * but is not this church's is a 403, the same sentence `resendInvitation` has always given.
+ */
+async function assertServesChurch(userId: string): Promise<void> {
+  const membership = await prisma.organizationMember.findFirst({
+    where: { userId, isActive: true, ...live },
+  });
+  if (!membership) throw forbiddenError('That account does not serve this church');
 }
 
 /**

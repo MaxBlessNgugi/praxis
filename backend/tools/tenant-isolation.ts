@@ -404,6 +404,32 @@ async function main(): Promise<void> {
       ) ?? [];
     check('the first church’s audit log does not name the second’s administrator', houseHistory.length === 0);
 
+    console.log('\n7b. An account of one church cannot be administered by another, by id');
+    // `User` is a global model — the tenant-scoped client deliberately does not scope it — so the
+    // **membership** is the boundary. Until section 8 below adds one, the probe account serves only
+    // its own church, so these must all be refused: the password reset in particular is a complete
+    // account takeover, not a read. (After section 8 the account legitimately serves this church
+    // too, which is why the section lives *before* it.)
+    const takeoverAttempts: Array<[string, () => Promise<Answer>]> = [
+      ['updating it', () => call('PATCH', `/api/admin/users/${probe.userId}`, houseToken, { name: 'Renamed by another church' })],
+      ['re-roling it', () => call('POST', `/api/admin/users/${probe.userId}/role`, houseToken, { roleKey: 'viewer' })],
+      ['resetting its password', () => call('POST', `/api/admin/users/${probe.userId}/password`, houseToken, { password: 'Taken-Over-2026!' })],
+      ['retiring it', () => call('DELETE', `/api/admin/users/${probe.userId}?reason=account&reasonLabel=Probe%20attempt`, houseToken)],
+      ['re-inviting it', () => call('POST', `/api/admin/users/${probe.userId}/reinvite`, houseToken)],
+    ];
+    for (const [what, attempt] of takeoverAttempts) {
+      const answer = await attempt();
+      check(`${what} is refused`, answer.status === 403 || answer.status === 404, errorMessage(answer));
+    }
+    // The refusals are only proof if nothing changed: the probe administrator signs in with the
+    // password it was provisioned with and still holds its own role.
+    const stillSignsIn = await signInAs(PROBE_EMAIL, PROBE_PASSWORD);
+    check('the probe account still signs in with its own password', Boolean(stillSignsIn));
+    const probeStillAdmin = stillSignsIn
+      ? data<{ user: { roleKey: string } }>(await call('GET', '/api/auth/me', stillSignsIn))?.user.roleKey
+      : null;
+    check('and still holds its own role', probeStillAdmin === 'admin', `got ${probeStillAdmin}`);
+
     console.log('\n8. One account serving two churches keeps a separate role in each');
     // The case memberships exist for: one login, two parishes, different authority in each. The rights
     // screen of one church must change the role it governs and no other.

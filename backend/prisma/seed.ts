@@ -80,6 +80,8 @@ async function clearDomain(): Promise<void> {
   await prisma.purchase.deleteMany();
   await prisma.issue.deleteMany();
   await prisma.transfer.deleteMany();
+  // A maintenance record RESTRICT-deletes the item it names, so it leaves before its item does.
+  await prisma.maintenanceRecord.deleteMany();
   await prisma.inventoryItem.deleteMany();
   await prisma.supplier.deleteMany();
   await prisma.attendance.deleteMany();
@@ -95,6 +97,9 @@ async function clearDomain(): Promise<void> {
   await prisma.meeting.deleteMany();
   await prisma.certificate.deleteMany();
   await prisma.prayerRequest.deleteMany();
+  await prisma.groupMeeting.deleteMany();
+  await prisma.groupMember.deleteMany();
+  await prisma.group.deleteMany();
   await prisma.ministryMember.deleteMany();
   await prisma.swapRequest.deleteMany();
   await prisma.rosterDuty.deleteMany();
@@ -585,6 +590,48 @@ async function main(): Promise<void> {
     { ministryId: department('Missions, Mercy & Church Planting'), memberId: person('MBR-1012'), roleTitle: 'Member' },
   ];
   await prisma.ministryMember.createMany({ data: ministryRoll });
+
+  // -------------------------------------------------------------------------------------------
+  // The midweek circles — the Groups & Fellowships tab's own register. The church already names a
+  // **Groups & Discipleship** department, so the two seeded circles sit under its Dean's shepherding:
+  // one meets midweek in a home, one gathers after service. Each carries a roll and one recorded
+  // gathering, so a fresh install opens on a screen that shows the pattern rather than an empty page.
+  const groupsAndMeetings = [
+    {
+      group: {
+        name: 'Grace Circle (Tuesday Cell)',
+        description: 'A midweek cell meeting in a member\u2019s home, under the Groups & Discipleship department.',
+        leaderId: person('MBR-1009'),
+        meetingDay: 'Tuesday',
+        location: 'Member\u2019s home, Nyahururu',
+      },
+      members: [
+        { memberId: person('MBR-1009'), roleTitle: 'Shepherd' },
+        { memberId: person('MBR-1007'), roleTitle: 'Member' },
+        { memberId: person('MBR-1010'), roleTitle: 'Member' },
+      ],
+      meeting: { metAt: new Date('2026-09-15T19:00:00+03:00'), hostName: 'Sarah Kimani', attendedCount: 3, notes: 'Opened with the Tuesday hymn; studied John 15.' },
+    },
+    {
+      group: {
+        name: 'Sunday Encouragement Circle',
+        description: 'Gathers after second service for prayer and a short study.',
+        leaderId: mary.id,
+        meetingDay: 'Sunday',
+        location: NYAHURURU,
+      },
+      members: [
+        { memberId: mary.id, roleTitle: 'Shepherd' },
+        { memberId: person('MBR-1013'), roleTitle: 'Member' },
+      ],
+      meeting: { metAt: new Date('2026-09-13T11:30:00+03:00'), hostName: null, attendedCount: 2, notes: null },
+    },
+  ];
+  for (const entry of groupsAndMeetings) {
+    const group = await prisma.group.create({ data: entry.group });
+    await prisma.groupMember.createMany({ data: entry.members.map((row) => ({ ...row, groupId: group.id })) });
+    await prisma.groupMeeting.create({ data: { ...entry.meeting, groupId: group.id } });
+  }
 
   /**
    * The Session's roll, and what a sitting of it needs.

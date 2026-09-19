@@ -1175,6 +1175,74 @@ export const ministriesApi = {
     api.get<ListEnvelope<MinistryMemberDto> & { totals: { serving: number } }>(`/api/ministries/roster${qs(params)}`),
 };
 
+// ==================== GROUPS & FELLOWSHIPS ====================
+export interface GroupDto {
+  id: string;
+  name: string;
+  description: string | null;
+  leaderId: string | null;
+  meetingDay: string | null;
+  location: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  leader: MemberRefWithPhone | null;
+  members?: GroupMemberDto[];
+  meetings?: GroupMeetingDto[];
+  _count?: { members: number };
+}
+
+export interface GroupMemberDto {
+  id: string;
+  groupId: string;
+  memberId: string;
+  roleTitle: string;
+  joinedAt: string;
+  member: MemberRefWithPhone;
+}
+
+export interface GroupMeetingDto {
+  id: string;
+  groupId: string;
+  metAt: string;
+  hostName: string | null;
+  notes: string | null;
+  attendedCount: number;
+  group?: { id: string; name: string };
+}
+
+interface GroupBody {
+  name: string;
+  description?: string;
+  leaderId?: string;
+  meetingDay?: string;
+  location?: string;
+  isActive?: boolean;
+}
+
+export const groupsApi = {
+  list: (params?: { q?: string; isActive?: boolean; leaderId?: string; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<GroupDto>>(`/api/groups${qs(params)}`),
+  get: (id: string) => api.get<ItemEnvelope<GroupDto>>(`/api/groups/${id}`),
+  create: (body: GroupBody) => api.post<ItemEnvelope<GroupDto>>('/api/groups', body),
+  update: (id: string, body: Partial<GroupBody> & { leaderId?: string | null }) =>
+    api.patch<ItemEnvelope<GroupDto>>(`/api/groups/${id}`, body),
+  retire: (id: string, body: RetireBody) =>
+    api.delete<ItemEnvelope<unknown>>(`/api/groups/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`),
+  addMember: (id: string, body: { memberId: string; roleTitle?: string }) =>
+    api.post<ItemEnvelope<GroupMemberDto>>(`/api/groups/${id}/members`, body),
+  updateMember: (memberRowId: string, body: { roleTitle: string }) =>
+    api.patch<ItemEnvelope<GroupMemberDto>>(`/api/groups/members/${memberRowId}`, body),
+  removeMember: (memberRowId: string) => api.delete<void>(`/api/groups/members/${memberRowId}`),
+  recordMeeting: (id: string, body: { metAt: string; hostName?: string; notes?: string; attendedCount?: number }) =>
+    api.post<ItemEnvelope<GroupMeetingDto>>(`/api/groups/${id}/meetings`, body),
+  updateMeeting: (meetingId: string, body: Partial<{ metAt: string; hostName?: string; notes?: string; attendedCount: number }>) =>
+    api.patch<ItemEnvelope<GroupMeetingDto>>(`/api/groups/meetings/${meetingId}`, body),
+  meetings: (params?: { groupId?: string; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<GroupMeetingDto> & { totals: { meetings: number; attendance: number } }>(`/api/groups/meetings${qs(params)}`),
+};
+
 // ==================== GOVERNANCE ====================
 export type MeetingKind = 'stated' | 'executive' | 'emergency';
 export type MeetingStatus = 'scheduled' | 'held' | 'cancelled';
@@ -1525,8 +1593,26 @@ export interface InventoryItemDto {
   supplier: { id: string; name: string } | null;
   purchasedAt: string | null;
   custodian: { id: string; firstName: string; lastName: string; initials: string } | null;
+  serialNumber: string | null;
+  warrantyUntil: string | null;
+  fileId: string | null;
   notes: string | null;
   lastCountedAt: string | null;
+}
+
+/** One visit to the repair bench, with the item it serviced and who logged it. */
+export interface MaintenanceRecordDto {
+  id: string;
+  itemId: string;
+  servicedAt: string;
+  provider: string | null;
+  cost: number | null;
+  description: string | null;
+  nextDueAt: string | null;
+  file: { id: string; fileName: string } | null;
+  recordedBy: { id: string; name: string } | null;
+  createdAt: string;
+  item: { id: string; name: string; sku: string; unit: string };
 }
 
 export interface StockMovementDto {
@@ -1604,7 +1690,15 @@ export interface InventoryReportDto {
   byCategory: Array<{ category: string; lines: number; value: number }>;
   byLocation: Array<{ location: string; lines: number; quantity: number }>;
   byCondition: Array<{ condition: string; lines: number }>;
+  byCustodian: Array<{ custodian: string; lines: number }>;
   lowStock: Array<{ id: string; sku: string; name: string; quantity: number; reorderAt: number | null; unit: string; location: string }>;
+  maintenanceDue: Array<{
+    id: string;
+    servicedAt: string;
+    nextDueAt: string | null;
+    provider: string | null;
+    item: { id: string; name: string; sku: string; location: string };
+  }>;
   recentVariances: Array<{
     id: string;
     approvedAt: string | null;
@@ -1635,11 +1729,38 @@ export const inventoryApi = {
     cost?: number | null;
     condition?: AssetCondition | null;
     supplierId?: string | null;
+    purchasedAt?: string | null;
+    custodianId?: string | null;
+    serialNumber?: string | null;
+    warrantyUntil?: string | null;
+    fileId?: string | null;
     openingQuantity?: number;
     notes?: string;
   }) => api.post<ItemEnvelope<InventoryItemDto>>('/api/inventory/items', body),
-  updateItem: (id: string, body: { status?: InventoryStatus; condition?: AssetCondition | null; location?: string; notes?: string; reorderAt?: number | null }) =>
-    api.patch<ItemEnvelope<InventoryItemDto>>(`/api/inventory/items/${id}`, body),
+  updateItem: (
+    id: string,
+    body: {
+      status?: Exclude<InventoryStatus, 'disposed'>;
+      condition?: AssetCondition | null;
+      location?: string;
+      notes?: string;
+      reorderAt?: number | null;
+      serialNumber?: string | null;
+      warrantyUntil?: string | null;
+      fileId?: string | null;
+    },
+  ) => api.patch<ItemEnvelope<InventoryItemDto>>(`/api/inventory/items/${id}`, body),
+  maintenance: (params?: { itemId?: string; due?: 'true'; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<MaintenanceRecordDto>>(`/api/inventory/maintenance${qs(params)}`),
+  addMaintenance: (body: {
+    itemId: string;
+    servicedAt: string;
+    provider?: string;
+    cost?: number | null;
+    description?: string;
+    nextDueAt?: string | null;
+    fileId?: string | null;
+  }) => api.post<ItemEnvelope<MaintenanceRecordDto>>('/api/inventory/maintenance', body),
   retireItem: (id: string, body: { reason: string; reasonLabel: string }) =>
     api.delete<ItemEnvelope<unknown>>(`/api/inventory/items/${id}${qs(body)}`),
   movements: (params?: { itemId?: string; kind?: StockMovementKind; from?: string; to?: string; page?: number; pageSize?: number }) =>

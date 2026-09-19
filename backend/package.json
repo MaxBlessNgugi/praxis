@@ -17,6 +17,8 @@
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
     "check:isolation": "tsx tools/tenant-isolation.ts",
+    "check:people": "tsx tools/people.ts",
+    "check:groups": "tsx tools/groups.ts",
     "check:inventory": "tsx tools/inventory.ts",
     "check:vendor": "tsx tools/vendor-smoke.ts",
     "check:billing": "tsx tools/billing-lifecycle.ts",

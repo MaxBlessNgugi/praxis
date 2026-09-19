@@ -5,8 +5,11 @@ import {
   useInventoryPurchases,
   useInventoryReport,
   useInventoryTransfers,
+  useMaintenance,
   useMinistries,
+  useMemberOptions,
   useMutation,
+  errorMessage,
   useStockMovements,
   useStockTakes,
   useSuppliers,
@@ -15,8 +18,11 @@ import {
 import { formatKes } from '../../../data/churchDomain';
 import {
   inventoryApi,
+  type AssetCondition,
   type InventoryItemDto,
   type InventoryKind,
+  type InventoryReportDto,
+  type InventoryStatus,
   type IssueDto,
   type PurchaseDto,
   type StockMovementDto,
@@ -26,8 +32,11 @@ import {
 import { usePermissions } from '../../../lib/permissions';
 import { day } from '../../../lib/period';
 import { exportCsv, type ExportColumn } from '../../../lib/export';
+import { Pager } from './council/CouncilControls';
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '../DataState';
+import { FileUpload } from '../FileUpload';
 import { useDialog } from '../dialog';
+import { useFileUrl } from '../../../hooks/useFileUrl';
 
 /**
  * Inventory & Assets — the register of everything the church owns, and every act that changes it.
@@ -40,7 +49,7 @@ import { useDialog } from '../dialog';
  * administrator approves the variance.
  */
 
-type SubTab = 'register' | 'ledger' | 'stock-takes' | 'purchases' | 'issues' | 'transfers';
+type SubTab = 'register' | 'ledger' | 'stock-takes' | 'purchases' | 'issues' | 'transfers' | 'maintenance';
 
 const SUB_TABS: Array<{ id: SubTab; label: string; icon: string }> = [
   { id: 'register', label: 'Register', icon: 'inventory_2' },
@@ -49,6 +58,7 @@ const SUB_TABS: Array<{ id: SubTab; label: string; icon: string }> = [
   { id: 'purchases', label: 'Purchases', icon: 'shopping_cart' },
   { id: 'issues', label: 'Issues', icon: 'assignment_turned_in' },
   { id: 'transfers', label: 'Transfers', icon: 'move_up' },
+  { id: 'maintenance', label: 'Maintenance', icon: 'build' },
 ];
 
 /** The columns the register leaves the app as. */
@@ -62,6 +72,11 @@ const ITEM_COLUMNS: ExportColumn<InventoryItemDto>[] = [
   { label: 'Reorder at', value: (i) => i.reorderAt ?? '' },
   { label: 'Unit cost (KES)', value: (i) => i.cost ?? '' },
   { label: 'Value at cost (KES)', value: (i) => (i.cost != null ? i.quantity * i.cost : '') },
+  { label: 'Serial number', value: (i) => i.serialNumber ?? '' },
+  { label: 'Custodian', value: (i) => (i.custodian ? `${i.custodian.firstName} ${i.custodian.lastName}` : '') },
+  { label: 'Purchased', value: (i) => (i.purchasedAt ? day(new Date(i.purchasedAt)) : '') },
+  { label: 'Warranty until', value: (i) => (i.warrantyUntil ? day(new Date(i.warrantyUntil)) : '') },
+  { label: 'Condition', value: (i) => i.condition ?? '' },
   { label: 'Last counted', value: (i) => (i.lastCountedAt ? day(new Date(i.lastCountedAt)) : 'never') },
 ];
 
@@ -106,6 +121,7 @@ export const InventoryAssetsView: React.FC = () => {
       {subTab === 'purchases' && <PurchasesPanel onChanged={refresh} />}
       {subTab === 'issues' && <IssuesPanel onChanged={refresh} />}
       {subTab === 'transfers' && <TransfersPanel />}
+      {subTab === 'maintenance' && <MaintenancePanel onChanged={refresh} />}
     </div>
   );
 };
@@ -134,7 +150,12 @@ const ViewHeader: React.FC = () => {
       note: 'at or below reorder level',
       alert: report.lowStock.length > 0,
     },
-    { label: 'Assets', value: String(report.totals.assetLines), note: `${formatKes(report.totals.assetValue)} at cost` },
+    {
+      label: 'Maintenance due',
+      value: String(report.maintenanceDue.length),
+      note: report.maintenanceDue.length > 0 ? `next: ${report.maintenanceDue[0].item.name}` : 'nothing on the bench',
+      alert: report.maintenanceDue.length > 0,
+    },
   ];
 
   return (
@@ -173,6 +194,54 @@ const ViewHeader: React.FC = () => {
           </div>
         ))}
       </div>
+
+      <Breakdowns report={report} />
+    </div>
+  );
+};
+
+/** The register cut three ways — category, location, custodian — straight from the same report. */
+const Breakdowns: React.FC<{ report: InventoryReportDto }> = ({ report }) => {
+  const sections: Array<{ title: string; icon: string; rows: Array<{ label: string; value: string }> }> = [
+    {
+      title: 'By category',
+      icon: 'category',
+      rows: report.byCategory.slice(0, 6).map((row) => ({ label: row.category, value: `${row.lines} · ${formatKes(row.value)}` })),
+    },
+    {
+      title: 'By location',
+      icon: 'place',
+      rows: report.byLocation.slice(0, 6).map((row) => ({ label: row.location, value: `${row.lines} · ${row.quantity} units` })),
+    },
+    {
+      title: 'By custodian',
+      icon: 'badge',
+      rows: report.byCustodian.slice(0, 6).map((row) => ({ label: row.custodian, value: `${row.lines} held` })),
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {sections.map((section) => (
+        <div key={section.title} className="bg-white rounded-[14px] border border-[#E7E5E4] p-4 shadow-warm-card">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#C2410C]">{section.icon}</span>
+            <span className="font-headline text-[11px] font-bold uppercase tracking-wider text-[#57534E]">{section.title}</span>
+          </div>
+          {section.rows.length === 0 ? (
+            <p className="text-[11px] text-[#57534E]">Nothing to break down yet.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {section.rows.map((row) => (
+                <li key={row.label} className="flex items-baseline justify-between gap-3 text-xs">
+                  <span className="font-semibold text-[#1C1917] truncate">{row.label}</span>
+                  <span className="text-[#57534E] whitespace-nowrap">{row.value}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
     </div>
   );
 };
@@ -326,7 +395,15 @@ const RegisterPanel: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
         </div>
       )}
 
-      {detailTarget && <ItemDialog item={detailTarget} onClose={closeDetail} dialog={detailDialog} />}
+      {detailTarget && (
+        <ItemDialog
+          key={detailTarget.id + String(list.items.find((i) => i.id === detailTarget.id)?.serialNumber ?? '') + String(list.items.find((i) => i.id === detailTarget.id)?.warrantyUntil ?? '')}
+          item={list.items.find((i) => i.id === detailTarget.id) ?? detailTarget}
+          onClose={closeDetail}
+          dialog={detailDialog}
+          onChanged={() => { list.refetch(); onChanged(); }}
+        />
+      )}
       {addOpen && <AddItemDialog onClose={closeAdd} dialog={addDialog} onSaved={() => { list.refetch(); onChanged(); }} />}
     </div>
   );
@@ -785,6 +862,209 @@ const TransfersPanel: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
 };
 
 // -------------------------------------------------------------------------------------------
+// Maintenance — the repair-bench history, one visit per row.
+// -------------------------------------------------------------------------------------------
+
+const MaintenancePanel: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
+  const { canEdit } = usePermissions();
+  const [dueOnly, setDueOnly] = useState(false);
+  const [page, setPage] = useState(1);
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  const dialog = useDialog(close, 'Log maintenance');
+  const list = useMaintenance({ due: dueOnly ? 'true' : undefined, page, pageSize: 25 });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="bg-white rounded-[14px] border border-[#E7E5E4] p-4 shadow-warm-card flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs font-semibold text-[#57534E] cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={dueOnly}
+            onChange={(e) => { setDueOnly(e.target.checked); setPage(1); }}
+            className="w-4 h-4 rounded border-[#D6D3D1] accent-[#C2410C] cursor-pointer"
+          />
+          Due for service only
+        </label>
+        {canEdit('inventory') && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="ml-auto h-9 px-3.5 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold cursor-pointer"
+          >
+            + Log maintenance
+          </button>
+        )}
+      </div>
+
+      {list.loading ? (
+        <LoadingBlock />
+      ) : list.error ? (
+        <ErrorBlock message={list.error} onRetry={list.refetch} />
+      ) : list.items.length === 0 ? (
+        <EmptyBlock
+          title={dueOnly ? 'Nothing is due for service.' : 'No maintenance recorded yet.'}
+          hint={dueOnly ? 'Every next-service date is still ahead.' : 'Log a repair visit against an asset to start its service history.'}
+          icon="build"
+        />
+      ) : (
+        <>
+          <div className="rounded-[14px] bg-white shadow-warm-card border border-[#E7E5E4] overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-[#F8F1E9] text-[#57534E] font-headline text-[11px] uppercase tracking-wider">
+                    <th className="px-4 py-3 font-bold">Serviced</th>
+                    <th className="px-4 py-3 font-bold">Item</th>
+                    <th className="px-4 py-3 font-bold">Provider</th>
+                    <th className="px-4 py-3 font-bold text-right">Cost</th>
+                    <th className="px-4 py-3 font-bold">Next due</th>
+                    <th className="px-4 py-3 font-bold">Paperwork</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.items.map((record) => {
+                    const overdue = record.nextDueAt != null && new Date(record.nextDueAt) < new Date();
+                    return (
+                      <tr key={record.id} className="border-t border-[#E7E5E4] hover:bg-[#FDF8F3]">
+                        <td className="px-4 py-3 text-[#57534E] whitespace-nowrap">{day(new Date(record.servicedAt))}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-headline font-bold text-[#1C1917]">{record.item.name}</div>
+                          <div className="font-mono text-[11px] text-[#57534E]">{record.item.sku}</div>
+                        </td>
+                        <td className="px-4 py-3 text-[#57534E]">{record.provider ?? '—'}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-[#1C1917]">{record.cost != null ? formatKes(record.cost) : '—'}</td>
+                        <td className={`px-4 py-3 whitespace-nowrap ${overdue ? 'font-bold text-[#ba1a1a]' : 'text-[#57534E]'}`}>
+                          {record.nextDueAt ? day(new Date(record.nextDueAt)) : '—'}
+                          {overdue && <span className="ml-1.5 text-[10px] font-bold uppercase">due</span>}
+                        </td>
+                        <td className="px-4 py-3 text-[#57534E]">
+                          {record.file ? (
+                            <MaintenanceFileLink fileId={record.file.id} fileName={record.file.fileName} />
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {list.meta && <Pager page={list.meta.page} pageSize={list.meta.pageSize} total={list.meta.total} noun="visits" onPage={setPage} />}
+        </>
+      )}
+
+      {open && <MaintenanceDialog onClose={close} dialog={dialog} onSaved={() => { list.refetch(); onChanged(); }} />}
+    </div>
+  );
+};
+
+/** The visit's paperwork, fetched through the API client because a link cannot carry the bearer token. */
+const MaintenanceFileLink: React.FC<{ fileId: string; fileName: string }> = ({ fileId, fileName }) => {
+  const { url, loading, error } = useFileUrl(fileId);
+  if (loading) return <span className="text-[11px] text-[#57534E]">Opening…</span>;
+  if (error || !url) return <span className="text-[11px] text-[#B91C1C]">Could not open.</span>;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-[#C2410C] underline underline-offset-2 hover:text-[#EA580C]">
+      {fileName}
+    </a>
+  );
+};
+
+const MaintenanceDialog: React.FC<ActDialogProps> = ({ onClose, dialog, onSaved }) => {
+  const items = useInventoryItems({ kind: 'asset', pageSize: 200 });
+  const save = useMutation((body: Parameters<typeof inventoryApi.addMaintenance>[0]) => inventoryApi.addMaintenance(body));
+  const [itemId, setItemId] = useState('');
+  const [servicedAt, setServicedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [provider, setProvider] = useState('');
+  const [cost, setCost] = useState('');
+  const [description, setDescription] = useState('');
+  const [nextDueAt, setNextDueAt] = useState('');
+  const [fileId, setFileId] = useState<string | null>(null);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      await save.run({
+        itemId,
+        servicedAt: new Date(`${servicedAt}T09:00:00`).toISOString(),
+        ...(provider.trim() ? { provider: provider.trim() } : {}),
+        ...(cost ? { cost: Number(cost) } : {}),
+        ...(description.trim() ? { description: description.trim() } : {}),
+        ...(nextDueAt ? { nextDueAt: new Date(`${nextDueAt}T09:00:00`).toISOString() } : {}),
+        ...(fileId ? { fileId } : {}),
+      });
+    } catch {
+      return;
+    }
+    onSaved();
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/45" {...dialog}>
+      <form onSubmit={submit} className="w-full max-w-[520px] bg-white rounded-[14px] shadow-warm-card border border-[#E7E5E4] p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <h3 className="font-headline text-base font-bold text-[#1e1b19]">Log maintenance</h3>
+        <p className="text-[11px] text-[#57534E]">
+          A visit is history, not stock: nothing on the shelf moves, and the record cannot be edited afterwards — a further visit supersedes it.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label htmlFor="m-item" className={labelClass}>Asset *</label>
+            <select id="m-item" required value={itemId} onChange={(e) => setItemId(e.target.value)} className={fieldClass}>
+              <option value="">Choose an asset…</option>
+              {items.items.map((i) => (
+                <option key={i.id} value={i.id}>{i.name} ({i.sku})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="m-serviced" className={labelClass}>Serviced on *</label>
+            <input id="m-serviced" type="date" required value={servicedAt} onChange={(e) => setServicedAt(e.target.value)} className={fieldClass} />
+          </div>
+          <div>
+            <label htmlFor="m-next" className={labelClass}>Next service due</label>
+            <input id="m-next" type="date" value={nextDueAt} onChange={(e) => setNextDueAt(e.target.value)} className={fieldClass} />
+          </div>
+          <div>
+            <label htmlFor="m-provider" className={labelClass}>Provider</label>
+            <input id="m-provider" value={provider} onChange={(e) => setProvider(e.target.value)} className={fieldClass} placeholder="Who did the work" />
+          </div>
+          <div>
+            <label htmlFor="m-cost" className={labelClass}>Cost (KES)</label>
+            <input id="m-cost" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} className={fieldClass} />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="m-desc" className={labelClass}>What was done</label>
+          <textarea id="m-desc" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className={`${fieldClass} h-auto`} />
+        </div>
+        <FileUpload
+          purpose="document"
+          label="Invoice or service report"
+          hint="A scan or PDF of the paperwork for this visit."
+          accept="application/pdf,image/png,image/jpeg"
+          currentFileId={fileId}
+          preview={false}
+          onUploaded={(file) => setFileId(file.id)}
+        />
+
+        {save.error && <ErrorBlock message={save.error} />}
+
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="px-3.5 py-1.5 rounded-[9px] text-xs font-semibold text-[#57534E] hover:bg-[#F5EDE4] cursor-pointer">Cancel</button>
+          <button type="submit" disabled={save.pending || !itemId} className="px-3.5 py-1.5 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] disabled:opacity-50 text-white text-xs font-bold cursor-pointer">
+            {save.pending ? 'Saving…' : 'Log visit'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// -------------------------------------------------------------------------------------------
 // Dialogs
 // -------------------------------------------------------------------------------------------
 
@@ -1078,14 +1358,91 @@ const TransferDialog: React.FC<ActDialogProps> = ({ onClose, dialog, onSaved }) 
   );
 };
 
-const ItemDialog: React.FC<ActDialogProps & { item: InventoryItemDto }> = ({ item, onClose, dialog }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/45" {...dialog}>
-    <div className="w-full max-w-[520px] bg-white rounded-[14px] shadow-warm-card border border-[#E7E5E4] p-6 space-y-3">
-      <h3 className="font-headline text-base font-bold text-[#1e1b19]">{item.name}</h3>
-      <p className="font-mono text-xs text-[#57534E]">{item.sku} · {item.category} · {item.kind}</p>
+/** The condition/status vocabularies, named once for the edit form. */
+const CONDITION_OPTIONS: Array<{ value: AssetCondition; label: string }> = [
+  { value: 'good', label: 'Good' },
+  { value: 'fair', label: 'Fair' },
+  { value: 'poor', label: 'Poor' },
+];
+
+const STATUS_OPTIONS: Array<{ value: Exclude<InventoryStatus, 'disposed'>; label: string }> = [
+  { value: 'active', label: 'Active' },
+  { value: 'in_service', label: 'In service' },
+  { value: 'maintenance', label: 'In maintenance' },
+  { value: 'lost', label: 'Lost' },
+  { value: 'damaged', label: 'Damaged' },
+];
+
+const ItemDialog: React.FC<ActDialogProps & { item: InventoryItemDto; onChanged: () => void }> = ({ item, onClose, dialog, onChanged }) => {
+  const canEdit = usePermissions().canEdit('inventory');
+  const canDelete = usePermissions().canDelete('inventory');
+  const [editing, setEditing] = useState(false);
+
+  // After a save the dialog closes along with the refetch: the parent re-renders it from the row it
+  // just read, and the row's id stays the dialog's key, so the next Open is fresh data.
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/45" {...dialog}>
+      {editing ? (
+        <EditItemForm item={item} onClose={onClose} onDone={() => { setEditing(false); onClose(); onChanged(); }} />
+      ) : (
+        <ItemDetail item={item} onClose={onClose} canEdit={canEdit} canDelete={canDelete} onEdit={() => setEditing(true)} onChanged={onChanged} />
+      )}
+    </div>
+  );
+};
+
+const ItemDetail: React.FC<{
+  item: InventoryItemDto;
+  onClose: () => void;
+  canEdit: boolean;
+  canDelete: boolean;
+  onEdit: () => void;
+  onChanged: () => void;
+}> = ({ item, onClose, canEdit, canDelete, onEdit, onChanged }) => {
+  const [retiring, setRetiring] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dialog = useDialog(onClose, 'Retire this item');
+
+  const retire = async (reason: string, reasonLabel: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await inventoryApi.retireItem(item.id, { reason, reasonLabel });
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    setRetiring(false);
+    onClose();
+    onChanged();
+  };
+
+  const isAsset = item.kind === 'asset';
+  const custodianName = item.custodian ? `${item.custodian.firstName} ${item.custodian.lastName}` : null;
+  const warrantyLive = item.warrantyUntil != null && new Date(item.warrantyUntil) >= new Date();
+
+  return (
+    <div className="w-full max-w-[560px] bg-white rounded-[14px] shadow-warm-card border border-[#E7E5E4] p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-headline text-base font-bold text-[#1e1b19]">{item.name}</h3>
+          <p className="font-mono text-xs text-[#57534E]">{item.sku} · {item.category} · {item.kind}</p>
+        </div>
+        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+          item.status === 'disposed' ? 'bg-[#E7E5E4] text-[#57534E]' : item.status === 'lost' || item.status === 'damaged' ? 'bg-[#ffdad6] text-[#ba1a1a]' : 'bg-[#F8F1E9] text-[#C2410C]'
+        }`}>
+          {item.status.replace('_', ' ')}
+        </span>
+      </div>
+
+      {error && <ErrorBlock message={error} />}
+
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-[9px] bg-[#F8F1E9] p-3">
-          <div className="font-headline text-[11px] font-bold uppercase tracking-wider text-[#57534E]">On hand</div>
+          <div className="font-headline text-[11px] font-bold uppercase tracking-wider text-[#57534E]">{isAsset ? 'Held' : 'On hand'}</div>
           <div className="font-headline text-xl font-extrabold text-[#1C1917]">{item.quantity} {item.unit}</div>
         </div>
         <div className="rounded-[9px] bg-[#F8F1E9] p-3">
@@ -1093,13 +1450,216 @@ const ItemDialog: React.FC<ActDialogProps & { item: InventoryItemDto }> = ({ ite
           <div className="font-headline text-sm font-bold text-[#1C1917]">{item.location}</div>
         </div>
       </div>
+
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+        {[
+          ['Custodian', custodianName],
+          ['Serial number', item.serialNumber],
+          ['Purchased', item.purchasedAt ? day(new Date(item.purchasedAt)) : null],
+          ['Cost', item.cost != null ? formatKes(item.cost) : null],
+          ['Warranty', item.warrantyUntil ? `${day(new Date(item.warrantyUntil))}${warrantyLive ? ' (in warranty)' : ' (expired)'}` : null],
+          ['Condition', item.condition],
+          ['Last counted', item.lastCountedAt ? day(new Date(item.lastCountedAt)) : 'never'],
+        ].map(([label, value]) =>
+          value ? (
+            <div key={label as string}>
+              <dt className="font-headline text-[11px] font-bold uppercase tracking-wider text-[#57534E]">{label}</dt>
+              <dd className="text-[#1C1917] font-semibold">{value}</dd>
+            </div>
+          ) : null,
+        )}
+      </dl>
+
       <p className="text-xs text-[#57534E]">{item.notes ?? 'No notes.'}</p>
-      <div className="flex justify-end">
-        <button type="button" onClick={onClose} className="px-3.5 py-1.5 rounded-[9px] text-xs font-semibold text-[#57534E] hover:bg-[#F5EDE4] cursor-pointer">Close</button>
-      </div>
+
+      {(canEdit || canDelete) && (
+        <div className="flex justify-between gap-2 border-t border-[#E7E5E4] pt-3">
+          {canDelete ? (
+            <button
+              type="button"
+              onClick={() => setRetiring(true)}
+              className="px-3 py-1.5 rounded-[9px] text-xs font-semibold text-[#B91C1C] hover:bg-[#ffdad6]/40 cursor-pointer"
+            >
+              Dispose of…
+            </button>
+          ) : (
+            <span />
+          )}
+          {canEdit && (
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="px-3.5 py-1.5 rounded-[9px] text-xs font-semibold text-[#57534E] hover:bg-[#F5EDE4] cursor-pointer">Close</button>
+              <button type="button" onClick={onEdit} className="px-3.5 py-1.5 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold cursor-pointer">Edit</button>
+            </div>
+          )}
+        </div>
+      )}
+      {(!canEdit && !canDelete) && (
+        <div className="flex justify-end">
+          <button type="button" onClick={onClose} className="px-3.5 py-1.5 rounded-[9px] text-xs font-semibold text-[#57534E] hover:bg-[#F5EDE4] cursor-pointer">Close</button>
+        </div>
+      )}
+
+      {retiring && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...dialog}>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const data = new FormData(event.currentTarget);
+              void retire(String(data.get('reason') ?? 'other'), String(data.get('reasonLabel') ?? ''));
+            }}
+            className="w-full max-w-[460px] rounded-[14px] border border-[#E7E5E4] bg-white p-6 shadow-warm-card"
+          >
+            <h4 className="font-headline text-base font-bold text-[#1C1917]">Dispose of {item.name}?</h4>
+            <p className="mt-1.5 text-xs text-[#57534E]">
+              Its remaining {item.quantity > 0 ? `${item.quantity} ${item.unit} leave` : 'ledger closes out'} by an explicit movement, and it goes to the Trash, where an administrator can put it back.
+            </p>
+            <label htmlFor="disp-reason" className="mt-4 block font-headline text-[11px] font-bold uppercase tracking-wider text-[#57534E]">Why is it leaving?</label>
+            <select id="disp-reason" name="reason" className="mt-1 w-full h-9 px-2.5 rounded-[9px] bg-[#FDF8F3] border border-[#E7E5E4] text-xs font-semibold text-[#1C1917] cursor-pointer">
+              <option value="wrong_entry">No longer serviceable</option>
+              <option value="transferred">Given away / transferred out</option>
+              <option value="duplicate">Sold or exchanged</option>
+              <option value="other">Other</option>
+            </select>
+            <label htmlFor="disp-label" className="mt-3 block font-headline text-[11px] font-bold uppercase tracking-wider text-[#57534E]">Say more (required)</label>
+            <input
+              id="disp-label"
+              name="reasonLabel"
+              required
+              minLength={3}
+              maxLength={500}
+              placeholder="e.g. Projector bulb blown beyond repair — approved by council"
+              className="mt-1 w-full h-9 px-2.5 rounded-[9px] bg-[#FDF8F3] border border-[#E7E5E4] text-xs text-[#1C1917] focus:outline-none focus:border-[#C2410C]"
+            />
+            {error && <ErrorBlock message={error} />}
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setRetiring(false)} className="px-3.5 py-1.5 rounded-[9px] text-xs font-semibold text-[#57534E] hover:bg-[#F5EDE4] cursor-pointer">Cancel</button>
+              <button type="submit" disabled={busy} className="px-3.5 py-1.5 rounded-[9px] bg-[#B91C1C] hover:bg-[#dc2626] disabled:opacity-50 text-white text-xs font-bold cursor-pointer">
+                {busy ? 'Disposing…' : 'Dispose of it'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
+
+const EditItemForm: React.FC<{ item: InventoryItemDto; onClose: () => void; onDone: () => void }> = ({ item, onClose, onDone }) => {
+  const [form, setForm] = useState({
+    location: item.location,
+    condition: (item.condition ?? '') as AssetCondition | '',
+    status: (item.status === 'disposed' ? 'active' : item.status) as Exclude<InventoryStatus, 'disposed'>,
+    serialNumber: item.serialNumber ?? '',
+    warrantyUntil: item.warrantyUntil ? item.warrantyUntil.slice(0, 10) : '',
+    purchasedAt: item.purchasedAt ? item.purchasedAt.slice(0, 10) : '',
+    notes: item.notes ?? '',
+  });
+  const [fileId, setFileId] = useState<string | null>(item.fileId);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await inventoryApi.updateItem(item.id, {
+        ...(form.location !== item.location ? { location: form.location } : {}),
+        ...(form.condition !== (item.condition ?? '') ? { condition: form.condition || null } : {}),
+        ...(form.status !== item.status ? { status: form.status } : {}),
+        ...(form.serialNumber !== (item.serialNumber ?? '') ? { serialNumber: form.serialNumber || null } : {}),
+        ...(form.warrantyUntil !== (item.warrantyUntil?.slice(0, 10) ?? '') ? { warrantyUntil: form.warrantyUntil || null } : {}),
+        ...(fileId !== (item.fileId ?? null) ? { fileId } : {}),
+        ...(form.notes !== (item.notes ?? '') ? { notes: form.notes || null } : {}),
+      });
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    onDone();
+  };
+
+  return (
+    <form onSubmit={submit} className="w-full max-w-[520px] bg-white rounded-[14px] shadow-warm-card border border-[#E7E5E4] p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <h3 className="font-headline text-base font-bold text-[#1e1b19]">Edit {item.name}</h3>
+      <p className="text-[11px] text-[#57534E]">
+        The name, SKU and shelf count are fixed here — the count moves through purchases, issues and counts, not by typing over it.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="e-location" className={labelClass}>Location</label>
+          <input id="e-location" required value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className={fieldClass} />
+        </div>
+        <div>
+          <label htmlFor="e-status" className={labelClass}>Status</label>
+          <select id="e-status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as Exclude<InventoryStatus, 'disposed'> })} className={fieldClass}>
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {item.kind === 'asset' && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="e-condition" className={labelClass}>Condition</label>
+            <select id="e-condition" value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value as AssetCondition | '' })} className={fieldClass}>
+              <option value="">— not set —</option>
+              {CONDITION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="e-serial" className={labelClass}>Serial number</label>
+            <input id="e-serial" value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} className={fieldClass} />
+          </div>
+        </div>
+      )}
+
+      {item.kind === 'asset' && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="e-purchased" className={labelClass}>Purchased on</label>
+            <input id="e-purchased" type="date" value={form.purchasedAt} onChange={(e) => setForm({ ...form, purchasedAt: e.target.value })} className={fieldClass} />
+          </div>
+          <div>
+            <label htmlFor="e-warranty" className={labelClass}>Warranty until</label>
+            <input id="e-warranty" type="date" value={form.warrantyUntil} onChange={(e) => setForm({ ...form, warrantyUntil: e.target.value })} className={fieldClass} />
+          </div>
+        </div>
+      )}
+
+      <div>
+        <label htmlFor="e-notes" className={labelClass}>Notes</label>
+        <textarea id="e-notes" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={`${fieldClass} h-auto`} />
+      </div>
+
+      <FileUpload
+        purpose="document"
+        label="Receipt, warranty or photo"
+        hint="A scan, a PDF or a photograph of the casing. Replaces any file already attached."
+        accept="application/pdf,image/png,image/jpeg"
+        currentFileId={fileId}
+        preview={false}
+        onUploaded={(file) => setFileId(file.id)}
+      />
+
+      {error && <ErrorBlock message={error} />}
+
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="px-3.5 py-1.5 rounded-[9px] text-xs font-semibold text-[#57534E] hover:bg-[#F5EDE4] cursor-pointer">Cancel</button>
+        <button type="submit" disabled={busy} className="px-3.5 py-1.5 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] disabled:opacity-50 text-white text-xs font-bold cursor-pointer">
+          {busy ? 'Saving…' : 'Save changes'}
+        </button>
+      </div>
+    </form>
+  );
+};
 
 const StartTakeDialog: React.FC<ActDialogProps> = ({ onClose, dialog, onSaved }) => {
   const items = useInventoryItems({ pageSize: 200 });
@@ -1158,6 +1718,7 @@ const StartTakeDialog: React.FC<ActDialogProps> = ({ onClose, dialog, onSaved })
 
 const AddItemDialog: React.FC<ActDialogProps> = ({ onClose, dialog, onSaved }) => {
   const suppliers = useSuppliers();
+  const members = useMemberOptions();
   const save = useMutation((body: Parameters<typeof inventoryApi.addItem>[0]) => inventoryApi.addItem(body));
   const [form, setForm] = useState({
     sku: '',
@@ -1170,8 +1731,16 @@ const AddItemDialog: React.FC<ActDialogProps> = ({ onClose, dialog, onSaved }) =
     cost: '',
     openingQuantity: '0',
     supplierId: '',
+    condition: '',
+    purchasedAt: '',
+    custodianId: '',
+    serialNumber: '',
+    warrantyUntil: '',
     notes: '',
   });
+  const [fileId, setFileId] = useState<string | null>(null);
+
+  const isAsset = form.kind === 'asset';
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -1187,6 +1756,12 @@ const AddItemDialog: React.FC<ActDialogProps> = ({ onClose, dialog, onSaved }) =
         ...(form.cost ? { cost: Number(form.cost) } : {}),
         openingQuantity: Math.max(0, Math.floor(Number(form.openingQuantity) || 0)),
         ...(form.supplierId ? { supplierId: form.supplierId } : {}),
+        ...(isAsset && form.condition ? { condition: form.condition as AssetCondition } : {}),
+        ...(isAsset && form.purchasedAt ? { purchasedAt: form.purchasedAt } : {}),
+        ...(isAsset && form.custodianId ? { custodianId: form.custodianId } : {}),
+        ...(isAsset && form.serialNumber.trim() ? { serialNumber: form.serialNumber.trim() } : {}),
+        ...(isAsset && form.warrantyUntil ? { warrantyUntil: form.warrantyUntil } : {}),
+        ...(fileId ? { fileId } : {}),
         ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
       });
     } catch {
@@ -1259,6 +1834,53 @@ const AddItemDialog: React.FC<ActDialogProps> = ({ onClose, dialog, onSaved }) =
             ))}
           </select>
         </div>
+        {isAsset && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="a-condition" className={labelClass}>Condition</label>
+                <select id="a-condition" value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })} className={fieldClass}>
+                  <option value="">— not set —</option>
+                  <option value="good">Good</option>
+                  <option value="fair">Fair</option>
+                  <option value="poor">Poor</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="a-purchased" className={labelClass}>Purchased on</label>
+                <input id="a-purchased" type="date" value={form.purchasedAt} onChange={(e) => setForm({ ...form, purchasedAt: e.target.value })} className={fieldClass} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="a-serial" className={labelClass}>Serial number</label>
+                <input id="a-serial" value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} className={fieldClass} />
+              </div>
+              <div>
+                <label htmlFor="a-warranty" className={labelClass}>Warranty until</label>
+                <input id="a-warranty" type="date" value={form.warrantyUntil} onChange={(e) => setForm({ ...form, warrantyUntil: e.target.value })} className={fieldClass} />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="a-custodian" className={labelClass}>Custodian</label>
+              <select id="a-custodian" value={form.custodianId} onChange={(e) => setForm({ ...form, custodianId: e.target.value })} className={fieldClass}>
+                <option value="">— nobody holds this —</option>
+                {members.members.map((m) => (
+                  <option key={m.id} value={m.id}>{m.firstName} {m.lastName}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+        <FileUpload
+          purpose="document"
+          label="Receipt or photograph"
+          hint="A scan of the receipt or a photo of the casing. Attached to the register line."
+          accept="application/pdf,image/png,image/jpeg"
+          currentFileId={fileId}
+          preview={false}
+          onUploaded={(file) => setFileId(file.id)}
+        />
         <div>
           <label htmlFor="a-notes" className={labelClass}>Notes</label>
           <input id="a-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={fieldClass} />

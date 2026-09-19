@@ -86,7 +86,7 @@ export async function removeChurch(organizationId: string, options: RemoveChurch
   // register does — the alphabetical order the column query returns otherwise tries to delete an
   // item while its own history still points at it. PurchaseLine carries no organizationId of its
   // own (it hangs off its purchase), so it is reached through its parent.
-  const historyFirst = ['"StockMovement"', '"Issue"', '"Transfer"', '"StockTake"'];
+  const historyFirst = ['"StockMovement"', '"Issue"', '"Transfer"', '"StockTake"', '"MaintenanceRecord"'];
   for (const table of historyFirst) {
     await basePrisma.$executeRawUnsafe(`DELETE FROM ${table} WHERE "organizationId" = $1`, organizationId);
   }

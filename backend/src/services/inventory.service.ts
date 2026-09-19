@@ -6,11 +6,13 @@ import { findLive, live } from '../lib/live';
 import type {
   CreateIssueInput,
   CreateItemInput,
+  CreateMaintenanceInput,
   CreatePurchaseInput,
   CreateSupplierInput,
   CreateTransferInput,
   ListIssuesQuery,
   ListItemQuery,
+  ListMaintenanceQuery,
   ListMovementsQuery,
   ListPurchasesQuery,
   ListStockTakesQuery,
@@ -42,8 +44,35 @@ const itemInclude = {
 
 type ItemRow = Prisma.InventoryItemGetPayload<{ include: typeof itemInclude }>;
 
+/**
+ * A file id is a reference to a row in *this* church's library, so it is resolved rather than
+ * trusted — the tenant-scoped client cannot see another church's file anyway, and this is what turns
+ * "no such file" into an answer instead of a dangling foreign key. Receipts, warranties and
+ * photographs are all filed as documents.
+ */
+async function assertAttachableFile(fileId: string): Promise<void> {
+  const file = await prisma.storedFile.findFirst({
+    where: { id: fileId, ...live },
+    select: { id: true, purpose: true },
+  });
+  if (!file) throw new AppError(400, 'That file is not in this church\u2019s library', 'unknown_file');
+  if (file.purpose !== 'document') {
+    throw new AppError(400, 'Only a file stored as a document can be attached to the register', 'wrong_file_purpose');
+  }
+}
+
 /** Money leaves as a number; see lib/prisma.money. */
 const toPublicItem = (row: ItemRow) => ({ ...row, cost: money(row.cost) });
+
+const maintenanceInclude = {
+  item: { select: { id: true, name: true, sku: true, unit: true } },
+  recordedBy: { select: { id: true, name: true } },
+  file: { select: { id: true, fileName: true } },
+} satisfies Prisma.MaintenanceRecordInclude;
+
+type MaintenanceRow = Prisma.MaintenanceRecordGetPayload<{ include: typeof maintenanceInclude }>;
+
+const toPublicMaintenance = (row: MaintenanceRow) => ({ ...row, cost: money(row.cost) });
 
 /** The transaction handle, typed the way the rest of the codebase types it. */
 type Tx = Db;
@@ -152,6 +181,7 @@ export async function updateSupplier(id: string, input: UpdateSupplierInput, act
 
 export async function createItem(input: CreateItemInput, actorId: string) {
   const { openingQuantity, ...fields } = input;
+  if (fields.fileId) await assertAttachableFile(fields.fileId);
 
   return prisma.$transaction(async (tx) => {
     // Assets and stock live in the same register, so a duplicate SKU on either kind is the same
@@ -238,10 +268,11 @@ export async function updateItem(id: string, input: UpdateItemInput, actorId: st
   return prisma.$transaction(async (tx) => {
     // `quantity` is deliberately not in the update path: it changes through movements, or through an
     // approved stock take, and nowhere else — that is what makes the ledger the truth.
-    const { status, ...fields } = input;
+    const { status, fileId, ...fields } = input;
+    if (fileId) await assertAttachableFile(fileId);
     const item = await tx.inventoryItem.update({
       where: { id },
-      data: { ...fields, ...(status ? { status } : {}) },
+      data: { ...fields, ...(fileId !== undefined ? { fileId } : {}), ...(status ? { status } : {}) },
       include: itemInclude,
     });
     await tx.auditLog.create({
@@ -271,6 +302,10 @@ export async function retireItem(id: string, input: { reason: string; reasonLabe
   // half failing alone.
   return prisma.$transaction(async (tx) => {
     const item = await findLive(tx.inventoryItem, id, 'That item is not in the register');
+    // Disposal is a lifecycle end, not a status somebody flips: once retired, the item is out of the
+    // register and only the Trash can bring it back. A second disposal would otherwise write a
+    // second balancing movement against a shelf the first already emptied.
+    if (item.status === 'disposed') throw new AppError(409, 'That item has already been disposed of', 'already_disposed');
     if (item.quantity > 0) {
       await applyMovement(tx, {
         itemId: id,
@@ -687,4 +722,61 @@ export async function listTransfers(query: ListTransfersQuery) {
     }),
   ]);
   return { data, meta: page(total, query) };
+}
+
+// -------------------------------------------------------------------------------------------
+// Maintenance — the repair-bench history. Append-only like the ledger: a further visit
+// supersedes an earlier one, and nothing edits or deletes a record that was signed.
+// -------------------------------------------------------------------------------------------
+
+export async function createMaintenance(input: CreateMaintenanceInput, actorId: string) {
+  if (input.fileId) await assertAttachableFile(input.fileId);
+
+  return prisma.$transaction(async (tx) => {
+    const item = await findLive(tx.inventoryItem, input.itemId, 'That item is not in the register');
+    const record = await tx.maintenanceRecord.create({
+      data: {
+        itemId: input.itemId,
+        servicedAt: input.servicedAt,
+        ...(input.provider ? { provider: input.provider } : {}),
+        ...(input.cost != null ? { cost: input.cost } : {}),
+        ...(input.description ? { description: input.description } : {}),
+        ...(input.nextDueAt ? { nextDueAt: input.nextDueAt } : {}),
+        ...(input.fileId ? { fileId: input.fileId } : {}),
+        recordedById: actorId,
+      },
+      include: maintenanceInclude,
+    });
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: 'create',
+        entityName: 'MaintenanceRecord',
+        entityId: record.id,
+        summary: `Logged maintenance on ${item.name} (${item.sku})${input.provider ? ` by ${input.provider}` : ''}`,
+      },
+    });
+    return toPublicMaintenance(record);
+  });
+}
+
+export async function listMaintenance(query: ListMaintenanceQuery) {
+  const [total, data] = await Promise.all([
+    prisma.maintenanceRecord.count({ where: maintenanceWhere(query) }),
+    prisma.maintenanceRecord.findMany({
+      where: maintenanceWhere(query),
+      include: maintenanceInclude,
+      orderBy: { servicedAt: 'desc' },
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+    }),
+  ]);
+  return { data: data.map(toPublicMaintenance), meta: page(total, query) };
+}
+
+function maintenanceWhere(query: ListMaintenanceQuery): Prisma.MaintenanceRecordWhereInput {
+  return {
+    ...(query.itemId ? { itemId: query.itemId } : {}),
+    ...(query.due === 'true' ? { nextDueAt: { lte: new Date() } } : {}),
+  };
 }

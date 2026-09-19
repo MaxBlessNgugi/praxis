@@ -48,3 +48,8 @@ inventoryRouter.get('/issues', asyncHandler(inventoryController.listIssues));
 inventoryRouter.post('/issues', requireRole('super_admin', 'admin', 'staff'), asyncHandler(inventoryController.createIssue));
 inventoryRouter.get('/transfers', asyncHandler(inventoryController.listTransfers));
 inventoryRouter.post('/transfers', requireRole('super_admin', 'admin', 'staff'), asyncHandler(inventoryController.createTransfer));
+
+// Maintenance — reading is any panel holder; logging a visit is staff and above. Maintenance itself
+// never mutates stock, so it does not need the administrator gate that approval and disposal carry.
+inventoryRouter.get('/maintenance', asyncHandler(inventoryController.listMaintenance));
+inventoryRouter.post('/maintenance', requireRole('super_admin', 'admin', 'staff'), asyncHandler(inventoryController.createMaintenance));

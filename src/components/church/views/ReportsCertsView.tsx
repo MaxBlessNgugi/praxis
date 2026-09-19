@@ -36,7 +36,7 @@ export const ReportsCertsView: React.FC = () => {
   const { user } = useAuth();
   const { church } = useChurchIdentity();
   const register = useMemberReport();
-  const report = register.data?.data ?? null;
+  const report = register.data ?? null;
 
   const [certificateType, setCertificateType] = useState<CertificateType>('baptism');
   const [fullName, setFullName] = useState('');

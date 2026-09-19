@@ -16,6 +16,10 @@ export async function listMembers(req: Request, res: Response): Promise<void> {
   ok(res, data, meta);
 }
 
+export async function listLocations(_req: Request, res: Response): Promise<void> {
+  ok(res, await memberService.listLocations());
+}
+
 export async function getMember(req: Request, res: Response): Promise<void> {
   ok(res, await memberService.getMember(id(req)));
 }

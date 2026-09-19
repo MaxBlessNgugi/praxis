@@ -1,5 +1,6 @@
 import { stringifyCsv } from '../lib/csv';
 import { prisma } from '../lib/prisma';
+import { displayTimeZone } from '../config/env';
 import { attendanceWhere } from './service.service';
 import { householdWhere } from './household.service';
 import { titheWhere, offeringWhere } from './giving.service';
@@ -22,7 +23,8 @@ import type { ListGivingQuery } from '../schemas/finance.schema';
 const BOM = '\uFEFF';
 
 /** A date leaves as `2026-02-08`, not as an ISO timestamp a spreadsheet turns into `####`. */
-const iso = (value: Date | null | undefined): string | null => (value ? value.toISOString().slice(0, 10) : null);
+const iso = (value: Date | null | undefined): string | null =>
+  value ? new Intl.DateTimeFormat('en-CA', { timeZone: displayTimeZone }).format(value) : null;
 
 /** `stringifyCsv` writes rows of cells, so the headers travel as the first row. */
 const rows = <T,>(columns: Array<[string, (row: T) => string | number | null | undefined]>, data: T[]) =>

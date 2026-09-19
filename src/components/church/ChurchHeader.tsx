@@ -152,13 +152,20 @@ export const ChurchHeader: React.FC<ChurchHeaderProps> = ({
   onSearchChange,
   activeTabTitle = 'Home Cloud Dashboard',
 }) => {
+  const { organization } = useAuth();
   return (
     <header className="h-16 bg-[#FFFFFF] border-b border-[#E7E5E4] px-6 flex items-center justify-between shadow-[0_1px_4px_rgba(87,83,78,0.04)] shrink-0 z-20">
       {/* Left: Breadcrumbs & Global Search */}
       <div className="flex items-center gap-5 min-w-0">
         <div className="flex items-center gap-2 font-headline text-xs text-[#57534E] shrink-0">
-          <span className="hover:text-[#1C1917] cursor-pointer font-medium">Main Church</span>
-          <span className="text-[#A8A29E]">/</span>
+          {/* The church's own name, once the session names it — nothing until then. A hardcoded
+              fallback would flash a wrong church on every restore. */}
+          {organization && (
+            <>
+              <span className="hover:text-[#1C1917] cursor-pointer font-medium">{organization.name}</span>
+              <span className="text-[#A8A29E]">/</span>
+            </>
+          )}
           <span className="font-bold text-[#1C1917]">{activeTabTitle}</span>
         </div>
 

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
-import { useMemberReport } from '../../../lib/hooks/useReports';
-import { useMembers } from '../../../lib/hooks/useMembers';
+import { useMembers, useLocations } from '../../../lib/hooks/useMembers';
+import { useMemberReport } from '../../../hooks/useApi';
 import { ApiError } from '../../../lib/api';
 
 /** The baptism states this form offers; the API records them as `baptismType`. */
@@ -20,7 +19,7 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [dob, setDob] = useState('');
-  const [location, setLocation] = useState(DEFAULT_LOCATION);
+  const [location, setLocation] = useState('');
   const [baptismStatus, setBaptismStatus] = useState<BaptismStatus>('baptized');
   const [notes, setNotes] = useState('');
   const [assignHousehold, setAssignHousehold] = useState(true);
@@ -29,6 +28,7 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   // The census cards report the roll itself, so enrolling someone moves them.
   const { data: register, refetch: refetchRegister } = useMemberReport();
+  const { locations } = useLocations();
   const [enrolledThisSession, setEnrolledThisSession] = useState(0);
   const rollTotal = register?.total ?? 0;
   const householdCount = register?.households.total ?? 0;
@@ -85,7 +85,7 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
         setFirstName('');
         setLastName('');
         setPhone('');
-        setLocation(DEFAULT_LOCATION);
+        setLocation('');
         setEmail('');
         setAddress('');
         setDob('');
@@ -369,7 +369,7 @@ export const AddNewChristianView: React.FC<AddNewChristianViewProps> = ({
                     onChange={(e) => setLocation(e.target.value)}
                     className="w-full h-10 px-3 rounded-lg bg-white border border-[#e1bfb5]/70 text-[#1e1b19] font-body text-sm focus:outline-none focus:border-[#9b2f00] cursor-pointer"
                   >
-                    {LOCATIONS.map((option) => (
+                    {locations.map((option) => (
                       <option key={option} value={option}>
                         {option}
                       </option>

@@ -3,6 +3,7 @@ import { MinistriesSubTab } from '../../../types';
 import { MinistriesDepartmentalPanel } from './MinistriesDepartmentalPanel';
 import { MinistriesLeadershipPanel } from './MinistriesLeadershipPanel';
 import { MinistriesVolunteerPanel } from './MinistriesVolunteerPanel';
+import { GroupsFellowshipPanel } from './GroupsFellowshipPanel';
 
 interface MinistriesViewProps {
   initialSubTab?: MinistriesSubTab;
@@ -95,6 +96,18 @@ export const MinistriesView: React.FC<MinistriesViewProps> = ({
               3 Gaps
             </span>
           </button>
+
+          <button
+            onClick={() => handleTabChange('ministries-groups')}
+            className={`px-4 py-2 rounded-[9px] text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'ministries-groups'
+                ? 'bg-[#C2410C] text-white shadow-sm'
+                : 'text-[#57534E] hover:text-[#1C1917] hover:bg-[#F5EDE4]'
+            }`}
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">groups_2</span>
+            <span>Groups & Fellowships</span>
+          </button>
         </div>
       </div>
 
@@ -102,6 +115,7 @@ export const MinistriesView: React.FC<MinistriesViewProps> = ({
       {activeTab === 'ministries-departmental' && <MinistriesDepartmentalPanel />}
       {activeTab === 'ministries-leadership' && <MinistriesLeadershipPanel />}
       {activeTab === 'ministries-volunteers' && <MinistriesVolunteerPanel />}
+      {activeTab === 'ministries-groups' && <GroupsFellowshipPanel />}
     </div>
   );
 };

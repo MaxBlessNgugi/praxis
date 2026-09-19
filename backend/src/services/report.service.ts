@@ -363,7 +363,7 @@ export async function governanceReport(range: Range) {
 export async function inventoryReport() {
   const organizationId = requireTenantId();
 
-  const [totals, byCategory, byLocation, byCondition, lowStock, variances, movementsByKind] = await Promise.all([
+  const [totals, byCategory, byLocation, byCondition, byCustodian, lowStock, variances, maintenanceDue, movementsByKind] = await Promise.all([
     prisma.$queryRaw<Array<{ kind: string; lines: bigint; quantity: bigint; value: Prisma.Decimal | null }>>`
       SELECT "kind", COUNT(*) AS lines, COALESCE(SUM("quantity"), 0) AS quantity, COALESCE(SUM("quantity" * "cost"), 0) AS value
       FROM "InventoryItem" WHERE ${liveSql} AND "organizationId" = ${organizationId} AND "status" != 'disposed'
@@ -380,6 +380,12 @@ export async function inventoryReport() {
       SELECT "condition", COUNT(*) AS lines
       FROM "InventoryItem" WHERE ${liveSql} AND "organizationId" = ${organizationId} AND "kind" = 'asset' AND "condition" IS NOT NULL
       GROUP BY "condition"`,
+    // The join makes "deletedAt" ambiguous, so this one names the table instead of reusing liveSql.
+    prisma.$queryRaw<Array<{ custodian: string | null; lines: bigint }>>`
+      SELECT m."firstName" || ' ' || m."lastName" AS custodian, COUNT(*) AS lines
+      FROM "InventoryItem" i JOIN "Member" m ON m.id = i."custodianId"
+      WHERE i."deletedAt" IS NULL AND i."organizationId" = ${organizationId} AND i."status" != 'disposed'
+      GROUP BY m.id, m."firstName", m."lastName" ORDER BY 2 DESC`,
     prisma.inventoryItem.findMany({
       where: { ...live, reorderAt: { not: null } },
       select: { id: true, sku: true, name: true, quantity: true, reorderAt: true, unit: true, location: true },
@@ -391,6 +397,14 @@ export async function inventoryReport() {
       include: { item: { select: { id: true, name: true, sku: true } } },
       orderBy: { approvedAt: 'desc' },
       take: 10,
+    }),
+    prisma.maintenanceRecord.findMany({
+      // Due means the date has arrived. Nothing here is overdue-shaming: the shelf of things that
+      // need a mechanic is short, and the console orders it by how overdue each one is.
+      where: { nextDueAt: { lte: new Date() }, item: { deletedAt: null } },
+      include: { item: { select: { id: true, name: true, sku: true, location: true } } },
+      orderBy: { nextDueAt: 'asc' },
+      take: 15,
     }),
     prisma.stockMovement.groupBy({ by: ['kind'], _count: true }),
   ]);
@@ -414,7 +428,15 @@ export async function inventoryReport() {
     byCategory: byCategory.map((row) => ({ category: row.category, lines: n(row.lines), value: money(row.value) ?? 0 })),
     byLocation: byLocation.map((row) => ({ location: row.location, lines: n(row.lines), quantity: n(row.quantity) })),
     byCondition: byCondition.map((row) => ({ condition: row.condition, lines: n(row.lines) })),
+    byCustodian: byCustodian.map((row) => ({ custodian: row.custodian, lines: n(row.lines) })),
     lowStock: lowStock.filter((item) => item.quantity <= (item.reorderAt ?? 0)),
+    maintenanceDue: maintenanceDue.map((record) => ({
+      id: record.id,
+      servicedAt: record.servicedAt,
+      nextDueAt: record.nextDueAt,
+      provider: record.provider,
+      item: record.item,
+    })),
     recentVariances: variances.map((take) => ({
       id: take.id,
       approvedAt: take.approvedAt,

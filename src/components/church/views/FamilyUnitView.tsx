@@ -3,7 +3,7 @@ import { HouseholdUnit } from '../../../types';
 import { useDialog } from '../dialog';
 import { EmptyState } from '../../ui';
 import { ErrorBlock } from '../DataState';
-import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
+import { useLocations } from '../../../lib/hooks/useMembers';
 import { useMembers } from '../../../lib/hooks/useMembers';
 import { ApiError, reportsApi } from '../../../lib/api';
 import { downloadBlob } from '../../../lib/export';
@@ -25,9 +25,10 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
   const [newSurname, setNewSurname] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [newUnitNumber, setNewUnitNumber] = useState('');
-  const [newCampus, setNewCampus] = useState<string>(DEFAULT_LOCATION);
+  const [newCampus, setNewCampus] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const { locations } = useLocations();
 
   useEffect(() => {
     const loadHouseholds = async () => {
@@ -169,7 +170,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                 className="appearance-none h-10 pl-3 pr-8 rounded-lg bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer focus:outline-none border border-[#e1bfb5]/40"
               >
                 <option value="all">All Campuses</option>
-                {LOCATIONS.map((location) => (
+                {locations.map((location) => (
                   <option key={location} value={location}>
                     {location}
                   </option>
@@ -526,7 +527,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                   onChange={(e) => setNewCampus(e.target.value)}
                   className="w-full h-9 px-2.5 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 >
-                  {LOCATIONS.map((location) => (
+                  {locations.map((location) => (
                     <option key={location} value={location}>
                       {location}
                     </option>

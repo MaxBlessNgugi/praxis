@@ -291,6 +291,84 @@ async function main(): Promise<void> {
   });
   check('and can still write while its notice runs', cancelledWrite.status === 201, `status ${cancelledWrite.status}`);
 
+  // 9. Plan limits are enforced server-side -------------------------------
+  // Downgrade is the one transition the story above doesn't walk: on Mustard Seed (150 seats) the
+  // next seat is refused with 402 *before* the row is written, at the exact boundary and above it —
+  // while reads, edits of existing people and a second staff account stay open.
+  console.log('\n9. A plan cap is enforced at the boundary, by the server');
+  const cap = await call('POST', `/api/vendor/organizations/${probeId}/plan`, vendorToken, {
+    planKey: 'mustard-seed',
+    status: 'active',
+    periodMonths: 1,
+    note: 'Lifecycle: downgrading to test the seat cap.',
+  });
+  check('the probe church is downgraded to Mustard Seed', cap.status === 200, `status ${cap.status}: ${errorOf(cap)}`);
+
+  const membersPage = await call('GET', '/api/members?pageSize=100', probeToken);
+  const seatsFilled = (membersPage.body as { meta?: { total: number } })?.meta?.total ?? 0;
+  const seatsToAdd = 150 - seatsFilled;
+  for (let i = 0; i < seatsToAdd; i += 1) {
+    await call('POST', '/api/members', probeToken, {
+      firstName: `Seat ${i + 1}`,
+      lastName: 'Filler',
+      location: 'Cap Probe',
+    });
+  }
+  const atCap = await call('GET', '/api/members?pageSize=1', probeToken);
+  check(
+    'the register is filled to exactly the plan cap',
+    (atCap.body as { meta?: { total: number } })?.meta?.total === 150,
+    `started at ${seatsFilled}`,
+  );
+
+  const overCap = await call('POST', '/api/members', probeToken, {
+    firstName: 'One Too Many',
+    lastName: 'Seat',
+    location: 'Cap Probe',
+  });
+  check('the seat above the cap is refused with 402', overCap.status === 402, `status ${overCap.status}: ${errorOf(overCap)}`);
+  check(
+    'and the refusal names the plan and the way out',
+    errorOf(overCap).includes('Mustard Seed') && errorOf(overCap).includes('larger plan'),
+    errorOf(overCap),
+  );
+
+  const withinCapEdit = await call('GET', '/api/members?pageSize=5', probeToken);
+  const editable = data<Array<{ id: string; firstName: string }>>(withinCapEdit)?.[0];
+  if (editable) {
+    const edited = await call('PATCH', `/api/members/${editable.id}`, probeToken, { firstName: 'Still Editable' });
+    check('existing records stay editable at the cap', edited.status === 200, `status ${edited.status}: ${errorOf(edited)}`);
+  }
+  const readsAtCap = await call('GET', '/api/members?pageSize=5', probeToken);
+  check('reads still work at the cap', readsAtCap.status === 200);
+
+  const secondUser = await call('POST', '/api/admin/users', probeToken, {
+    name: 'Second Clerk',
+    email: `clerk-${stamp}@billing-lifecycle.test`,
+    password: 'lifecycle-password',
+    roleKey: 'staff',
+  });
+  check('the user cap of 3 is not yet reached, so a second account is allowed', secondUser.status === 201, `status ${secondUser.status}: ${errorOf(secondUser)}`);
+  const thirdUser = await call('POST', '/api/admin/users', probeToken, {
+    name: 'Third Clerk',
+    email: `clerk3-${stamp}@billing-lifecycle.test`,
+    password: 'lifecycle-password',
+    roleKey: 'staff',
+  });
+  const fourthUser = await call('POST', '/api/admin/users', probeToken, {
+    name: 'Fourth Clerk',
+    email: `clerk4-${stamp}@billing-lifecycle.test`,
+    password: 'lifecycle-password',
+    roleKey: 'staff',
+  });
+  check('the fourth staff account is refused with 402', fourthUser.status === 402, `status ${fourthUser.status}: ${errorOf(fourthUser)}`);
+  const userCapError = errorOf(fourthUser);
+  check('and that refusal also names the plan', userCapError.includes('Mustard Seed'), userCapError);
+  for (const user of [secondUser, thirdUser]) {
+    const id = data<{ id: string }>(user)?.id;
+    if (id) await call('DELETE', `/api/admin/users/${id}`, probeToken);
+  }
+
   console.log('\nSweeping the probe church away');
   await removeProbeChurch(probeId);
 

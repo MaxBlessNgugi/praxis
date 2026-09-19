@@ -1,5 +1,10 @@
 # Backend blueprint — what Praxis needs, read off ECCLESIA
 
+> **Status:** Praxis's backend has since been **built and completed** under `backend/` — the live
+> truths are [`backend/README.md`](../backend/README.md) and `backend/prisma/schema.prisma`. This
+> document is kept as the architecture reference and the ECCLESIA comparison; its "build order"
+> sections are history, not a plan.
+
 **This document was rewritten against a system that exists.** The previous revision was inference —
 a data model, auth story and offline story reasoned out from what the mockup implies. It has been
 replaced by the architecture of **ECCLESIA ChMS** (`MaxBlessNgugi/ecclesia-church-management-system`),

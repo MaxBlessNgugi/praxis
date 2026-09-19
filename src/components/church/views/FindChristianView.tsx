@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ParishMember } from '../../../types';
-import { LOCATIONS } from '../../../data/churchDomain';
+import { useLocations } from '../../../lib/hooks/useMembers';
 import { interactiveCard } from '../interactiveCard';
-import { useMemberReport } from '../../../lib/hooks/useReports';
+import { useMemberReport } from '../../../hooks/useApi';
 import { usePermissions } from '../../../lib/permissions';
 import { exportCsv } from '../../../lib/export';
 import { EmptyState } from '../../ui';
@@ -96,6 +96,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
   const [importing, setImporting] = useState(false);
 
   const { listMembers, getMember, isLoading, error } = useMembers();
+  const { locations } = useLocations();
 
   /** Opening a record names it in the URL; closing clears the parameter without a history entry. */
   const openRecordFor = useCallback((member: ParishMember) => {
@@ -505,7 +506,7 @@ export const FindChristianView: React.FC<FindChristianViewProps> = ({
                 className="w-full h-11 pl-3 pr-8 rounded-lg bg-[#faf2ee] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer appearance-none focus:outline-none"
               >
                 <option value="">All Churches</option>
-                {LOCATIONS.map((location) => (
+                {locations.map((location) => (
                   <option key={location} value={location}>
                     {location}
                   </option>

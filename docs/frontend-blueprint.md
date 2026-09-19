@@ -1,5 +1,8 @@
 # Frontend blueprint — reconciled against the repo
 
+> **Status:** a point-in-time audit of the frontend, kept for the reasoning behind the decisions it
+> records. The app has moved on since; the live truths are `README.md` and the code.
+
 **This is the proposed frontend blueprint, audited against what is on disk.** The proposal's *shape*
 — phases, a definition of done, explicit non-negotiables — is worth keeping. Its *state summary* and
 several of its "non-negotiable" rules describe an earlier version of this app, and two of them would

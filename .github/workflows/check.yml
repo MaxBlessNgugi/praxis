@@ -102,6 +102,23 @@ jobs:
         working-directory: backend
         run: npx tsx tools/tenant-isolation.ts
 
+      # The people domain, which the suites above only touch in passing: a household staffed, headed,
+      # emptied before it may retire and put back from the trash; a ministry whose roll re-rolls a
+      # returning member and refuses retirement while anybody still serves; and the two boundaries
+      # the console's buttons claim — a viewer who may read but not write, a staff member who may
+      # write but not retire. It runs in a probe church of its own and removes it either way.
+      - name: households, ministries and the role matrix
+        working-directory: backend
+        run: npm run check:people
+
+      # The circles that meet midweek: a group convened with its leader, its roll staffed, a meeting
+      # recorded and corrected, retirement refused while anybody still belongs, the trash that takes
+      # it back, the role matrix again on the new surface, and a second church that cannot reach
+      # another's circle at all. It runs in probe churches of its own and removes them either way.
+      - name: groups, fellowships and their meetings
+        working-directory: backend
+        run: npm run check:groups
+
       # The operator's side, which crosses tenants by design and so needs its own proof: suspension
       # refusing a sign-in and saying why, a support session that is scoped, audited and one-way, and
       # an outbound send that is refused rather than recorded as delivered when no provider is set.

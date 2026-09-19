@@ -193,9 +193,9 @@ every time it is run again.
 
 | | |
 | --- | --- |
-| **Last rehearsed** | 2026-09-17 (release-candidate validation) |
-| **Dump rehearsed** | `backups/praxis-2026-09-17-17-34.dump` (2.9 MB, custom format) |
-| **Method** | `createdb praxis_restore_check` → `pg_restore --no-owner` (the commands above, run exactly as written) |
-| **Verification** | Row counts of `Organization`, `User`, `Member`, `Tithe`, `AuditLog` matched the live database exactly (3 / 3 / 18 / 34 / 70) |
+| **Last rehearsed** | 2026-09-19 (final hardening pass) |
+| **Dump rehearsed** | `praxis-2026-09-19-14-11.dump` (2.9 MB, custom format, `PGDMP` magic verified by the tool) |
+| **Method** | `createdb praxis_restore_check` → `pg_restore --no-owner --exit-on-error` (the commands above, run exactly as written) |
+| **Verification** | Row counts of `Organization`, `User`, `Member`, `Tithe`, `AuditLog` matched the live database exactly (2 / 10 / 22 / 77 / 239) |
 | **Time to restore** | Under a minute for this size of database; the scratch database was dropped afterwards |
 | **Responsible operator** | Whoever holds the `DIRECT_URL` for the environment — the church's administrator on a self-hosted box, the platform operator on managed hosting |

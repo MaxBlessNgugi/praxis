@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { api, ApiError } from '../api';
 import type { HouseholdDto, ListEnvelope, MemberDto } from '../api';
 import { toHouseholdUnit, toParishMember } from '../adapters';
@@ -144,6 +144,37 @@ export interface LinkMemberInput {
 
 export interface SetHeadInput {
   memberId: string;
+}
+
+/**
+ * The congregations the register itself names — what the location pickers on the member and
+ * household forms offer. Read from the server rather than any local list, so a church that signs up
+ * sees its own congregations and never another church's campus names.
+ */
+export function useLocations() {
+  const [locations, setLocations] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refetch = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await api.get<{ data: string[] }>('/api/members/locations');
+      setLocations(response.data);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.body.error : 'Failed to load congregations';
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  return { locations, isLoading, error, refetch };
 }
 
 export function useMembers() {

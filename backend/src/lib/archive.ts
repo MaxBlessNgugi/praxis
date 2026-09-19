@@ -39,6 +39,7 @@ export const ARCHIVE_TABLES = {
   Certificate: 'certificate',
   Supplier: 'supplier',
   InventoryItem: 'inventoryItem',
+  Group: 'group',
   StoredFile: 'storedFile',
 } as const;
 

@@ -4,6 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import { prisma } from '../lib/prisma';
 import { page } from '../lib/respond';
 import { retireRecord, type ArchiveReason } from '../lib/archive';
+import { assertMemberOnRegister } from './member.service';
 import type {
   CertificateKind,
   CreateCertificateInput,
@@ -62,6 +63,12 @@ function toPublicCertificate(row: Prisma.CertificateGetPayload<{ include: typeof
 // -------------------------------------------------------------------------------------------
 
 export async function issueCertificate(input: CreateCertificateInput, issuerId: string) {
+  // The member link must point at *this* church's register. Member ids are global, and the FK is
+  // tenant-blind — without this check a certificate could be issued from another church's member
+  // row, certifying one church's ceremony in another church's name. The same refusal the finance
+  // module's `assertMemberOnRegister` gives, owned there so the register rule has one owner.
+  if (input.memberId) await assertMemberOnRegister(input.memberId);
+
   const prefix = `${KIND_PREFIX[input.kind]}-${input.ceremonyDate.getFullYear()}-`;
 
   return prisma.$transaction(async (tx) => {

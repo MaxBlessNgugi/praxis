@@ -30,6 +30,10 @@ memberRouter.post(
 );
 
 memberRouter.get('/', asyncHandler(memberController.listMembers));
+
+// The congregations the register itself names, for the member and household forms. Declared before
+// `/:id` for the usual reason: "locations" is not a member id.
+memberRouter.get('/locations', asyncHandler(memberController.listLocations));
 memberRouter.get('/:id', asyncHandler(memberController.getMember));
 
 memberRouter.post('/', requireRole('super_admin', 'admin', 'staff'), asyncHandler(memberController.createMember));

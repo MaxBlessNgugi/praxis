@@ -102,6 +102,26 @@ the same moment.
 
 ---
 
+## Groups & Fellowships
+
+The sidebar's **Groups & Fellowships** entry holds two different things, and knowing which is which
+keeps the register honest:
+
+- **Departmental / Leadership / Volunteer Roles** — who **serves**: the choir, the ushering team, the
+  Sunday school teachers. A department has a leader answerable for it and a roll of the people
+  working in it.
+- **Groups & Fellowships** (the fourth tab) — who **belongs**: the midweek cell groups, fellowship
+  circles and youth chapters that meet in homes. Convene one from the button on the register, name
+  its meeting day and where it gathers, and open its card to keep the roll and record each
+  gathering with the number that came. A circle cannot be retired while people still belong to it —
+  take them off the roll first, the same rule as a department — and a retired circle is in the Trash
+  like any other record.
+
+The distinction matters when someone asks "who is in the choir?" (a department roll) versus "who
+comes on Tuesdays?" (a circle's roll and its meeting counts).
+
+---
+
 ## Services & Worship
 
 - **Service Planner** — the services and the order of service: call to worship, praise, sermon,
@@ -208,8 +228,14 @@ many copies went up and the record keeps your number.
 
 ## Groups & Fellowships, Inventory & Assets
 
-Departments and their rosters and leaders; and the church's equipment and assets with their condition
-and location.
+**Groups & Fellowships** — departments and their rosters and leaders, the people serving on each and
+the role they hold.
+
+**Inventory & Assets** — the stock room and the property register. Each item carries a SKU or asset
+number, a kind (**consumable** — counted in whole units, with a reorder level — or **asset**, with a
+condition of good, fair or poor), its location, and a movement trail: receipts in, issues out,
+transfers, and the periodic stock take whose approval is the only thing that moves stock. The ledger
+always sums to the shelf: an issue that would take the count below zero is refused.
 
 ---
 

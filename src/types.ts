@@ -16,7 +16,7 @@ export type ParishNavTab =
 
 export type MembersSubTab = 'add-new-christian' | 'find-christian' | 'delete-christian' | 'family-unit';
 
-export type MinistriesSubTab = 'ministries-departmental' | 'ministries-leadership' | 'ministries-volunteers';
+export type MinistriesSubTab = 'ministries-departmental' | 'ministries-leadership' | 'ministries-volunteers' | 'ministries-groups';
 
 export type FinancesSubTab = 'tithes' | 'offerings' | 'project-funding' | 'welfare' | 'charity';
 

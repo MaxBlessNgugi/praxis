@@ -58,6 +58,9 @@ const itemFields = z.object({
   supplierId: z.string().uuid().nullable().optional(),
   purchasedAt: z.coerce.date().nullable().optional(),
   custodianId: z.string().uuid().nullable().optional(),
+  serialNumber: z.string().trim().max(120).nullable().optional(),
+  warrantyUntil: z.coerce.date().nullable().optional(),
+  fileId: z.string().uuid().nullable().optional(),
   notes: z.string().trim().max(1000).optional(),
   /** The opening count. Becomes the register's first movement, so the ledger explains it. */
   openingQuantity: quantity.optional(),
@@ -65,7 +68,9 @@ const itemFields = z.object({
 
 export const createItemSchema = itemFields;
 export const updateItemSchema = itemFields.partial().omit({ openingQuantity: true }).extend({
-  status: inventoryStatusSchema.optional(),
+  // `disposed` is deliberately absent: disposal is the retire action, which balances the ledger and
+  // archives the row. Letting a PATCH set it would strand stock outside the Trash.
+  status: inventoryStatusSchema.exclude(['disposed']).optional(),
 });
 
 export const listItemQuerySchema = z.object({
@@ -181,6 +186,28 @@ export const listTransfersQuerySchema = z.object({
 });
 
 // -------------------------------------------------------------------------------------------
+// Maintenance — one visit to the repair bench, per asset. History only: nothing edits a visit.
+// -------------------------------------------------------------------------------------------
+
+export const createMaintenanceSchema = z.object({
+  itemId: z.string().uuid(),
+  servicedAt: z.coerce.date(),
+  provider: z.string().trim().max(160).optional(),
+  cost: money.nullable().optional(),
+  description: z.string().trim().max(1000).optional(),
+  nextDueAt: z.coerce.date().nullable().optional(),
+  fileId: z.string().uuid().nullable().optional(),
+});
+
+export const listMaintenanceQuerySchema = z.object({
+  itemId: z.string().uuid().optional(),
+  /** `due=true` keeps only the visits whose next service date has arrived or passed. */
+  due: z.enum(['true', 'false']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+// -------------------------------------------------------------------------------------------
 // Retirement (query-string reasons, the convention everywhere else)
 // -------------------------------------------------------------------------------------------
 
@@ -200,4 +227,6 @@ export type CreateIssueInput = z.infer<typeof createIssueSchema>;
 export type ListIssuesQuery = z.infer<typeof listIssuesQuerySchema>;
 export type CreateTransferInput = z.infer<typeof createTransferSchema>;
 export type ListTransfersQuery = z.infer<typeof listTransfersQuerySchema>;
+export type CreateMaintenanceInput = z.infer<typeof createMaintenanceSchema>;
+export type ListMaintenanceQuery = z.infer<typeof listMaintenanceQuerySchema>;
 export type RetireQuery = z.infer<typeof retireReasonSchema>;

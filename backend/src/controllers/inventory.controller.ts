@@ -2,11 +2,13 @@ import type { Request, Response } from 'express';
 import {
   createIssueSchema,
   createItemSchema,
+  createMaintenanceSchema,
   createPurchaseSchema,
   createSupplierSchema,
   createTransferSchema,
   listIssuesQuerySchema,
   listItemQuerySchema,
+  listMaintenanceQuerySchema,
   listMovementsQuerySchema,
   listPurchasesQuerySchema,
   listStockTakesQuerySchema,
@@ -106,5 +108,14 @@ export async function createTransfer(req: Request, res: Response): Promise<void>
 
 export async function listTransfers(req: Request, res: Response): Promise<void> {
   const { data, meta } = await inventoryService.listTransfers(listTransfersQuerySchema.parse(req.query));
+  ok(res, data, meta);
+}
+
+export async function createMaintenance(req: Request, res: Response): Promise<void> {
+  created(res, await inventoryService.createMaintenance(createMaintenanceSchema.parse(req.body), actor(req)));
+}
+
+export async function listMaintenance(req: Request, res: Response): Promise<void> {
+  const { data, meta } = await inventoryService.listMaintenance(listMaintenanceQuerySchema.parse(req.query));
   ok(res, data, meta);
 }

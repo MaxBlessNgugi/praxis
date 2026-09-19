@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ParishNavTab, MembersSubTab, ParishMember } from '../../../types';
-import { DEFAULT_LOCATION, formatKes } from '../../../data/churchDomain';
+import { formatKes } from '../../../data/churchDomain';
 import { useDialog } from '../dialog';
 import { interactiveCard } from '../interactiveCard';
-import { useOverviewReport } from '../../../lib/hooks/useReports';
+import { useOverviewReport } from '../../../hooks/useApi';
 import { useAuth } from '../../../lib/auth';
 import { GettingStartedCard } from '../GettingStartedCard';
 import {
@@ -96,7 +96,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({ onNavigate
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Fetch real data from backend
-  const { data: overview, isLoading: overviewLoading, error: overviewError, refetch } = useOverviewReport();
+  const { data: overview, loading: overviewLoading, error: overviewError, refetch } = useOverviewReport();
   // Who is signed in, and which church they are looking at. Both used to be literals here.
   const { user, organization } = useAuth();
 
@@ -224,7 +224,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({ onNavigate
       await api.post<ItemEnvelope<ParishMember>>('/api/members', {
         firstName: parts[0],
         lastName: parts.slice(1).join(' '),
-        location: DEFAULT_LOCATION,
+        location: 'Main Campus',
         ...(newMemberEmail.trim() ? { email: newMemberEmail.trim() } : {}),
         ...(newMemberPhone.trim() ? { phone: newMemberPhone.trim() } : {}),
       });

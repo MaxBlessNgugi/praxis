@@ -79,6 +79,12 @@ function listOf<T>(answer: Answer): { data: T[]; total: number } | null {
   return body?.meta ? { data: body.data ?? [], total: body.meta.total ?? 0 } : null;
 }
 
+/** A one-pixel PNG, so an upload passes the signature check. */
+const PNG = Buffer.from(
+  '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63fcffff3f030005fe02fea72d5e2b0000000049454e44ae426082',
+  'hex',
+).toString('base64');
+
 interface ItemRow {
   id: string;
   sku: string;
@@ -87,6 +93,7 @@ interface ItemRow {
   quantity: number;
   location: string;
   status: string;
+  serialNumber?: string | null;
 }
 
 interface MovementRow {
@@ -301,7 +308,151 @@ async function main(): Promise<void> {
     await basePrisma.softDeletedRecord.deleteMany({ where: { entityId: houseItem?.id } });
     await basePrisma.inventoryItem.deleteMany({ where: { id: houseItem?.id } });
 
-    console.log('\n11. The reports answer for the probe church only');
+    console.log('\n11. Assets carry identity, custody and paperwork');
+    const asset = data<ItemRow>(
+      await call('POST', '/api/inventory/items', token, {
+        sku: 'PRB-AST-1',
+        name: 'Probe Sound Mixer',
+        kind: 'asset',
+        category: 'Sound',
+        unit: 'pcs',
+        location: 'Probe Sanctuary',
+        cost: 85000,
+        condition: 'good',
+        serialNumber: 'SN-PRB-9001',
+      }),
+    );
+    check('an asset is accepted with its serial', asset !== null && asset.serialNumber === 'SN-PRB-9001', asset ? 'no serial on the row' : 'no row');
+
+    const warrantied = data<{ id: string }>(
+      await call('POST', '/api/inventory/items', token, {
+        sku: 'PRB-AST-2',
+        name: 'Probe Projector',
+        kind: 'asset',
+        category: 'Media',
+        unit: 'pcs',
+        location: 'Probe Sanctuary',
+        warrantyUntil: '2027-06-30',
+      }),
+    );
+    check('a warranty date is taken as given', warrantied !== null, 'no row');
+
+    const receipt = await call('POST', '/api/files', token, {
+      purpose: 'document',
+      fileName: 'probe-receipt.png',
+      mimeType: 'image/png',
+      content: PNG,
+    });
+    const receiptFile = data<{ id: string }>(receipt);
+    check('a receipt can be uploaded as a document', receipt.status === 201 && receiptFile !== null, `${receipt.status} ${errorOf(receipt)}`);
+
+    const attached = data<{ fileId: string | null; serialNumber: string | null }>(
+      await call('PATCH', `/api/inventory/items/${asset!.id}`, token, {
+        ...(receiptFile ? { fileId: receiptFile.id } : {}),
+        serialNumber: 'SN-PRB-9001-B',
+      }),
+    );
+    check('the receipt attaches to the asset', attached?.fileId === receiptFile?.id, `fileId ${attached?.fileId ?? 'none'}`);
+
+    const logo = await call('POST', '/api/files', token, {
+      purpose: 'logo',
+      fileName: 'probe-logo.png',
+      mimeType: 'image/png',
+      content: PNG,
+    });
+    const logoFile = data<{ id: string }>(logo);
+    if (logoFile) {
+      const wrongPurpose = await call('PATCH', `/api/inventory/items/${asset!.id}`, token, { fileId: logoFile.id });
+      check('a logo is refused as a register attachment', wrongPurpose.status === 400, `${wrongPurpose.status} ${errorOf(wrongPurpose)}`);
+      await basePrisma.storedFile.delete({ where: { id: logoFile.id } });
+    }
+
+    const houseReceipt = await call('POST', '/api/files', houseToken, {
+      purpose: 'document',
+      fileName: 'house-receipt.png',
+      mimeType: 'image/png',
+      content: PNG,
+    });
+    const houseFile = data<{ id: string }>(houseReceipt);
+    if (houseFile) {
+      const crossFile = await call('PATCH', `/api/inventory/items/${asset!.id}`, token, { fileId: houseFile.id });
+      check('another church\'s file cannot be attached', crossFile.status === 400, `${crossFile.status} ${errorOf(crossFile)}`);
+      await basePrisma.storedFile.delete({ where: { id: houseFile.id } });
+    }
+
+    const crossMaintenance = await call('POST', '/api/inventory/maintenance', houseToken, {
+      itemId: asset!.id,
+      servicedAt: new Date().toISOString(),
+    });
+    check('the house cannot log maintenance on the probe\'s asset', crossMaintenance.status === 404, `${crossMaintenance.status} ${errorOf(crossMaintenance)}`);
+
+    console.log('\n12. Maintenance is a history, not a status flip');
+    const visit = await call('POST', '/api/inventory/maintenance', token, {
+      itemId: asset!.id,
+      servicedAt: '2026-08-01T09:00:00.000Z',
+      provider: 'Probe Audio Ltd',
+      cost: 4500,
+      description: 'Fader replaced, firmware updated',
+      nextDueAt: '2026-09-01T09:00:00.000Z',
+      ...(receiptFile ? { fileId: receiptFile.id } : {}),
+    });
+    const visitRow = data<{ id: string; cost: number; provider: string | null }>(visit);
+    check('a service visit is recorded with its cost', visit.status === 201 && visitRow?.cost === 4500, `${visit.status} ${errorOf(visit)}`);
+
+    const visitList = listOf<{ id: string; item: { sku: string }; file: { id: string } | null }>(
+      await call('GET', `/api/inventory/maintenance?itemId=${asset!.id}`, token),
+    );
+    check('the history reads back with its item and paperwork',
+      visitList?.data.length === 1 && visitList.data[0]?.item.sku === 'PRB-AST-1' && visitList.data[0]?.file?.id === receiptFile?.id,
+      visitList ? `${visitList.data.length} rows` : 'no answer',
+    );
+
+    const dueList = listOf<{ id: string }>(await call('GET', '/api/inventory/maintenance?due=true', token));
+    check('the due filter catches a lapsed next-service date', (dueList?.data ?? []).some((r) => r.id === visitRow?.id), `${dueList?.data.length ?? 0} due`);
+
+    const secondVisit = await call('POST', '/api/inventory/maintenance', token, {
+      itemId: asset!.id,
+      servicedAt: '2026-09-10T09:00:00.000Z',
+      description: 'Second visit supersedes the first',
+    });
+    check('a further visit is appended, not an edit', secondVisit.status === 201, errorOf(secondVisit));
+    const afterSecond = listOf<{ id: string }>(await call('GET', `/api/inventory/maintenance?itemId=${asset!.id}`, token));
+    check('and both visits remain in the history', afterSecond?.data.length === 2, `${afterSecond?.data.length ?? 0} rows`);
+
+    const maintenanceReport = data<{ maintenanceDue: Array<{ item: { sku: string } }>; byCustodian: Array<{ custodian: string }> }>(
+      await call('GET', '/api/reports/inventory', token),
+    );
+    check(
+      'the report names what is due for service',
+      (maintenanceReport?.maintenanceDue ?? []).some((row) => row.item.sku === 'PRB-AST-1'),
+      `${maintenanceReport?.maintenanceDue.length ?? 0} due`,
+    );
+
+    console.log('\n13. Disposal is the archive, and it happens once');
+    const patched = await call('PATCH', `/api/inventory/items/${asset!.id}`, token, { status: 'disposed' });
+    check('a PATCH cannot flip an item to disposed', patched.status === 400, `${patched.status} ${errorOf(patched)}`);
+
+    const disposal = await call('DELETE', `/api/inventory/items/${asset!.id}?reason=wrong_entry&reasonLabel=Probe disposal — mixer beyond repair`, token);
+    check('the disposal route retires the asset', disposal.status === 200, `${disposal.status} ${errorOf(disposal)}`);
+    const assetArchiveId = data<{ id: string }>(disposal)?.id ?? null;
+    check('the disposal answers with its Trash id', assetArchiveId !== null, 'no archive id');
+
+    const secondDisposal = await call('DELETE', `/api/inventory/items/${asset!.id}?reason=wrong_entry&reasonLabel=A second disposal attempt`, token);
+    check('disposing twice is refused', secondDisposal.status === 404, `${secondDisposal.status} ${errorOf(secondDisposal)}`);
+
+    const maintenanceAfterDisposal = await call('POST', '/api/inventory/maintenance', token, {
+      itemId: asset!.id,
+      servicedAt: new Date().toISOString(),
+    });
+    check('a disposed asset takes no further visits', maintenanceAfterDisposal.status === 404, `${maintenanceAfterDisposal.status} ${errorOf(maintenanceAfterDisposal)}`);
+
+    const restore = await call('POST', `/api/admin/trash/${assetArchiveId}/restore`, token);
+    check('the disposed asset comes back from the Trash', restore.status < 300, `${restore.status} ${errorOf(restore)}`);
+
+    const restoredList = listOf<{ id: string }>(await call('GET', `/api/inventory/maintenance?itemId=${asset!.id}`, token));
+    check('and its maintenance history came back with it', restoredList?.data.length === 2, `${restoredList?.data.length ?? 0} rows`);
+
+    console.log('\n14. The reports answer for the probe church only');
     const report = data<{
       totals: { totalValue: number };
       lowStock: Array<{ id: string }>;

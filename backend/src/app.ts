@@ -16,6 +16,7 @@ import { serviceRouter } from './routes/service.routes';
 import { financeRouter } from './routes/finance.routes';
 import { communicationsRouter } from './routes/communications.routes';
 import { ministryRouter } from './routes/ministry.routes';
+import { groupRouter } from './routes/group.routes';
 import { governanceRouter } from './routes/governance.routes';
 import { reportRouter } from './routes/report.routes';
 import { certificateRouter } from './routes/certificate.routes';
@@ -118,6 +119,7 @@ export function createApp(): Express {
   app.use('/api/members', memberRouter);
   app.use('/api/households', householdRouter);
   app.use('/api/ministries', ministryRouter);
+  app.use('/api/groups', groupRouter);
   app.use('/api/services', serviceRouter);
   app.use('/api/finance', financeRouter);
   app.use('/api/communications', communicationsRouter);

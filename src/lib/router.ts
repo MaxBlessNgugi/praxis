@@ -93,6 +93,8 @@ export interface Route {
   sub: string | null;
   /** The member whose record dialog is open on the register, by id. */
   memberId: string | null;
+  /** True when the URL names no section the console has — a broken or stale link. */
+  notFound?: boolean;
 }
 
 export const SECTION_PATHS: Record<ParishNavTab, string> = Object.fromEntries(
@@ -116,7 +118,10 @@ export function parsePath(pathname: string, search: string): Route {
     }
     return { tab, sub: null, memberId };
   }
-  return { tab: 'home', sub: null, memberId };
+  // Root is home; anything else is a location the console does not have — named as such so the
+  // shell can offer a not-found screen instead of silently opening the dashboard under a wrong
+  // address.
+  return { tab: 'home', sub: null, memberId, notFound: path !== '/' };
 }
 
 /** Serialize the route back to the URL the way it was parsed. */
@@ -147,6 +152,14 @@ const NAVIGATED = 'praxis:navigated';
 export function useRouter(): { route: Route; navigate: (route: Route, replace?: boolean) => void } {
   const [route, setRoute] = useState<Route>(currentRoute);
 
+  const navigate = useCallback((next: Route, replace = false) => {
+    const path = toPath(next);
+    if (replace) window.history.replaceState(null, '', path);
+    else window.history.pushState(null, '', path);
+    setRoute(next);
+    window.dispatchEvent(new Event(NAVIGATED));
+  }, []);
+
   useEffect(() => {
     const reparse = () => setRoute(currentRoute());
     window.addEventListener('popstate', reparse);
@@ -155,14 +168,6 @@ export function useRouter(): { route: Route; navigate: (route: Route, replace?: 
       window.removeEventListener('popstate', reparse);
       window.removeEventListener(NAVIGATED, reparse);
     };
-  }, []);
-
-  const navigate = useCallback((next: Route, replace = false) => {
-    const path = toPath(next);
-    if (replace) window.history.replaceState(null, '', path);
-    else window.history.pushState(null, '', path);
-    setRoute(next);
-    window.dispatchEvent(new Event(NAVIGATED));
   }, []);
 
   return { route, navigate };
