@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { env } from '../config/env';
-import { AppError } from '../middleware/errorHandler';
+import { AppError, notFoundError } from '../middleware/errorHandler';
 import { resolveAudience } from '../lib/audience';
 import { emailStatus, sendEmail } from '../lib/email';
 import { sendSms, smsStatus } from '../lib/sms';
@@ -69,7 +69,7 @@ export async function listAnnouncements(query: ListAnnouncementsQuery) {
     prisma.announcement.findMany({
       where,
       include: { author: { select: { id: true, name: true } } },
-      orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }],
+      orderBy: [{ isPinned: 'desc' }, { priority: 'desc' }, { publishedAt: 'desc' }],
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),
@@ -91,6 +91,7 @@ export async function createAnnouncement(input: CreateAnnouncementInput, actorId
         title: input.title,
         body: input.body,
         audience: input.audience,
+        priority: input.priority,
         isPinned: input.isPinned,
         publishedAt: input.publishedAt ?? new Date(),
         expiresAt: input.expiresAt ?? null,
@@ -120,6 +121,7 @@ export async function updateAnnouncement(id: string, input: UpdateAnnouncementIn
         ...(input.title === undefined ? {} : { title: input.title }),
         ...(input.body === undefined ? {} : { body: input.body }),
         ...(input.audience === undefined ? {} : { audience: input.audience }),
+        ...(input.priority === undefined ? {} : { priority: input.priority }),
         ...(input.isPinned === undefined ? {} : { isPinned: input.isPinned }),
         ...(input.publishedAt === undefined ? {} : { publishedAt: input.publishedAt }),
         ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
@@ -361,6 +363,11 @@ export function retireBroadcast(id: string, input: RetireReason, actorId: string
 // Events
 // -------------------------------------------------------------------------------------------
 
+/** Every read of an event names its organiser the same way, so no screen has to look them up. */
+const eventWithOrganizer = {
+  organizer: { select: { id: true, firstName: true, lastName: true } },
+} as const;
+
 export async function listEvents(query: ListEventsQuery) {
   const where: Prisma.EventWhereInput = {
     ...live,
@@ -383,6 +390,7 @@ export async function listEvents(query: ListEventsQuery) {
     prisma.event.count({ where }),
     prisma.event.findMany({
       where,
+      include: eventWithOrganizer,
       orderBy: { startsAt: 'asc' },
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
@@ -393,12 +401,18 @@ export async function listEvents(query: ListEventsQuery) {
 }
 
 export function getEvent(id: string) {
-  return findLive(prisma.event, id, 'That event does not exist');
+  return findLive(prisma.event, id, 'That event does not exist', { include: eventWithOrganizer });
+}
+
+/** The organiser named on an event has to be someone on this church's register. */
+async function assertOrganizer(event: { organizerId?: string | null }) {
+  if (event.organizerId) await assertMemberOnRegister(event.organizerId, 'That organiser');
 }
 
 export async function createEvent(input: CreateEventInput, actorId: string) {
+  await assertOrganizer(input);
   return prisma.$transaction(async (tx) => {
-    const event = await tx.event.create({ data: input });
+    const event = await tx.event.create({ data: input, include: eventWithOrganizer });
     await tx.auditLog.create({
       data: { actorId, action: 'create', entityName: 'Event', entityId: event.id, summary: `Added "${event.title}" to the calendar` },
     });
@@ -408,9 +422,10 @@ export async function createEvent(input: CreateEventInput, actorId: string) {
 
 export async function updateEvent(id: string, input: UpdateEventInput, actorId: string) {
   const before = await findLive(prisma.event, id, 'That event does not exist');
+  await assertOrganizer(input);
 
   return prisma.$transaction(async (tx) => {
-    const event = await tx.event.update({ where: { id }, data: input });
+    const event = await tx.event.update({ where: { id }, data: input, include: eventWithOrganizer });
     await tx.auditLog.create({
       data: {
         actorId,
@@ -439,9 +454,39 @@ export function retireEvent(id: string, input: RetireReason, actorId: string) {
 // Prayer requests
 // -------------------------------------------------------------------------------------------
 
-export async function listPrayerRequests(query: ListPrayerRequestsQuery) {
+/**
+ * Who may read a petition that was marked private.
+ *
+ * The shared list belongs to the whole office; a private petition is pastoral correspondence and
+ * belongs to those who administer the church. The rule is stated once and used by every read and
+ * write path below, so a private petition cannot be reached by listing, by guessing its id or by
+ * answering it.
+ */
+const PRIVATE_PRAYER_ROLES = new Set(['super_admin', 'admin']);
+
+function prayerScope(roleKey: string | null): Prisma.PrayerRequestWhereInput {
+  return PRIVATE_PRAYER_ROLES.has(roleKey ?? '') ? {} : { isPrivate: false };
+}
+
+function mayReadPrayer(row: { isPrivate: boolean }, roleKey: string | null) {
+  return !row.isPrivate || PRIVATE_PRAYER_ROLES.has(roleKey ?? '');
+}
+
+/**
+ * A private petition the caller may not read is reported as missing rather than forbidden: a 403
+ * would confirm that somebody by that name asked for prayer about something.
+ */
+async function findVisiblePrayer(id: string, roleKey: string | null, include?: Prisma.PrayerRequestInclude) {
+  const row = await findLive(prisma.prayerRequest, id, 'That prayer request does not exist',
+    include ? { include } : {});
+  if (!mayReadPrayer(row, roleKey)) throw notFoundError('That prayer request');
+  return row;
+}
+
+export async function listPrayerRequests(query: ListPrayerRequestsQuery, roleKey: string | null) {
+  const visible = { ...live, ...prayerScope(roleKey) };
   const where: Prisma.PrayerRequestWhereInput = {
-    ...live,
+    ...visible,
     ...(query.status ? { status: query.status } : {}),
     ...(query.memberId ? { memberId: query.memberId } : {}),
     ...between('submittedAt', query),
@@ -464,7 +509,9 @@ export async function listPrayerRequests(query: ListPrayerRequestsQuery) {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),
-    prisma.prayerRequest.groupBy({ by: ['status'], where: live, _count: true }),
+    // Counted over the same rows the caller may read, or the totals would disclose how many private
+    // petitions are being held.
+    prisma.prayerRequest.groupBy({ by: ['status'], where: visible, _count: true }),
   ]);
 
   return {
@@ -474,10 +521,10 @@ export async function listPrayerRequests(query: ListPrayerRequestsQuery) {
   };
 }
 
-export function getPrayerRequest(id: string) {
-  return findLive(prisma.prayerRequest, id, 'That prayer request does not exist', {
-    include: { member: { select: { id: true, firstName: true, lastName: true } } },
-  });
+const prayerWithMember = { member: { select: { id: true, firstName: true, lastName: true } } } as const;
+
+export function getPrayerRequest(id: string, roleKey: string | null) {
+  return findVisiblePrayer(id, roleKey, prayerWithMember);
 }
 
 export async function createPrayerRequest(input: CreatePrayerRequestInput, actorId: string) {
@@ -507,8 +554,13 @@ export async function createPrayerRequest(input: CreatePrayerRequestInput, actor
   });
 }
 
-export async function updatePrayerRequest(id: string, input: UpdatePrayerRequestInput, actorId: string) {
-  const before = await findLive(prisma.prayerRequest, id, 'That prayer request does not exist');
+export async function updatePrayerRequest(
+  id: string,
+  input: UpdatePrayerRequestInput,
+  actorId: string,
+  roleKey: string | null,
+) {
+  const before = await findVisiblePrayer(id, roleKey);
 
   return prisma.$transaction(async (tx) => {
     const request = await tx.prayerRequest.update({
@@ -536,8 +588,13 @@ export async function updatePrayerRequest(id: string, input: UpdatePrayerRequest
   });
 }
 
-export async function answerPrayerRequest(id: string, input: AnswerPrayerRequestInput, actorId: string) {
-  const before = await findLive(prisma.prayerRequest, id, 'That prayer request does not exist');
+export async function answerPrayerRequest(
+  id: string,
+  input: AnswerPrayerRequestInput,
+  actorId: string,
+  roleKey: string | null,
+) {
+  const before = await findVisiblePrayer(id, roleKey);
   if (before.status === 'answered') throw new AppError(409, 'That request has already been marked answered', 'already_answered');
 
   const answeredAt = input.answeredAt ?? new Date();

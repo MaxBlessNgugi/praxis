@@ -5,6 +5,7 @@ import {
   type LiturgyItemDto,
   type LiturgyKind,
   type ServiceDto,
+  type ServiceKind,
 } from '../../../../lib/api';
 import { errorMessage, useMemberOptions, useRoster, useService, useServices } from '../../../../hooks/useApi';
 import { usePermissions } from '../../../../lib/permissions';
@@ -41,6 +42,76 @@ const KIND_LABELS: Record<LiturgyKind, string> = {
 
 const KIND_ORDER = Object.keys(KIND_LABELS) as LiturgyKind[];
 
+/** The kinds of gathering the API stores, in the order a planner offers them. */
+const SERVICE_KIND_LABELS: Record<ServiceKind, string> = {
+  worship: 'Sunday worship',
+  midweek: 'Midweek service',
+  prayer: 'Prayer meeting',
+  special: 'Special service',
+  other: 'Other gathering',
+};
+
+const SERVICE_KIND_ORDER = Object.keys(SERVICE_KIND_LABELS) as ServiceKind[];
+
+/** The ways a service comes off the calendar, in the API's own vocabulary. */
+const RETIRE_REASONS = [
+  { id: 'cancelled', label: 'Cancelled', detail: 'The service did not happen.' },
+  { id: 'postponed', label: 'Postponed', detail: 'It moved; schedule the new date as its own service.' },
+  { id: 'duplicate', label: 'Duplicate entry', detail: 'The same service was scheduled twice; this is the copy.' },
+  { id: 'wrong_entry', label: 'Wrong entry', detail: 'The date, the time or the venue was entered wrongly.' },
+  { id: 'other', label: 'Other', detail: 'Anything the categories above do not describe — say what.' },
+] as const;
+
+type RetireReason = (typeof RETIRE_REASONS)[number]['id'];
+
+const RETIRE_LABELS = Object.fromEntries(RETIRE_REASONS.map((row) => [row.id, row.label])) as Record<
+  RetireReason,
+  string
+>;
+
+/** The fields both scheduling and editing write, so the two are one form rather than two. */
+interface ServiceDraft {
+  /** The service being edited, or null while a new one is being scheduled. */
+  id: string | null;
+  title: string;
+  kind: ServiceKind;
+  heldAt: string;
+  startTime: string;
+  venue: string;
+  theme: string;
+  officiantId: string;
+}
+
+const EMPTY_DRAFT: ServiceDraft = {
+  id: null,
+  title: '',
+  kind: 'worship',
+  heldAt: new Date().toISOString().slice(0, 10),
+  startTime: '09:00',
+  venue: '',
+  theme: '',
+  officiantId: '',
+};
+
+/** An element of the order of service, as it is added or changed. */
+interface ItemDraft {
+  id: string | null;
+  title: string;
+  kind: LiturgyKind;
+  durationMinutes: number;
+  responsible: string;
+  notes: string;
+}
+
+const EMPTY_ITEM: ItemDraft = {
+  id: null,
+  title: '',
+  kind: 'praise_worship',
+  durationMinutes: 10,
+  responsible: '',
+  notes: '',
+};
+
 const FIELD =
   'w-full px-3.5 py-2.5 text-sm rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] text-[#1C1917] placeholder-[#A8A29E] transition-all focus:outline-none focus:border-[#C2410C] focus:ring-4 focus:ring-[#C2410C]/15';
 const LABEL = 'block text-xs font-bold text-[#1C1917] mb-1.5';
@@ -73,30 +144,19 @@ export const ServicePlannerPanel: React.FC = () => {
   const current = detail.data?.data ?? null;
   const duties = useRoster({ serviceId: selectedId ?? undefined });
 
-  const [isCreating, setIsCreating] = useState(false);
-  const creatingDialog = useDialog(() => setIsCreating(false), 'Schedule a service');
-  const [isAddingItem, setIsAddingItem] = useState(false);
-  const addingItemDialog = useDialog(() => setIsAddingItem(false), 'Add an element to the order');
+  const [formOpen, setFormOpen] = useState(false);
+  const formDialog = useDialog(() => setFormOpen(false), 'Service');
+  const [isEditingItem, setIsEditingItem] = useState(false);
+  const itemDialog = useDialog(() => setIsEditingItem(false), 'Element of the order');
   const [isPrinting, setIsPrinting] = useState(false);
   const printingDialog = useDialog(() => setIsPrinting(false), 'Order of service');
   const [isRetiring, setIsRetiring] = useState(false);
   const retiringDialog = useDialog(() => setIsRetiring(false), 'Retire this service');
 
-  const [draft, setDraft] = useState({
-    title: '',
-    heldAt: new Date().toISOString().slice(0, 10),
-    startTime: '09:00',
-    venue: '',
-    theme: '',
-    officiantId: '',
-  });
-  const [item, setItem] = useState({
-    title: '',
-    kind: 'praise_worship' as LiturgyKind,
-    durationMinutes: 10,
-    responsible: '',
-    notes: '',
-  });
+  const [draft, setDraft] = useState<ServiceDraft>(EMPTY_DRAFT);
+  const [item, setItem] = useState<ItemDraft>(EMPTY_ITEM);
+  const [retireReason, setRetireReason] = useState<RetireReason>('cancelled');
+  const [retireNote, setRetireNote] = useState('');
 
   const rows = services.items
     .filter((service) => {
@@ -159,25 +219,51 @@ export const ServicePlannerPanel: React.FC = () => {
     }
   };
 
-  const handleCreate = async (event: React.FormEvent) => {
+  /** Open the form on a service, or on nothing at all for a new one. */
+  const openForm = (service?: ServiceDto) => {
+    setDraft(
+      service
+        ? {
+            id: service.id,
+            title: service.title,
+            kind: service.kind,
+            heldAt: service.heldAt.slice(0, 10),
+            startTime: service.startTime ?? '',
+            venue: service.venue,
+            theme: service.theme ?? '',
+            officiantId: service.officiantId ?? '',
+          }
+        : EMPTY_DRAFT,
+    );
+    setFormOpen(true);
+  };
+
+  const handleSaveService = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    const body = {
+      title: draft.title.trim(),
+      kind: draft.kind,
+      heldAt: draft.heldAt,
+      startTime: draft.startTime || undefined,
+      venue: draft.venue.trim() || 'Main Sanctuary',
+      theme: draft.theme.trim() || undefined,
+      officiantId: draft.officiantId || undefined,
+    };
     try {
-      const { data } = await servicesApi.create({
-        title: draft.title.trim(),
-        heldAt: draft.heldAt,
-        startTime: draft.startTime || undefined,
-        venue: draft.venue.trim() || 'Main Sanctuary',
-        theme: draft.theme.trim() || undefined,
-        officiantId: draft.officiantId || undefined,
-      });
-      setIsCreating(false);
-      setFilter('upcoming');
-      setSelectedId(data.id);
-      setDraft((previous) => ({ ...previous, title: '', theme: '' }));
-      await services.refetch();
-      announce(`${data.title} is on the calendar. Add its order of service next.`);
+      if (draft.id) {
+        await servicesApi.update(draft.id, body);
+        await Promise.all([services.refetch(), detail.refetch()]);
+        announce('The service is changed.');
+      } else {
+        const { data } = await servicesApi.create(body);
+        setFilter('upcoming');
+        setSelectedId(data.id);
+        await services.refetch();
+        announce(`${data.title} is on the calendar. Add its order of service next.`);
+      }
+      setFormOpen(false);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -185,29 +271,42 @@ export const ServicePlannerPanel: React.FC = () => {
     }
   };
 
-  const handleAddItem = async (event: React.FormEvent) => {
+  const openItem = (entry?: LiturgyItemDto) => {
+    setItem(
+      entry
+        ? {
+            id: entry.id,
+            title: entry.title,
+            kind: entry.kind,
+            durationMinutes: entry.durationMinutes ?? 0,
+            responsible: entry.responsible ?? '',
+            notes: entry.notes ?? '',
+          }
+        : EMPTY_ITEM,
+    );
+    setIsEditingItem(true);
+  };
+
+  const handleSaveItem = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!current) return;
     const existing = current.liturgy ?? [];
-    await saveLiturgy(
-      [
-        ...existing,
-        {
-          id: `new-${Date.now()}`,
-          serviceId: current.id,
-          position: existing.length + 1,
-          title: item.title.trim(),
-          kind: item.kind,
-          durationMinutes: Number(item.durationMinutes) || null,
-          responsible: item.responsible.trim() || null,
-          ministryId: null,
-          notes: item.notes.trim() || null,
-        },
-      ],
-      `Added "${item.title.trim()}" to the order.`,
-    );
-    setIsAddingItem(false);
-    setItem((previous) => ({ ...previous, title: '', notes: '', responsible: '' }));
+    const changed: LiturgyItemDto = {
+      id: item.id ?? `new-${Date.now()}`,
+      serviceId: current.id,
+      position: 0,
+      title: item.title.trim(),
+      kind: item.kind,
+      durationMinutes: Number(item.durationMinutes) || null,
+      responsible: item.responsible.trim() || null,
+      // A ministry is not set from this dialog, and a save must not drop the link the roster chose.
+      ministryId: existing.find((row) => row.id === item.id)?.ministryId ?? null,
+      notes: item.notes.trim() || null,
+    };
+    const items = item.id ? existing.map((row) => (row.id === item.id ? changed : row)) : [...existing, changed];
+    await saveLiturgy(items, item.id ? 'That element is changed.' : `Added "${changed.title}" to the order.`);
+    setIsEditingItem(false);
+    setItem(EMPTY_ITEM);
   };
 
   const moveItem = (index: number, direction: 'up' | 'down') => {
@@ -232,7 +331,10 @@ export const ServicePlannerPanel: React.FC = () => {
     setBusy(true);
     setError(null);
     try {
-      await servicesApi.retire(current.id, { reason: 'other', reasonLabel: 'Removed from the planner' });
+      await servicesApi.retire(current.id, {
+        reason: retireReason,
+        reasonLabel: retireNote.trim() || RETIRE_LABELS[retireReason],
+      });
       setIsRetiring(false);
       setSelectedId(null);
       await services.refetch();
@@ -310,7 +412,7 @@ export const ServicePlannerPanel: React.FC = () => {
               {canEdit('services') && (
                 <button
                   type="button"
-                  onClick={() => setIsCreating(true)}
+                  onClick={() => openForm()}
                   className="inline-flex items-center gap-1.5 rounded-[9px] bg-[#C2410C] px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-[#EA580C] cursor-pointer"
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[15px]">add</span>
@@ -415,7 +517,7 @@ export const ServicePlannerPanel: React.FC = () => {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-[11px] font-bold uppercase tracking-wide text-[#C2410C]">
-                      {isPast(current) ? 'Past service' : 'Upcoming service'}
+                      {isPast(current) ? 'Past service' : 'Upcoming service'} · {SERVICE_KIND_LABELS[current.kind]}
                       {current.isTemplate ? ' · Template' : ''}
                     </p>
                     <h2 className="mt-0.5 font-headline text-lg font-extrabold text-[#1C1917] sm:text-xl">
@@ -438,6 +540,16 @@ export const ServicePlannerPanel: React.FC = () => {
                       <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#C2410C]">print</span>
                       Bulletin
                     </button>
+                    {canEdit('services') && (
+                      <button
+                        type="button"
+                        onClick={() => openForm(current)}
+                        className="inline-flex items-center gap-1.5 rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-3 py-1.5 text-xs font-bold text-[#1C1917] transition-colors hover:bg-[#F5EDE4] cursor-pointer"
+                      >
+                        <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#C2410C]">edit</span>
+                        Edit
+                      </button>
+                    )}
                     {canDelete('services') && (
                       <button
                         type="button"
@@ -500,7 +612,7 @@ export const ServicePlannerPanel: React.FC = () => {
                   {canEdit('services') && (
                     <button
                       type="button"
-                      onClick={() => setIsAddingItem(true)}
+                      onClick={() => openItem()}
                       disabled={busy}
                       className="inline-flex items-center gap-1.5 self-start rounded-[9px] bg-[#C2410C] px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer"
                     >
@@ -549,6 +661,15 @@ export const ServicePlannerPanel: React.FC = () => {
                               <>
                                 <button
                                   type="button"
+                                  aria-label={`Change ${entry.title}`}
+                                  disabled={busy}
+                                  onClick={() => openItem(entry)}
+                                  className="flex h-7 w-7 items-center justify-center rounded-[7px] border border-[#E7E5E4] bg-[#FFFFFF] text-[#57534E] transition-colors hover:text-[#1C1917] disabled:opacity-40 cursor-pointer"
+                                >
+                                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">edit</span>
+                                </button>
+                                <button
+                                  type="button"
                                   aria-label={`Move ${entry.title} earlier`}
                                   disabled={index === 0 || busy}
                                   onClick={() => moveItem(index, 'up')}
@@ -588,12 +709,16 @@ export const ServicePlannerPanel: React.FC = () => {
         </div>
       </div>
 
-      {isCreating && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...creatingDialog}>
-          <form onSubmit={handleCreate} className="w-full max-w-[520px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
-            <h3 className="font-headline text-base font-bold text-[#1C1917]">Schedule a service</h3>
+      {formOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...formDialog}>
+          <form onSubmit={handleSaveService} className="w-full max-w-[520px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
+            <h3 className="font-headline text-base font-bold text-[#1C1917]">
+              {draft.id ? 'Edit the service' : 'Schedule a service'}
+            </h3>
             <p className="mt-0.5 text-xs text-[#57534E]">
-              Four fields, and the rest can follow. The order of service is added beside the service once it exists.
+              {draft.id
+                ? 'The order of service, the roster and the census hang off this service, and they stay with it.'
+                : 'Four fields, and the rest can follow. The order of service is added beside the service once it exists.'}
             </p>
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
@@ -607,6 +732,16 @@ export const ServicePlannerPanel: React.FC = () => {
               <div>
                 <label className={LABEL} htmlFor="svc-time">Start time</label>
                 <input id="svc-time" type="time" value={draft.startTime} onChange={(e) => setDraft((previous) => ({ ...previous, startTime: e.target.value }))} className={FIELD} />
+              </div>
+              <div>
+                <label className={LABEL} htmlFor="svc-kind">What kind of gathering</label>
+                <select id="svc-kind" value={draft.kind} onChange={(e) => setDraft((previous) => ({ ...previous, kind: e.target.value as ServiceKind }))} className={FIELD}>
+                  {SERVICE_KIND_ORDER.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {SERVICE_KIND_LABELS[kind]}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className={LABEL} htmlFor="svc-venue">Where</label>
@@ -623,27 +758,29 @@ export const ServicePlannerPanel: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div className="sm:col-span-2">
+              <div>
                 <label className={LABEL} htmlFor="svc-theme">Theme</label>
                 <input id="svc-theme" value={draft.theme} onChange={(e) => setDraft((previous) => ({ ...previous, theme: e.target.value }))} placeholder="The Righteous Shall Live by Faith" className={FIELD} />
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setIsCreating(false)} className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer">
+              <button type="button" onClick={() => setFormOpen(false)} className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer">
                 Cancel
               </button>
               <button type="submit" disabled={busy} className="rounded-[9px] bg-[#C2410C] px-4 py-2 text-xs font-bold text-white hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer">
-                {busy ? 'Scheduling…' : 'Schedule it'}
+                {busy ? 'Saving…' : draft.id ? 'Save the changes' : 'Schedule it'}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {isAddingItem && current && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...addingItemDialog}>
-          <form onSubmit={handleAddItem} className="w-full max-w-[480px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
-            <h3 className="font-headline text-base font-bold text-[#1C1917]">Add an element</h3>
+      {isEditingItem && current && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...itemDialog}>
+          <form onSubmit={handleSaveItem} className="w-full max-w-[480px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
+            <h3 className="font-headline text-base font-bold text-[#1C1917]">
+              {item.id ? 'Change this element' : 'Add an element'}
+            </h3>
             <div className="mt-4 space-y-3">
               <div>
                 <label className={LABEL} htmlFor="item-title">What happens</label>
@@ -675,11 +812,11 @@ export const ServicePlannerPanel: React.FC = () => {
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setIsAddingItem(false)} className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer">
+              <button type="button" onClick={() => setIsEditingItem(false)} className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer">
                 Cancel
               </button>
               <button type="submit" disabled={busy} className="rounded-[9px] bg-[#C2410C] px-4 py-2 text-xs font-bold text-white hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer">
-                {busy ? 'Saving…' : 'Add to the order'}
+                {busy ? 'Saving…' : item.id ? 'Save the changes' : 'Add to the order'}
               </button>
             </div>
           </form>
@@ -689,11 +826,47 @@ export const ServicePlannerPanel: React.FC = () => {
       {isRetiring && current && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...retiringDialog}>
           <div className="w-full max-w-[440px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
-            <h3 className="font-headline text-base font-bold text-[#1C1917]">Retire this service?</h3>
+            <h3 className="font-headline text-base font-bold text-[#1C1917]">Take this service off the calendar?</h3>
             <p className="mt-1.5 text-xs text-[#57534E]">
               {current.title} · {whenOf(current.heldAt)}. Its order, its roster and its census go to the Trash
               with it, where an administrator can put it back.
             </p>
+            <fieldset className="mt-4">
+              <legend className={LABEL}>Why is it coming off?</legend>
+              <div className="space-y-1.5">
+                {RETIRE_REASONS.map((option) => (
+                  <label
+                    key={option.id}
+                    className={`flex cursor-pointer items-start gap-2.5 rounded-[10px] border p-2.5 transition-colors ${
+                      retireReason === option.id ? 'border-[#C2410C] bg-[#FDF8F3]' : 'border-[#E7E5E4] hover:bg-[#FDF8F3]'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="retire-reason"
+                      value={option.id}
+                      checked={retireReason === option.id}
+                      onChange={() => setRetireReason(option.id)}
+                      className="mt-0.5 h-4 w-4 accent-[#C2410C]"
+                    />
+                    <span>
+                      <span className="block text-xs font-bold text-[#1C1917]">{option.label}</span>
+                      <span className="block text-[11px] text-[#57534E]">{option.detail}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div className="mt-3">
+              <label className={LABEL} htmlFor="retire-note">In your own words</label>
+              <input
+                id="retire-note"
+                value={retireNote}
+                onChange={(e) => setRetireNote(e.target.value)}
+                placeholder="What the Trash should say about it"
+                className={FIELD}
+              />
+            </div>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
@@ -708,7 +881,7 @@ export const ServicePlannerPanel: React.FC = () => {
                 onClick={() => void retire()}
                 className="rounded-[9px] bg-[#B91C1C] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#991B1B] disabled:opacity-60 cursor-pointer"
               >
-                {busy ? 'Retiring…' : 'Retire it'}
+                {busy ? 'Retiring…' : 'Take it off the calendar'}
               </button>
             </div>
           </div>

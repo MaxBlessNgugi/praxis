@@ -70,7 +70,7 @@ export async function listAudit(query: ListAuditQuery) {
     ...(query.q ? { summary: { contains: query.q, mode: 'insensitive' as const } } : {}),
   };
 
-  const [total, data, byAction, byEntity] = await Promise.all([
+  const [total, data, byAction, byEntity, byActor] = await Promise.all([
     prisma.auditLog.count({ where }),
     prisma.auditLog.findMany({
       where,
@@ -81,7 +81,14 @@ export async function listAudit(query: ListAuditQuery) {
     }),
     prisma.auditLog.groupBy({ by: ['action'], _count: true }),
     prisma.auditLog.groupBy({ by: ['entityName'], _count: true }),
+    prisma.auditLog.groupBy({ by: ['actorId'], _count: true, where: { actorId: { not: null } } }),
   ]);
+
+  // Names for the actor filter: the ids the log actually carries, labelled for a dropdown.
+  const actorNames = await prisma.user.findMany({
+    where: { id: { in: byActor.map((row) => row.actorId).filter((id): id is string => id !== null) } },
+    select: { id: true, name: true },
+  });
 
   return {
     data,
@@ -89,6 +96,7 @@ export async function listAudit(query: ListAuditQuery) {
     totals: {
       byAction: Object.fromEntries(byAction.map((row) => [row.action, row._count])),
       byEntity: Object.fromEntries(byEntity.map((row) => [row.entityName, row._count])),
+      byActor: Object.fromEntries(actorNames.map((row) => [row.id, row.name])),
     },
   };
 }

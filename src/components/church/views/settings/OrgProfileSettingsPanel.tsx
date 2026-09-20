@@ -1,389 +1,127 @@
-import React, { useState } from 'react';
-import { ChurchOrgProfile } from '../../../../types';
-import { INITIAL_ORG_PROFILE } from '../../../../data/churchMockData';
-import { CHURCH, SERVICE_TIMES } from '../../../../data/churchDomain';
+import React from 'react';
+import { useOrgProfile } from '../../../../hooks/useApi';
 import { ChurchIdentityPanel } from './ChurchIdentityPanel';
+import { ErrorBlock, LoadingBlock } from '../../DataState';
 
 /**
- * The form's editable draft: the church record every screen reads (`CHURCH`), merged with
- * the facts only this screen carries, so no fact is stored twice. Nothing is persisted —
- * there is no backend behind the mock.
+ * The organization profile tab.
+ *
+ * The editable half is `ChurchIdentityPanel` above — name, contacts, vision and the logo, saved to
+ * the server. What sits below it is the rest of the same server record rendered for reading: the
+ * service running order, the social channels, and the values the church publishes. They are shown
+ * from the API response rather than being editable here twice, because a fact with two editing
+ * surfaces is a fact that can disagree with itself.
  */
-type ProfileDraft = Record<keyof typeof CHURCH, string> & ChurchOrgProfile;
-
 export const OrgProfileSettingsPanel: React.FC = () => {
-  const [profile, setProfile] = useState<ProfileDraft>({ ...CHURCH, ...INITIAL_ORG_PROFILE });
-  const [isSaved, setIsSaved] = useState<boolean>(false);
+  const profile = useOrgProfile();
+  const record = profile.data?.data ?? null;
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3500);
-  };
+  const serviceTimes = record?.serviceTimes ?? null;
+  const socialEntries = Object.entries(record?.socials ?? {});
 
   return (
     <div className="flex flex-col gap-6">
-      {/* The identity that every other screen and every certificate reads. This one is live. */}
       <ChurchIdentityPanel />
 
-      {/* The extended profile below is still the local draft: see the README's status table. */}
-      <div className="bg-[#FFFFFF] rounded-[14px] p-6 border border-[#E7E5E4] shadow-warm-card space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4]">
-        <div>
-          <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
-            <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">church</span>
-            Organization & Church Identity
-          </h3>
-          <p className="text-xs text-[#57534E] mt-0.5">
-            Configure official church profile, tax exemptions, legal incorporation, and campus service times.
-          </p>
+      {profile.loading && !record && (
+        <div className="bg-white rounded-[14px] p-6 border border-[#E7E5E4] shadow-warm-card">
+          <LoadingBlock label="Reading the church profile…" />
         </div>
-
-        {isSaved && (
-          <div className="px-3 py-1 rounded-[8px] bg-[#059669]/10 border border-[#059669]/30 text-[#059669] text-xs font-bold flex items-center gap-1.5">
-            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span>
-            Settings Saved
-          </div>
-        )}
-      </div>
-
-      <form onSubmit={handleSave} className="space-y-6">
-        {/* General Church Details */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            General Information
-          </h4>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="church-name" className="block text-xs font-bold text-[#1C1917] mb-1">Church Name *</label>
-              <input id="church-name" aria-label="Church Name"
-                type="text"
-                required
-                value={profile.name}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-bold text-[#1C1917]"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="church-denomination" className="block text-xs font-bold text-[#1C1917] mb-1">Denomination / Affiliation</label>
-              <input id="church-denomination" aria-label="Denomination / Affiliation"
-                type="text"
-                value={profile.denomination}
-                onChange={(e) => setProfile({ ...profile, denomination: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="church-established-year" className="block text-xs font-bold text-[#1C1917] mb-1">Established Year</label>
-              <input id="church-established-year" aria-label="Established Year"
-                type="number"
-                value={profile.establishedYear}
-                onChange={(e) => setProfile({ ...profile, establishedYear: Number(e.target.value) })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="church-registration" className="block text-xs font-bold text-[#1C1917] mb-1">Registration</label>
-              <input id="church-registration" aria-label="Registration"
-                type="text"
-                value={profile.registration}
-                onChange={(e) => setProfile({ ...profile, registration: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="church-registration-type" className="block text-xs font-bold text-[#1C1917] mb-1">Registration Type</label>
-              <input id="church-registration-type" aria-label="Registration Type"
-                type="text"
-                value={profile.nonprofitStatus}
-                onChange={(e) => setProfile({ ...profile, nonprofitStatus: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-              />
-            </div>
-          </div>
+      )}
+      {profile.error && (
+        <div className="bg-white rounded-[14px] p-6 border border-[#E7E5E4] shadow-warm-card">
+          <ErrorBlock message={profile.error} onRetry={() => void profile.refetch()} />
         </div>
+      )}
 
-        {/* Contact & Physical Address */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Physical Campus & Communication Channels
-          </h4>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="church-street" className="block text-xs font-bold text-[#1C1917] mb-1">Street Address</label>
-              <input id="church-street" aria-label="Street Address"
-                type="text"
-                value={profile.street}
-                onChange={(e) => setProfile({ ...profile, street: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label htmlFor="church-city" className="block text-xs font-bold text-[#1C1917] mb-1">City</label>
-                <input id="church-city" aria-label="City"
-                  type="text"
-                  value={profile.city}
-                  onChange={(e) => setProfile({ ...profile, city: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
-              </div>
-              <div>
-                <label htmlFor="church-county" className="block text-xs font-bold text-[#1C1917] mb-1">County</label>
-                <input id="church-county" aria-label="County"
-                  type="text"
-                  value={profile.county}
-                  onChange={(e) => setProfile({ ...profile, county: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                />
-              </div>
-              <div>
-                <label htmlFor="church-postal-code" className="block text-xs font-bold text-[#1C1917] mb-1">Postal Code</label>
-                <input id="church-postal-code" aria-label="Postal Code"
-                  type="text"
-                  value={profile.postalCode}
-                  onChange={(e) => setProfile({ ...profile, postalCode: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3] font-mono"
-                />
-              </div>
-            </div>
+      {record && (
+        <div className="bg-white rounded-[14px] p-6 border border-[#E7E5E4] shadow-warm-card space-y-6">
+          <div className="pb-4 border-b border-[#E7E5E4]">
+            <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">church</span>
+              Published Profile
+            </h3>
+            <p className="text-xs text-[#57534E] mt-0.5">
+              The rest of the church&apos;s own record, as the server holds it. Service times are also what the
+              welcome wizard seeds for the planner.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="church-phone" className="block text-xs font-bold text-[#1C1917] mb-1">Primary Phone</label>
-              <input id="church-phone" aria-label="Primary Phone"
-                type="tel"
-                value={profile.phone}
-                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="church-email" className="block text-xs font-bold text-[#1C1917] mb-1">Office Email</label>
-              <input id="church-email" aria-label="Office Email"
-                type="email"
-                value={profile.email}
-                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="church-website" className="block text-xs font-bold text-[#1C1917] mb-1">Church Website</label>
-              <input id="church-website" aria-label="Church Website"
-                type="url"
-                value={profile.website}
-                onChange={(e) => setProfile({ ...profile, website: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Pastoral Leadership */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Visionary Leadership
-          </h4>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="church-visionary-leader" className="block text-xs font-bold text-[#1C1917] mb-1">Bishop / Visionary Leader</label>
-              <input id="church-visionary-leader" aria-label="Bishop / Visionary Leader"
-                type="text"
-                value={profile.visionaryLeader}
-                onChange={(e) => setProfile({ ...profile, visionaryLeader: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="church-administrator" className="block text-xs font-bold text-[#1C1917] mb-1">Church Administrator</label>
-              <input id="church-administrator" aria-label="Church Administrator"
-                type="text"
-                value={profile.administrator}
-                onChange={(e) => setProfile({ ...profile, administrator: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Service Times & Office Hours */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Service Times & Office Hours
-          </h4>
-          <p className="text-[11px] text-[#57534E]">
-            Office open {profile.officeHours} · {profile.street}
-          </p>
-          <div className="rounded-[10px] border border-[#E7E5E4] overflow-hidden">
-            <table className="w-full text-xs">
-              <thead className="bg-[#FDF8F3] text-[#57534E]">
-                <tr>
-                  <th className="text-left font-bold px-3 py-2">Service</th>
-                  <th className="text-left font-bold px-3 py-2">Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {SERVICE_TIMES.map((slot) => (
-                  <tr key={slot.name} className="border-t border-[#E7E5E4]/70">
-                    <td className="px-3 py-2 font-medium text-[#1C1917]">{slot.name}</td>
-                    <td className="px-3 py-2 text-[#57534E]">{slot.time}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Social Channels */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Social Channels & Broadcast
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {profile.socials.map((channel) => (
-              <div
-                key={channel.platform}
-                className="flex items-center justify-between gap-3 px-3 py-2 rounded-[8px] border border-[#E7E5E4] bg-[#FDF8F3]"
-              >
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold text-[#1C1917]">{channel.platform}</span>
-                  <span className="text-[11px] text-[#57534E] truncate">{channel.handle}</span>
-                </div>
-                <a
-                  href={channel.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[11px] font-bold text-[#C2410C] shrink-0 hover:underline"
-                >
-                  Open
-                </a>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Vision & Mission */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Vision & Mission
-          </h4>
+          {/* Service times */}
           <div className="space-y-3">
-            <div className="p-3 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4]">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-[#C2410C] mb-1">
-                Our Vision
-              </span>
-              <p className="text-xs text-[#1C1917] leading-relaxed">{profile.vision}</p>
-            </div>
-            <div className="p-3 rounded-[10px] bg-[#FDF8F3] border border-[#E7E5E4]">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-[#C2410C] mb-1">
-                Our Mission
-              </span>
-              <ul className="space-y-1.5">
-                {profile.mission.map((line) => (
-                  <li key={line} className="flex gap-2 text-xs text-[#1C1917] leading-relaxed">
-                    <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-[#C2410C] shrink-0">
-                      check_circle
-                    </span>
-                    <span>{line}</span>
-                  </li>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
+              Service times
+            </h4>
+            {serviceTimes && Object.keys(serviceTimes).length > 0 ? (
+              <div className="rounded-[10px] border border-[#E7E5E4] overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-[#FDF8F3] text-[#57534E]">
+                    <tr>
+                      <th className="text-left font-bold px-3 py-2">Gathering</th>
+                      <th className="text-left font-bold px-3 py-2">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(serviceTimes).map(([name, time]) => (
+                      <tr key={name} className="border-t border-[#E7E5E4]/70">
+                        <td className="px-3 py-2 font-medium text-[#1C1917]">{name}</td>
+                        <td className="px-3 py-2 text-[#57534E]">{time}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-xs text-[#57534E]">No service times recorded yet — they are set through the welcome wizard or an administrator.</p>
+            )}
+          </div>
+
+          {/* Social channels */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
+              Social channels
+            </h4>
+            {socialEntries.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {socialEntries.map(([platform, url]) => (
+                  <div key={platform} className="flex items-center justify-between gap-3 px-3 py-2 rounded-[8px] border border-[#E7E5E4] bg-[#FDF8F3]">
+                    <span className="text-xs font-bold text-[#1C1917]">{platform}</span>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] font-bold text-[#C2410C] shrink-0 hover:underline truncate max-w-[60%]"
+                    >
+                      {String(url).replace(/^https?:\/\//, '')}
+                    </a>
+                  </div>
                 ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Theme of the Year */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Theme of the Year
-          </h4>
-          <div className="p-4 rounded-[10px] bg-[#C2410C]/5 border border-[#C2410C]/25">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[#C2410C] mb-1">
-              {profile.yearTheme.year} Theme
-            </span>
-            <div className="font-headline text-base font-extrabold text-[#1C1917]">
-              {profile.yearTheme.title}
-            </div>
-            <p className="text-xs text-[#57534E] leading-relaxed mt-2">{profile.yearTheme.declaration}</p>
-          </div>
-        </div>
-
-        {/* Core Values */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Our Ten Core Values
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {profile.coreValues.map((value, index) => (
-              <div
-                key={value.title}
-                className="flex gap-3 p-3 rounded-[10px] border border-[#E7E5E4] bg-white"
-              >
-                <span className="w-6 h-6 shrink-0 rounded-full bg-[#C2410C]/10 text-[#C2410C] text-[11px] font-bold flex items-center justify-center">
-                  {index + 1}
-                </span>
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="text-xs font-bold text-[#1C1917]">{value.title}</span>
-                  <span className="text-[11px] text-[#57534E] leading-relaxed">{value.description}</span>
-                </div>
               </div>
-            ))}
+            ) : (
+              <p className="text-xs text-[#57534E]">No social channels recorded yet.</p>
+            )}
           </div>
-        </div>
 
-        {/* Team Values */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
-            Our Team Values
-          </h4>
-          <p className="text-[11px] text-[#57534E]">
-            As a team, we value unity and oneness and will endeavor to:
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {profile.teamValues.map((value) => (
-              <div key={value.title} className="p-3 rounded-[10px] border border-[#E7E5E4] bg-white">
-                <span className="text-xs font-bold text-[#1C1917]">{value.title}</span>
-                <ul className="mt-1.5 space-y-1">
-                  {value.points.map((point) => (
-                    <li key={point} className="flex gap-2 text-[11px] text-[#57534E] leading-relaxed">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[13px] text-[#C2410C] shrink-0">
-                        check_circle
-                      </span>
-                      <span>{point}</span>
-                    </li>
-                  ))}
-                </ul>
+          {/* Core values */}
+          {record.coreValues.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A29E] border-b border-[#E7E5E4]/60 pb-1">
+                Core values
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {record.coreValues.map((value, index) => (
+                  <div key={value} className="flex gap-3 p-3 rounded-[10px] border border-[#E7E5E4] bg-white">
+                    <span className="w-6 h-6 shrink-0 rounded-full bg-[#C2410C]/10 text-[#C2410C] text-[11px] font-bold flex items-center justify-center">
+                      {index + 1}
+                    </span>
+                    <span className="text-xs font-bold text-[#1C1917]">{value}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
-
-        {/* Submit */}
-        <div className="pt-4 border-t border-[#E7E5E4] flex items-center justify-end">
-          <button
-            type="submit"
-            className="px-5 py-2.5 rounded-[9px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer"
-          >
-            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">save</span>
-            Save Church Profile
-          </button>
-        </div>
-      </form>
-      </div>
+      )}
     </div>
   );
 };

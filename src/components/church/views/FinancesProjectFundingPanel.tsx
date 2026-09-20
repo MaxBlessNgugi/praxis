@@ -5,6 +5,7 @@ import { projectsApi, type ContributionDto, type ProjectDto } from '../../../lib
 import { usePermissions } from '../../../lib/permissions';
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '../DataState';
 import { formatKes } from '../../../data/churchDomain';
+import { VoidFinanceDialog } from './GivingLedgerParts';
 
 /**
  * Project funding: capital campaigns and the gifts toward them.
@@ -32,12 +33,14 @@ const METHOD_OPTIONS: Array<{ value: ContributionDto['method']; label: string }>
 
 export const FinancesProjectFundingPanel: React.FC = () => {
   const { items, loading, error, refetch } = useProjects();
-  const { canEdit } = usePermissions();
+  const { canEdit, canDelete } = usePermissions();
   const canRecord = canEdit('giving');
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const contributions = useProjectContributions(selectedProjectId);
   const recordContribution = useMutation(projectsApi.recordContribution);
+  /** A gift toward a project is voided from here — the funding bar follows the ledger, so it moves. */
+  const [voidRow, setVoidRow] = useState<ContributionDto | null>(null);
 
   const [isPledgeModalOpen, setIsPledgeModalOpen] = useState(false);
   const pledgeModalOpenDialog = useDialog(() => setIsPledgeModalOpen(false), 'Record a Gift Toward a Project');
@@ -285,13 +288,26 @@ export const FinancesProjectFundingPanel: React.FC = () => {
                         {row.reference ? ` · ${row.reference}` : ''}
                       </div>
                     </div>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                        row.kind === 'cash' ? 'bg-[#85f8c4]/40 text-[#005137]' : 'bg-[#ffdcc3] text-[#2f1500]'
-                      }`}
-                    >
-                      {row.kind === 'cash' ? 'Banked' : 'Pledge'}
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          row.kind === 'cash' ? 'bg-[#85f8c4]/40 text-[#005137]' : 'bg-[#ffdcc3] text-[#2f1500]'
+                        }`}
+                      >
+                        {row.kind === 'cash' ? 'Banked' : 'Pledge'}
+                      </span>
+                      {canDelete('giving') && (
+                        <button
+                          type="button"
+                          onClick={() => setVoidRow(row)}
+                          aria-label={`Void ${row.txCode}`}
+                          title="Void and record a correction"
+                          className="p-1 rounded text-[#59413a] hover:text-[#ba1a1a] hover:bg-[#f4ece8] transition-colors cursor-pointer"
+                        >
+                          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">block</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -426,6 +442,17 @@ export const FinancesProjectFundingPanel: React.FC = () => {
           </div>
         </div>
       )}
+
+      <VoidFinanceDialog
+        entity="contribution"
+        record={voidRow ? { id: voidRow.id, label: `${voidRow.txCode} · ${voidRow.donorName}`, amount: voidRow.amount } : null}
+        onClose={() => setVoidRow(null)}
+        onVoided={() => {
+          void contributions.refetch();
+          // The campaign's progress is asked of the contributions, so it moves with them.
+          void refetch();
+        }}
+      />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import { basePrisma } from '../src/lib/prisma';
-import { hashPassword } from '../src/lib/auth';
+import { provisionChurch, removeChurch, roleId } from './lib/provision';
+import { waitForSignInBudget } from './lib/signInBudget';
 
 /**
  * One church cannot see or touch another's records.
@@ -75,6 +76,12 @@ function errorMessage(answer: Answer): string {
   return body?.error ?? `HTTP ${answer.status}`;
 }
 
+/** The `{ data: […], meta: { total } }` shape every paged list returns. */
+function listOf<T>(answer: Answer): { data: T[]; total: number } | null {
+  const body = answer.body as { data?: T[]; meta?: { total?: number } } | null;
+  return body?.meta ? { data: body.data ?? [], total: body.meta.total ?? 0 } : null;
+}
+
 async function signInAs(email: string, password: string): Promise<string | null> {
   const answer = await call('POST', '/api/auth/login', undefined, { email, password });
   return data<{ token: string }>(answer)?.token ?? null;
@@ -84,64 +91,77 @@ async function churchOf(token: string): Promise<{ id: string; name: string } | n
   return data<{ organization: { id: string; name: string } }>(await call('GET', '/api/auth/me', token))?.organization ?? null;
 }
 
-/** Provision a church the way an operator would: there is deliberately no endpoint for this. */
-async function roleIdOf(key: string): Promise<string> {
-  const role = await basePrisma.role.findFirst({ where: { key } });
-  if (!role) throw new Error(`the ${key} role is missing — seed the database first`);
-  return role.id;
+/** The modules a second church must find empty. Each is a list endpoint of the first church's data. */
+const ISOLATED_LISTS: Array<[string, string, string]> = [
+  ['the household roll', '/api/households', '/api/households?pageSize=50'],
+  ['the service plan', '/api/services', '/api/services?pageSize=50'],
+  ['the roster', '/api/services/roster', '/api/services/roster'],
+  ['the ministries', '/api/ministries', '/api/ministries'],
+  ['the meeting list', '/api/governance/meetings', '/api/governance/meetings?pageSize=50'],
+  ['the resolutions', '/api/governance/resolutions', '/api/governance/resolutions?pageSize=50'],
+  ['the document library', '/api/governance/documents', '/api/governance/documents?pageSize=50'],
+  ['the offering ledger', '/api/finance/offerings', '/api/finance/offerings?pageSize=50'],
+  ['the project list', '/api/finance/projects', '/api/finance/projects?pageSize=50'],
+  ['the welfare register', '/api/finance/welfare', '/api/finance/welfare?pageSize=50'],
+  ['the charity register', '/api/finance/charity', '/api/finance/charity?pageSize=50'],
+  ['the file library', '/api/files', '/api/files?pageSize=50'],
+];
+
+/** One id per domain from the first church, taken as the first church, to aim at from outside. */
+interface ForeignIds {
+  member: string;
+  household: string;
+  service: string;
+  ministry: string;
+  meeting: string;
+  resolution: string;
+  document: string;
+  offering: string;
+  project: string;
+  welfare: string;
+  charity: string;
 }
 
-async function provisionProbeChurch(): Promise<{ organizationId: string; userId: string; adminRoleId: string }> {
-  const adminRoleId = await roleIdOf('admin');
-  const organization = await basePrisma.organization.create({
-    data: { name: 'Isolation Probe Church', slug: PROBE_SLUG },
-  });
-  const user = await basePrisma.user.create({
-    data: {
-      name: PROBE_NAME,
-      email: PROBE_EMAIL,
-      passwordHash: await hashPassword(PROBE_PASSWORD),
-      roleId: adminRoleId,
-      memberships: { create: { organizationId: organization.id, roleId: adminRoleId, isDefault: true } },
-    },
-  });
+const firstId = async (token: string, path: string): Promise<string> => {
+  const rows = data<Array<{ id: string }>>(await call('GET', path, token)) ?? [];
+  return rows[0]?.id ?? '';
+};
 
-  return { organizationId: organization.id, userId: user.id, adminRoleId };
+async function collectIds(token: string): Promise<ForeignIds> {
+  return {
+    member: await firstId(token, '/api/members?pageSize=1'),
+    household: await firstId(token, '/api/households?pageSize=1'),
+    service: await firstId(token, '/api/services?pageSize=1'),
+    ministry: await firstId(token, '/api/ministries'),
+    meeting: await firstId(token, '/api/governance/meetings?pageSize=1'),
+    resolution: await firstId(token, '/api/governance/resolutions?pageSize=1'),
+    document: await firstId(token, '/api/governance/documents?pageSize=1'),
+    offering: await firstId(token, '/api/finance/offerings?pageSize=1'),
+    project: await firstId(token, '/api/finance/projects?pageSize=1'),
+    welfare: await firstId(token, '/api/finance/welfare?pageSize=1'),
+    charity: await firstId(token, '/api/finance/charity?pageSize=1'),
+  };
 }
 
-/**
- * Remove every trace of the probe church: its rows first, because the foreign keys point that way,
- * then the account and the church. Table names come from the schema, so a model added later is
- * covered too.
- */
-async function removeProbeChurch(organizationId: string, houseOrganizationId: string): Promise<void> {
-  // The probe account's own rows go with the church; a membership it was given in the *first* church
-  // has that church's id, and leaves with the account (the relation cascades).
-  const tenantTables = await basePrisma.$queryRawUnsafe<Array<{ table_name: string }>>(
-    `SELECT table_name FROM information_schema.columns WHERE column_name = 'organizationId'`,
-  );
-  for (const { table_name: table } of tenantTables) {
-    await basePrisma.$executeRawUnsafe(`DELETE FROM "${table}" WHERE "organizationId" = $1`, organizationId);
-  }
+/** A one-pixel PNG, named so the run's audit rows can be swept with it. */
+const PROBE_PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
 
-  // The run also *writes* into the first church: assigning the shared account a role there, and its
-  // own refusals. Those rows name the probe account, so they are removed with it. Leaving them behind
-  // is what made the next run fail its own "neither history mentions the other" check — the leak was
-  // in the tool, not in the product, and a check that only passes on a clean database is worth very
-  // little.
-  await basePrisma.auditLog.deleteMany({
-    where: {
-      organizationId: houseOrganizationId,
-      OR: [{ summary: { contains: PROBE_NAME } }, { summary: { contains: PROBE_EMAIL } }],
-    },
+async function uploadProbeFile(token: string): Promise<string | null> {
+  const answer = await call('POST', '/api/files', token, {
+    purpose: 'other',
+    fileName: 'isolation-probe-file.png',
+    mimeType: 'image/png',
+    content: PROBE_PNG,
   });
-
-  await basePrisma.user.deleteMany({ where: { email: PROBE_EMAIL } });
-  await basePrisma.organization.deleteMany({ where: { id: organizationId } });
+  return data<{ id: string }>(answer)?.id ?? null;
 }
 
 async function main(): Promise<void> {
   console.log(`Tenant isolation → ${API_URL}`);
+
+  // Two sign-ins below, on an address that other suites in the same CI job share.
+  await waitForSignInBudget(API_URL, 3);
 
   const houseToken = await signInAs(EMAIL, PASSWORD);
   if (!houseToken) throw new Error(`could not sign in as ${EMAIL}`);
@@ -159,7 +179,14 @@ async function main(): Promise<void> {
   const [memberId, announcementId, titheId] = [members[0].id, announcements[0].id, tithes[0].id];
 
   console.log('\n2. A second church is provisioned');
-  const probe = await provisionProbeChurch();
+  // Provision a church the way an operator would: there is deliberately no endpoint for this.
+  const probe = await provisionChurch({
+    name: 'Isolation Probe Church',
+    slug: PROBE_SLUG,
+    adminName: PROBE_NAME,
+    email: PROBE_EMAIL,
+    password: PROBE_PASSWORD,
+  });
   try {
     const probeToken = await signInAs(PROBE_EMAIL, PROBE_PASSWORD);
     check('its administrator can sign in', Boolean(probeToken));
@@ -257,6 +284,109 @@ async function main(): Promise<void> {
       }
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // The rest of the modules, and nested references
+    // ---------------------------------------------------------------------------------------------
+    console.log('\n9. Every module’s lists are empty for the second church, not filtered');
+    for (const [label, path, query] of ISOLATED_LISTS) {
+      check(
+        `${label} is empty`,
+        data<unknown[]>(await call('GET', query, probeToken))?.length === 0,
+        path,
+      );
+    }
+
+    console.log('\n10. And none of the first church’s rows can be reached by id');
+    const foreignIds = await collectIds(houseToken);
+    // The probe church's own member, so a roster write aimed at the *other* church's service is a
+    // valid request that tenancy has to refuse. With an invalid payload the check would pass on a
+    // validation error and prove nothing at all.
+    const ownMemberId = await firstId(probeToken, '/api/members?pageSize=1');
+    const idChecks: Array<[string, () => Promise<Answer>]> = [
+      ['household', () => call('GET', `/api/households/${foreignIds.household}`, probeToken)],
+      ['service', () => call('GET', `/api/services/${foreignIds.service}`, probeToken)],
+      ['service attendance', () => call('GET', `/api/services/${foreignIds.service}/attendance`, probeToken)],
+      ['service report', () => call('GET', `/api/services/${foreignIds.service}/report`, probeToken)],
+      ['liturgy write', () => call('PUT', `/api/services/${foreignIds.service}/liturgy`, probeToken, { items: [] })],
+      [
+        'roster duty',
+        () =>
+          call('POST', `/api/services/${foreignIds.service}/roster`, probeToken, {
+            memberId: ownMemberId,
+            roleTitle: 'Probe',
+          }),
+      ],
+      ['ministry', () => call('GET', `/api/ministries/${foreignIds.ministry}`, probeToken)],
+      ['meeting', () => call('GET', `/api/governance/meetings/${foreignIds.meeting}`, probeToken)],
+      ['resolution', () => call('GET', `/api/governance/resolutions/${foreignIds.resolution}`, probeToken)],
+      ['governance document', () => call('GET', `/api/governance/documents/${foreignIds.document}`, probeToken)],
+      ['offering', () => call('GET', `/api/finance/offerings/${foreignIds.offering}`, probeToken)],
+      ['project', () => call('GET', `/api/finance/projects/${foreignIds.project}`, probeToken)],
+      ['welfare case', () => call('GET', `/api/finance/welfare/${foreignIds.welfare}`, probeToken)],
+      ['charity activity', () => call('GET', `/api/finance/charity/${foreignIds.charity}`, probeToken)],
+      ['project contributions', () => call('GET', `/api/finance/projects/${foreignIds.project}/contributions`, probeToken)],
+    ];
+    for (const [label, attempt] of idChecks) {
+      const answer = await attempt();
+      check(`reading a ${label} is refused`, answer.status === 404 || answer.status === 403, errorMessage(answer));
+    }
+
+    console.log('\n11. A file belongs to its church, bearer token or not');
+    const fileId = await uploadProbeFile(houseToken);
+    check('the first church can store a file', Boolean(fileId));
+    if (fileId) {
+      check('reading its bytes is refused', (await call('GET', `/api/files/${fileId}`, probeToken)).status === 404);
+      check('reading its metadata is refused', (await call('GET', `/api/files/${fileId}/meta`, probeToken)).status === 404);
+      // Well-formed, so the refusal that comes back is the tenant's, not the validator's.
+      const deleted = await call(
+        'DELETE',
+        `/api/files/${fileId}?reason=other&reasonLabel=${encodeURIComponent('Probe attempted deletion')}`,
+        probeToken,
+      );
+      check('deleting it is refused', deleted.status === 404 || deleted.status === 403, errorMessage(deleted));
+      // The owner's list is the proof: every library row carries its church's id, so a file the
+      // probe reached would be absent from this page even though the probe's delete was refused.
+      const stillListed = listOf<{ id: string }>(
+        await call('GET', `/api/files?pageSize=50`, houseToken),
+      );
+      check(
+        'and the file is still listed by the church that owns it',
+        stillListed?.data.some((file) => file.id === fileId) === true,
+        stillListed === null ? 'list did not parse' : 'not on the owner’s page',
+      );
+      // Tidy the probe's own upload as the API requires it: every retirement names its reason.
+      await call(
+        'DELETE',
+        `/api/files/${fileId}?reason=other&reasonLabel=${encodeURIComponent('Isolation probe cleanup')}`,
+        houseToken,
+      );
+    }
+
+    console.log('\n12. A reference to the other church’s row is refused, not recorded');
+    const linkedToMember = await call('POST', '/api/members', probeToken, {
+      firstName: 'Probe',
+      lastName: 'Linked',
+      location: 'Probe Congregation',
+      householdId: foreignIds.household,
+    });
+    check(
+      'a member cannot be added to the other church’s household',
+      linkedToMember.status >= 400,
+      `got ${linkedToMember.status}`,
+    );
+    const linkedTithe = await call('POST', '/api/finance/tithes', probeToken, {
+      memberId: foreignIds.member,
+      donorName: 'Probe Donor',
+      amount: 100,
+      method: 'cash',
+      category: 'general_tithe',
+    });
+    check(
+      'a tithe cannot be attributed to the other church’s member',
+      linkedTithe.status >= 400,
+      `got ${linkedTithe.status}`,
+    );
+
     console.log('\n6. A session cannot be moved into a church it does not serve');
     check(
       'switching to the other church is refused',
@@ -274,11 +404,37 @@ async function main(): Promise<void> {
       ) ?? [];
     check('the first church’s audit log does not name the second’s administrator', houseHistory.length === 0);
 
+    console.log('\n7b. An account of one church cannot be administered by another, by id');
+    // `User` is a global model — the tenant-scoped client deliberately does not scope it — so the
+    // **membership** is the boundary. Until section 8 below adds one, the probe account serves only
+    // its own church, so these must all be refused: the password reset in particular is a complete
+    // account takeover, not a read. (After section 8 the account legitimately serves this church
+    // too, which is why the section lives *before* it.)
+    const takeoverAttempts: Array<[string, () => Promise<Answer>]> = [
+      ['updating it', () => call('PATCH', `/api/admin/users/${probe.userId}`, houseToken, { name: 'Renamed by another church' })],
+      ['re-roling it', () => call('POST', `/api/admin/users/${probe.userId}/role`, houseToken, { roleKey: 'viewer' })],
+      ['resetting its password', () => call('POST', `/api/admin/users/${probe.userId}/password`, houseToken, { password: 'Taken-Over-2026!' })],
+      ['retiring it', () => call('DELETE', `/api/admin/users/${probe.userId}?reason=account&reasonLabel=Probe%20attempt`, houseToken)],
+      ['re-inviting it', () => call('POST', `/api/admin/users/${probe.userId}/reinvite`, houseToken)],
+    ];
+    for (const [what, attempt] of takeoverAttempts) {
+      const answer = await attempt();
+      check(`${what} is refused`, answer.status === 403 || answer.status === 404, errorMessage(answer));
+    }
+    // The refusals are only proof if nothing changed: the probe administrator signs in with the
+    // password it was provisioned with and still holds its own role.
+    const stillSignsIn = await signInAs(PROBE_EMAIL, PROBE_PASSWORD);
+    check('the probe account still signs in with its own password', Boolean(stillSignsIn));
+    const probeStillAdmin = stillSignsIn
+      ? data<{ user: { roleKey: string } }>(await call('GET', '/api/auth/me', stillSignsIn))?.user.roleKey
+      : null;
+    check('and still holds its own role', probeStillAdmin === 'admin', `got ${probeStillAdmin}`);
+
     console.log('\n8. One account serving two churches keeps a separate role in each');
     // The case memberships exist for: one login, two parishes, different authority in each. The rights
     // screen of one church must change the role it governs and no other.
     await basePrisma.organizationMember.create({
-      data: { organizationId: house.id, userId: probe.userId, roleId: await roleIdOf('viewer'), isDefault: false },
+      data: { organizationId: house.id, userId: probe.userId, roleId: await roleId('viewer'), isDefault: false },
     });
     const shared =
       data<Array<{ id: string; roleKey: string }>>(
@@ -299,7 +455,16 @@ async function main(): Promise<void> {
       `got ${probeMe?.user.roleKey}`,
     );
   } finally {
-    await removeProbeChurch(probe.organizationId, house.id);
+    // The run also writes into the seeded church: the probe account's refusals and the role it was
+    // given there. Those rows name the probe, so they go with it — a check that only passes on a
+    // database nobody has touched is worth very little.
+    await removeChurch(probe.organizationId, {
+      adminEmails: [PROBE_EMAIL],
+      residualAudit: {
+        organizationId: house.id,
+        mentions: [PROBE_NAME, PROBE_EMAIL, 'isolation-probe'],
+      },
+    });
     console.log('\nThe probe church and its rows were removed.');
   }
 

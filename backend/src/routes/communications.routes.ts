@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as communications from '../controllers/communications.controller';
 import { env } from '../config/env';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { moduleGate } from '../middleware/authorize';
 import { requireAuth, requireRole } from '../middleware/authenticate';
 import { rateLimit } from '../middleware/rateLimit';
 import { requireWritableSubscription } from '../middleware/subscription';
@@ -18,7 +19,7 @@ export const communicationsRouter = Router();
 const WRITERS = requireRole('super_admin', 'admin', 'staff');
 const ADMINS = requireRole('admin');
 
-communicationsRouter.use(requireAuth, requireWritableSubscription);
+communicationsRouter.use(requireAuth, moduleGate('communications'), requireWritableSubscription);
 
 // Named paths first, or "celebrations" parses as an announcement id.
 communicationsRouter.get('/celebrations', asyncHandler(communications.listCelebrations));

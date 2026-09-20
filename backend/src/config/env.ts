@@ -18,6 +18,10 @@ const schema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
   BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
+  /// How long a password-reset link stays good. Short because it is a key to an account arriving in
+  /// an inbox: an hour is long enough to walk to the office machine and short enough that a mail left
+  /// in a shared sent folder is not a standing invitation tomorrow.
+  RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(60),
   /// How many proxy hops sit in front of the API. Zero by default, deliberately: trusting
   /// `X-Forwarded-For` when nothing sets it lets a client write its own address and walk straight
   /// past the rate limiter below. Set it to 1 behind Railway, Render, Fly or a single nginx.
@@ -74,9 +78,10 @@ const schema = z.object({
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_FROM: z.string().optional(),
 
-  // -------------------------------------------------------------------------------------------
-  // Monitoring
-  // -------------------------------------------------------------------------------------------
+  /// The IANA zone the church's office lives in, used wherever a date is shown or exported as a
+  /// calendar day rather than an instant. `UTC` by default only because something has to be: for
+  /// Kenya set `Africa/Nairobi`, and the ledgers then agree with the wall calendar.
+  DISPLAY_TIMEZONE: z.string().default('UTC'),
   /// A Sentry-compatible DSN. Unset — the default — means failures are logged and go no further, and
   /// nothing is sent to a third party unless somebody deliberately configured one.
   SENTRY_DSN: z.string().optional(),
@@ -106,6 +111,15 @@ if (parsed.data.NODE_ENV === 'production' && parsed.data.JWT_SECRET.includes('re
   throw new Error('JWT_SECRET is still the placeholder value. Set a real secret before running in production.');
 }
 
+// A production service that still sends mail through the `console` driver cannot deliver a password
+// reset, and the person locked out on a Sunday evening has nobody to ask. That is a configuration
+// mistake worth stopping for, not a warning in a log nobody reads.
+if (parsed.data.NODE_ENV === 'production' && parsed.data.EMAIL_DRIVER === 'console') {
+  throw new Error(
+    'EMAIL_DRIVER is still "console" in production, so no password-reset link could ever be delivered. Set EMAIL_DRIVER=resend and RESEND_API_KEY.',
+  );
+}
+
 export const env = parsed.data;
 
 /** The console may be reached on localhost during setup and on the LAN address afterwards. */
@@ -124,3 +138,21 @@ export const corsOrigins = env.CORS_ORIGIN.split(',')
 export const uploadBodyLimit = Math.ceil(env.UPLOAD_MAX_BYTES * 1.4) + 64 * 1024;
 
 export const isProduction = env.NODE_ENV === 'production';
+
+// An unparseable zone makes every Intl call below silently fall back to UTC, which is exactly the
+// kind of drift this setting exists to prevent — so a typo fails at boot, loudly.
+if (!isValidTimeZone(env.DISPLAY_TIMEZONE)) {
+  throw new Error(`DISPLAY_TIMEZONE "${env.DISPLAY_TIMEZONE}" is not an IANA time zone (e.g. Africa/Nairobi).`);
+}
+
+function isValidTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The church's own calendar: the zone every exported or printed date is named in. */
+export const displayTimeZone = env.DISPLAY_TIMEZONE;

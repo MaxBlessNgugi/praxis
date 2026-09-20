@@ -66,7 +66,7 @@ export function errorHandler(
   // mistake reported to whoever watches the error tracker.
   const bodyFailure = bodyParserFailure(error);
   if (bodyFailure) {
-    res.status(bodyFailure.status).json({ error: bodyFailure.message, code: bodyFailure.code });
+    res.status(bodyFailure.status).json({ error: bodyFailure.message, code: bodyFailure.code, requestId: reqId(res) });
     return;
   }
 
@@ -74,6 +74,7 @@ export function errorHandler(
     res.status(400).json({
       error: 'The request failed validation',
       fields: error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
+      requestId: reqId(res),
     });
     return;
   }
@@ -104,7 +105,7 @@ export function errorHandler(
       });
       reportError(error, contextOf(req));
     }
-    res.status(error.statusCode).json({ error: error.message, code: error.code });
+    res.status(error.statusCode).json({ error: error.message, code: error.code, requestId: reqId(res) });
     return;
   }
 
@@ -115,8 +116,11 @@ export function errorHandler(
     ...describeError(error),
   });
   reportError(error, contextOf(req));
-  res.status(500).json({ error: isProduction ? 'Something went wrong' : String((error as Error)?.message ?? error) });
+  res.status(500).json({ error: isProduction ? 'Something went wrong' : String((error as Error)?.message ?? error), requestId: reqId(res) });
 }
+
+/** The same id the logs carry, so a caller can quote it and the office can find the request. */
+const reqId = (res: Response): string | null => (res.getHeader('X-Request-Id') as string | undefined) ?? null;
 
 /** Enough to find the request again, and nothing that could carry a member's data to a third party. */
 function contextOf(req: Request): Record<string, unknown> {

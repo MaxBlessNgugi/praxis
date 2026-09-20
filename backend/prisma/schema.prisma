@@ -82,6 +82,10 @@ model User {
   isActive    Boolean   @default(true)
   lastLoginAt DateTime?
 
+  /// Created by an administrator's invitation and still waiting on its activation link — the
+  /// account has never signed in, and the only way forward is a re-issued link, not a reset.
+  isInvited   Boolean   @default(false)
+
   /// A Praxis employee rather than a church's own account: it is what opens `/api/vendor`, the only
   /// routes that deliberately cross between churches (list them, assign a plan, record a payment).
   /// Default false, so an account created by a church can never reach another's records.
@@ -93,32 +97,78 @@ model User {
   failedAttempts Int       @default(0)
   lockedUntil    DateTime?
 
+  /// Which generation of sessions this account will accept.
+  ///
+  /// A token carries the value it was minted with, and a request whose token disagrees is refused.
+  /// Changing or resetting a password bumps this, which is what makes those two acts end every other
+  /// session on the account — the copy of a token left on a shared parish machine stops working the
+  /// moment the password it was protecting is replaced.
+  tokenVersion Int @default(0)
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  role             Role?                 @relation(fields: [roleId], references: [id])
-  member           Member?               @relation("UserAccount", fields: [memberId], references: [id], onDelete: SetNull)
-  tithes           Tithe[]
-  offerings        Offering[]
-  announcements    Announcement[]        @relation("AnnouncementAuthor")
-  broadcasts       Broadcast[]           @relation("BroadcastAuthor")
-  auditLogs        AuditLog[]
-  softDeletes      SoftDeletedRecord[]   @relation("SoftDeleteActor")
-  softRestores     SoftDeletedRecord[]   @relation("SoftRestoreActor")
-  welfareApprovals WelfareDisbursement[] @relation("WelfareApprover")
-  paymentsRecorded SubscriptionPayment[] @relation("PaymentRecorder")
-  serviceReports   ServiceReport[]       @relation("ServiceReportAuthor")
-  swapDecisions    SwapRequest[]         @relation("SwapDecider")
-  charityLed       CharityActivity[]     @relation("CharityLead")
-  financeAudit     FinanceAuditEntry[]   @relation("FinanceAuditActor")
-  settingsChanged  AppSetting[]          @relation("SettingEditor")
-  uploadedFiles    StoredFile[]          @relation("FileUploader")
+  role               Role?                 @relation(fields: [roleId], references: [id])
+  member             Member?               @relation("UserAccount", fields: [memberId], references: [id], onDelete: SetNull)
+  tithes             Tithe[]
+  offerings          Offering[]
+  announcements      Announcement[]        @relation("AnnouncementAuthor")
+  broadcasts         Broadcast[]           @relation("BroadcastAuthor")
+  auditLogs          AuditLog[]
+  softDeletes        SoftDeletedRecord[]   @relation("SoftDeleteActor")
+  softRestores       SoftDeletedRecord[]   @relation("SoftRestoreActor")
+  welfareApprovals   WelfareDisbursement[] @relation("WelfareApprover")
+  paymentsRecorded   SubscriptionPayment[] @relation("PaymentRecorder")
+  serviceReports     ServiceReport[]       @relation("ServiceReportAuthor")
+  sealedMinutes      Meeting[]             @relation("MeetingMinutes")
+  swapDecisions      SwapRequest[]         @relation("SwapDecider")
+  charityLed         CharityActivity[]     @relation("CharityLead")
+  financeAudit       FinanceAuditEntry[]   @relation("FinanceAuditActor")
+  settingsChanged    AppSetting[]          @relation("SettingEditor")
+  uploadedFiles      StoredFile[]          @relation("FileUploader")
+  certificatesIssued Certificate[]         @relation("CertificateIssuer")
   /// The churches this account may serve. One login, several parishes, one role in each.
-  memberships      OrganizationMember[]  @relation("OrganizationMembership")
+  memberships        OrganizationMember[]  @relation("OrganizationMembership")
+  resetTokens        PasswordResetToken[]
+  stockMovements     StockMovement[]       @relation("StockActor")
+  stockTakesCounted  StockTake[]           @relation("StockTaker")
+  stockTakesApproved StockTake[]           @relation("StockTakeApprover")
+  purchasesRecorded  Purchase[]            @relation("PurchaseRecorder")
+  issuesIssued       Issue[]               @relation("IssueIssuer")
+  issuesAuthorized   Issue[]               @relation("IssueAuthorizer")
+  transfersMoved     Transfer[]            @relation("TransferMover")
+  maintenanceLogged  MaintenanceRecord[]   @relation("MaintenanceRecorder")
 
   @@index([roleId])
   @@index([deletedAt])
+}
+
+/// A password reset in flight.
+///
+/// The token itself is never stored, only its SHA-256, so a copy of this table is not a set of keys to
+/// every account. One row is one request: it expires, it is spent when used, and asking again is a new
+/// row — so an old email cannot be replayed and asking twice does not extend the first one's life.
+///
+/// It belongs to the account rather than to a church, because a password is the account's and the
+/// person asking has not signed in yet — there is no church context to write it in.
+model PasswordResetToken {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 of the token that was emailed. Never the token.
+  tokenHash String @unique
+
+  expiresAt   DateTime
+  usedAt      DateTime?
+  requestedIp String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -158,10 +208,14 @@ model Organization {
   members              Member[]
   ministries           Ministry[]
   ministryMembers      MinistryMember[]
+  groups               Group[]
+  groupMembers         GroupMember[]
+  groupMeetings        GroupMeeting[]
   services             Service[]
   attendance           Attendance[]
   tithes               Tithe[]
   offerings            Offering[]
+  certificates         Certificate[]
   projects             Project[]
   projectContributions ProjectContribution[]
   welfareDisbursements WelfareDisbursement[]
@@ -182,6 +236,14 @@ model Organization {
   swapRequests         SwapRequest[]
   serviceReports       ServiceReport[]
   files                StoredFile[]
+  suppliers            Supplier[]
+  inventoryItems       InventoryItem[]
+  stockMovements       StockMovement[]
+  stockTakes           StockTake[]
+  purchases            Purchase[]
+  issues               Issue[]
+  transfers            Transfer[]
+  maintenanceRecords   MaintenanceRecord[]
 
   @@index([deletedAt])
 }
@@ -325,6 +387,8 @@ model Member {
   userAccount        User?                 @relation("UserAccount")
   ministries         MinistryMember[]
   ledMinistries      Ministry[]            @relation("MinistryLeader")
+  groups             GroupMember[]
+  ledGroups          Group[]               @relation("GroupLeader")
   officiatedServices Service[]             @relation("ServiceOfficiant")
   attendance         Attendance[]
   welfareAssigned    WelfareDisbursement[] @relation("WelfareAssignee")
@@ -337,6 +401,9 @@ model Member {
   rosterDuties       RosterDuty[]          @relation("DutyHolder")
   swapRequests       SwapRequest[]         @relation("SwapRequester")
   reliefSwaps        SwapRequest[]         @relation("SwapReplacement")
+  organizedEvents    Event[]               @relation("EventOrganizer")
+  certificates       Certificate[]         @relation("CertificateMember")
+  custodianFor       InventoryItem[]       @relation("InventoryCustodian")
 
   /// Every register number, envelope number and unit number in this system is unique *within a
   /// church*, not across the platform: two parishes both start their register at #MBR-1001, and a
@@ -372,6 +439,7 @@ model Ministry {
   members      MinistryMember[]
   rosterDuties RosterDuty[]
   liturgyItems OrderOfServiceItem[]
+  issues       Issue[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -400,14 +468,106 @@ model MinistryMember {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Groups and fellowships
+// ---------------------------------------------------------------------------------------------
+
+/// A small congregation-sized community: a cell group, a fellowship circle, a youth chapter.
+///
+/// A ministry is **service** — who does what on a Sunday. A group is **belonging** — who gathers on
+/// a Tuesday in someone's front room. The two look alike (a named unit with people on a roll) but
+/// they answer different questions, which is why they are separate tables rather than a flag.
+model Group {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  name           String
+  description    String?
+  /// The member who hosts or shepherds the gathering. Like a ministry's leader: one answerable
+  /// person, not a committee.
+  leaderId       String?
+  meetingDay     String?
+  location       String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  leader   Member?        @relation("GroupLeader", fields: [leaderId], references: [id])
+  members  GroupMember[]
+  meetings GroupMeeting[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([leaderId])
+  @@index([deletedAt])
+}
+
+model GroupMember {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  groupId        String
+  memberId       String
+  roleTitle      String       @default("Member")
+  joinedAt       DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  group  Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, memberId])
+  @@index([organizationId])
+  @@index([deletedAt])
+}
+
+/// One gathering of a group, with its own attendance count — the unit a cell leader reports on.
+model GroupMeeting {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  groupId        String
+  /// When the group actually met, not when the row was typed — cell groups meet midweek and the
+  /// record is often written on the day.
+  metAt          DateTime
+  hostName       String?
+  notes          String?
+  attendedCount  Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([groupId, metAt])
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------------------------
 // Services and attendance
 // ---------------------------------------------------------------------------------------------
+
+/// The kinds of gathering a parish actually puts on a calendar.
+///
+/// Deliberately a short list rather than free text: a planner that lets every clerk invent a
+/// category cannot report by it, and "Sunday service" is spelled the same way in every parish.
+/// `special` covers the one-offs — a baptism Sunday, a crusade, an induction.
+enum ServiceKind {
+  worship
+  midweek
+  prayer
+  special
+  other
+}
 
 model Service {
   id             String       @id @default(uuid())
   organizationId String       @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   title          String
+  kind           ServiceKind  @default(worship)
   heldAt         DateTime
   startTime      String?
   venue          String
@@ -799,16 +959,25 @@ model Meeting {
   chairId        String?
   secretaryId    String?
   attendees      Int?
+  /// Derived from `attendees` against `quorumRequired`; never accepted from a client.
   quorumMet      Boolean?
+  /// What a sitting needed to be quorate, counted from the council roll and snapshotted here.
+  quorumRequired Int?
   agenda         Json?
   minutes        String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  deletedAt      DateTime?
 
-  chair       Member?      @relation("MeetingChair", fields: [chairId], references: [id], onDelete: SetNull)
-  secretary   Member?      @relation("MeetingSecretary", fields: [secretaryId], references: [id], onDelete: SetNull)
-  resolutions Resolution[]
+  /// Sealing a minute is what closes a sitting: after it the register and the minute are fixed, and
+  /// only an administrator may change them. The account is kept beside the date, like a signature.
+  minutesFinalizedAt   DateTime?
+  minutesFinalizedById String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+
+  chair              Member?      @relation("MeetingChair", fields: [chairId], references: [id], onDelete: SetNull)
+  secretary          Member?      @relation("MeetingSecretary", fields: [secretaryId], references: [id], onDelete: SetNull)
+  minutesFinalizedBy User?        @relation("MeetingMinutes", fields: [minutesFinalizedById], references: [id], onDelete: SetNull)
+  resolutions        Resolution[]
 
   @@index([organizationId])
   @@index([heldAt])
@@ -867,6 +1036,12 @@ enum DocumentKind {
   other
 }
 
+/// The two ordinances the register records and the church issues certificates for.
+enum CertificateKind {
+  baptism
+  dedication
+}
+
 /// The repository the governance screen calls "the foundational bylaws". `isActive` marks the
 /// version currently in force, so a superseded policy stays readable without being mistaken for law.
 model GovernanceDocument {
@@ -879,11 +1054,16 @@ model GovernanceDocument {
   version        String       @default("1.0")
   adoptedAt      DateTime?
   body           String?
+  /// A link out to a file held somewhere else, for a by-law that lives on the church's website.
   fileUrl        String?
+  /// The copy the church actually holds, uploaded through `/api/files`.
+  fileId         String?
   isActive       Boolean      @default(true)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
+
+  file StoredFile? @relation("GovernanceDocumentFile", fields: [fileId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, reference])
   @@index([organizationId])
@@ -891,23 +1071,73 @@ model GovernanceDocument {
   @@index([deletedAt])
 }
 
+///
+/// A certificate the church has issued — baptism or dedication — in its own serial series.
+/// The print is a browser act; the *record* is what makes a certificate official: a serial issued
+/// once, the person and ceremony it certifies, who signed it, and whether a reissued copy supersedes
+/// this one. The model deliberately holds what the printed page shows, so a reissue years later
+/// reproduces the original wording rather than whatever the register says today.
+model Certificate {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  /// The serial in the church's year series (`BAP-2026-0001`), issued by the server like a
+  /// resolution code, so a certificate can be cited and found long after the service.
+  serial       String
+  kind         CertificateKind
+  fullName     String
+  /// The register number the certificate cites, as typed — a certificate may be issued for a
+  /// ceremony recorded before this register, so it is text rather than a foreign key.
+  memberNumber String?
+  /// The member the certificate was issued from, when the person is on this roll. Null for a
+  /// certificate issued for someone the register does not hold.
+  memberId     String?
+  member       Member?         @relation("CertificateMember", fields: [memberId], references: [id], onDelete: SetNull)
+  parents      String?
+  ceremonyDate DateTime?
+  officiant    String?
+  scripture    String?
+  issuedById   String?
+  issuedBy     User?           @relation("CertificateIssuer", fields: [issuedById], references: [id], onDelete: SetNull)
+  /// A reissue names the copy it replaces, so the register shows one live certificate per ceremony.
+  reissuesId   String?
+  reissues     Certificate?    @relation("CertificateReissue", fields: [reissuesId], references: [id], onDelete: SetNull)
+  reissuedBy   Certificate[]   @relation("CertificateReissue")
+  issuedAt     DateTime        @default(now())
+  createdAt    DateTime        @default(now())
+  deletedAt    DateTime?
+
+  @@unique([organizationId, serial])
+  @@index([organizationId, kind])
+  @@index([deletedAt])
+}
+
 // ---------------------------------------------------------------------------------------------
 // Communications and community
 // ---------------------------------------------------------------------------------------------
 
+/// How loudly a notice asks to be read. The office's own judgement, recorded rather than styled:
+/// an urgent notice is placed first and marked on every screen that shows the notice sheet.
+enum AnnouncementPriority {
+  normal
+  urgent
+}
+
 model Announcement {
-  id             String       @id @default(uuid())
-  organizationId String       @default(dbgenerated())
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id             String               @id @default(uuid())
+  organizationId String               @default(dbgenerated())
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   title          String
   body           String
-  audience       String       @default("Everyone")
-  isPinned       Boolean      @default(false)
-  publishedAt    DateTime     @default(now())
+  audience       String               @default("Everyone")
+  priority       AnnouncementPriority @default(normal)
+  isPinned       Boolean              @default(false)
+  publishedAt    DateTime             @default(now())
   expiresAt      DateTime?
   authorId       String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
   deletedAt      DateTime?
 
   author User? @relation("AnnouncementAuthor", fields: [authorId], references: [id])
@@ -961,6 +1191,13 @@ model Event {
   title          String
   description    String?
   kind           EventKind    @default(service)
+  /// Who is running it. Null when nobody has been named yet, which is an honest state for a date
+  /// that has been pencilled in.
+  organizerId    String?
+  organizer      Member?      @relation("EventOrganizer", fields: [organizerId], references: [id], onDelete: SetNull)
+  /// Whether the calendar still expects it. A postponed or called-off gathering is kept on the
+  /// record rather than deleted, because the people who were told about it need to see why it moved.
+  status         EventStatus  @default(scheduled)
   venue          String
   startsAt       DateTime
   endsAt         DateTime
@@ -972,6 +1209,11 @@ model Event {
   @@index([organizationId])
   @@index([startsAt])
   @@index([deletedAt])
+}
+
+enum EventStatus {
+  scheduled
+  cancelled
 }
 
 enum PrayerStatus {
@@ -1189,6 +1431,9 @@ model ServiceReport {
   offeringsTotal Decimal?     @db.Decimal(12, 2)
   highlights     String?
   preparedById   String?
+  /// When the report was signed off. A signed report can still be revised, but only by an
+  /// administrator, and the revision is audited — see `upsertReport`.
+  finalizedAt    DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
@@ -1244,10 +1489,12 @@ model StoredFile {
 
   uploadedBy User? @relation("FileUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
 
-  /// The two places a file is currently referenced. Kept explicit rather than polymorphic so the
+  /// The places a file is currently referenced. Kept explicit rather than polymorphic so the
   /// foreign keys do their job and a deleted file cannot be left dangling on a profile.
-  orgProfile  OrganizationProfile? @relation("OrgLogo")
-  memberPhoto Member?              @relation("MemberPhoto")
+  orgProfile     OrganizationProfile? @relation("OrgLogo")
+  memberPhoto    Member?              @relation("MemberPhoto")
+  governanceDocs GovernanceDocument[] @relation("GovernanceDocumentFile")
+  maintenanceFor MaintenanceRecord[]  @relation("MaintenanceFile")
 
   @@index([organizationId])
   @@index([purpose])
@@ -1389,4 +1636,302 @@ model SubscriptionPayment {
   @@index([organizationId])
   @@index([subscriptionId])
   @@index([receivedAt])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Inventory and assets
+// ---------------------------------------------------------------------------------------------
+
+/// What a movement did to the quantity. The set is the set of ways a shelf figure can honestly
+/// change: bought, given out, brought back, moved, corrected, or lost. A transfer changes where a
+/// thing is, not how much of it exists, so it carries no quantity delta.
+enum StockMovementKind {
+  purchase
+  issue
+  return
+  transfer
+  adjustment
+  loss
+  damage
+}
+
+/// Consumable stock the church uses up (bookshop lines, kitchen supplies) and durable assets it
+/// keeps (sound gear, instruments). One table rather than two, because both are named, located,
+/// counted and issued — the difference is whether "quantity" means units on a shelf or 1.
+enum InventoryKind {
+  consumable
+  asset
+}
+
+/// A durable asset's working life. A consumable's condition is not tracked: it is used up, and its
+/// `status` is active until retired.
+enum AssetCondition {
+  good
+  fair
+  poor
+}
+
+/// Why a thing is (or is not) in service. `disposed` is what retiring an asset records; `lost` and
+/// `damaged` are the states a loss or damage movement puts an asset in.
+enum InventoryStatus {
+  active
+  in_service
+  maintenance
+  lost
+  damaged
+  disposed
+}
+
+/// A stock take's life. `counting` while the count is gathered, `review` once the variance is
+/// visible, and only `approved` touches the shelf — approval is what makes the adjustment real.
+enum StockTakeStatus {
+  counting
+  review
+  approved
+  cancelled
+}
+
+/// Who stock was bought from. Deliberately its own model rather than a string: the purchases screen
+/// groups by supplier, and a misspelled vendor string would split one supplier into three.
+model Supplier {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  name      String
+  phone     String?
+  email     String?
+  notes     String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  items     InventoryItem[]
+  purchases Purchase[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+/// One line of the register: what the church owns, where it is, how much there is.
+///
+/// `quantity` is the *derived* figure — the sum of its movements — and is stored so lists and reports
+/// do not have to aggregate a ledger to render a shelf. The movements are the truth; a write to
+/// `quantity` that did not go through a movement is a discrepancy, which is why every service path
+/// adjusts the two together inside one transaction.
+model InventoryItem {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  sku           String
+  name          String
+  kind          InventoryKind   @default(consumable)
+  category      String
+  unit          String          @default("pcs")
+  location      String
+  quantity      Int             @default(0)
+  reorderAt     Int?
+  cost          Decimal?        @db.Decimal(12, 2)
+  status        InventoryStatus @default(active)
+  condition     AssetCondition?
+  supplierId    String?
+  purchasedAt   DateTime?
+  custodianId   String?
+  /// The maker's own serial, read off the casing — how an asset is identified when a SKU is not enough.
+  serialNumber  String?
+  /// When the maker's warranty runs out, so the register can answer "is this still covered?"
+  warrantyUntil DateTime?
+  /// The receipt or photograph, uploaded through `/api/files`.
+  fileId        String?
+  notes         String?
+  lastCountedAt DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  deletedAt     DateTime?
+
+  supplier      Supplier?       @relation(fields: [supplierId], references: [id])
+  custodian     Member?         @relation("InventoryCustodian", fields: [custodianId], references: [id])
+  movements     StockMovement[]
+  issues        Issue[]
+  transfers     Transfer[]
+  stockTakes    StockTake[]
+  purchaseLines PurchaseLine[]
+  maintenanceRecords MaintenanceRecord[]
+
+  @@unique([organizationId, sku])
+  @@index([organizationId])
+  @@index([organizationId, category])
+  @@index([organizationId, status])
+}
+
+/// The ledger of how a quantity changed. Append-only in practice — nothing edits a movement, a
+/// correction is another movement — and never soft-deleted: the history is the point of it.
+model StockMovement {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  kind         StockMovementKind
+  /// Signed: positive adds to the shelf, negative takes away. A transfer's line is 0 — the item
+  /// moved, nothing was created or destroyed.
+  delta        Int
+  /// What the shelf read after this movement landed. Recording it means any later dispute can be
+  /// answered without replaying the ledger.
+  balanceAfter Int
+  reference    String?
+  note         String?
+  actorId      String?
+  actor        User?             @relation("StockActor", fields: [actorId], references: [id], onDelete: SetNull)
+  occurredAt   DateTime          @default(now())
+  createdAt    DateTime          @default(now())
+
+  @@index([organizationId])
+  @@index([itemId, occurredAt])
+}
+
+/// One act of counting the shelf. The variance is computed and shown, and an administrator approves
+/// the adjustment — the only path by which a count changes stock.
+model StockTake {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  status          StockTakeStatus @default(counting)
+  bookQuantity    Int
+  countedQuantity Int?
+  variance        Int?
+  countedById     String?
+  countedBy       User?           @relation("StockTaker", fields: [countedById], references: [id], onDelete: SetNull)
+  approvedById    String?
+  approvedBy      User?           @relation("StockTakeApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  note            String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([organizationId])
+  @@index([itemId])
+}
+
+/// A buy. Header-plus-lines so one receipt of many things is one purchase, and `total` is computed
+/// from the lines inside the transaction rather than trusted from the client.
+model Purchase {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  reference    String?
+  supplierId   String?
+  supplier     Supplier? @relation(fields: [supplierId], references: [id])
+  total        Decimal   @default(0) @db.Decimal(12, 2)
+  purchasedAt  DateTime  @default(now())
+  note         String?
+  recordedById String?
+  recordedBy   User?     @relation("PurchaseRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  lines PurchaseLine[]
+
+  @@index([organizationId])
+  @@index([purchasedAt])
+}
+
+/// One item bought in one purchase. Its own table because the movement engine needs per-item
+/// quantities and costs, and a header row cannot carry them.
+model PurchaseLine {
+  id         String        @id @default(uuid())
+  purchaseId String
+  purchase   Purchase      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  itemId     String
+  item       InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  quantity Int
+  unitCost Decimal? @db.Decimal(12, 2)
+
+  @@index([purchaseId])
+  @@index([itemId])
+}
+
+/// Stock or an asset handed to a person for a ministry's use. The authorizer is the person whose
+/// name the register records as having let it leave the cupboard.
+model Issue {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  quantity       Int
+  issuedToName   String
+  ministryId     String?
+  ministry       Ministry? @relation(fields: [ministryId], references: [id])
+  reason         String?
+  issuedAt       DateTime  @default(now())
+  issuedById     String?
+  issuedBy       User?     @relation("IssueIssuer", fields: [issuedById], references: [id], onDelete: SetNull)
+  authorizedById String?
+  authorizedBy   User?     @relation("IssueAuthorizer", fields: [authorizedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([itemId])
+}
+
+/// A move between two named places — rooms, departments, churches on the same register. History is
+/// the movements it wrote, so a transfer is never deleted either.
+model Transfer {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  quantity        Int
+  fromLocation    String
+  toLocation      String
+  note            String?
+  transferredAt   DateTime @default(now())
+  transferredById String?
+  transferredBy   User?    @relation("TransferMover", fields: [transferredById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([itemId])
+}
+
+/// One visit to the repair bench: when, by whom, what it cost, and when the next one falls due.
+/// Kept as its own table rather than a movement kind because a service visit changes the asset's
+/// condition, not its shelf count — and because the "maintenance due" report has to read it
+/// directly. History is the point: nothing edits or deletes a visit, a further visit supersedes it.
+model MaintenanceRecord {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  servicedAt   DateTime
+  provider     String?
+  cost         Decimal?        @db.Decimal(12, 2)
+  description  String?
+  nextDueAt    DateTime?
+  fileId       String?
+  file         StoredFile?     @relation("MaintenanceFile", fields: [fileId], references: [id], onDelete: SetNull)
+  recordedById String?
+  recordedBy   User?           @relation("MaintenanceRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime        @default(now())
+
+  @@index([organizationId])
+  @@index([itemId, servicedAt])
+  @@index([nextDueAt])
 }

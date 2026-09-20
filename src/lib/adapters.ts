@@ -2,27 +2,111 @@
  * The backend stores a record; a panel renders a view model. They are not the same shape, and
  * pretending otherwise is how a screen quietly renders `undefined`.
  *
- * These mappers are that translation, one function per record, in one file. A panel imports the
- * mapper it needs and keeps rendering exactly the types it did before Phase 2 — so connecting to the
- * API changed where the data comes from, not what the UI is.
- *
- * Where the console shows a field the backend does not store (an announcement's *priority*, for
- * instance), the mapper supplies a documented default rather than inventing persistence. Those gaps
- * are the honest limit of "connect the panel to the API" and are listed in the Phase 2 notes.
+ * These mappers are that translation, one function per record, in one file, and every field they
+ * return is a field the backend actually stores: a screen that needs something the table does not
+ * have says so, rather than rendering a default that looks like data.
  */
-import type { AnnouncementDto, CelebrationDto, EventDto, OfferingDto, PrayerRequestDto, ServiceDto, TitheDto } from './api';
+import type { HouseholdDto, MemberDto, OfferingDto, ServiceDto, TitheDto } from './api';
 import type {
-  AnnouncementAudience,
-  AnnouncementItem,
-  BirthdayAnniversaryItem,
-  ChurchEventItem,
-  PrayerPrivacyLevel,
-  PrayerRequestItem,
+  BaptismType,
+  HouseholdDependent,
+  HouseholdUnit,
+  MemberStatus,
+  ParishMember,
   TitheTransaction,
 } from '../types';
-import { DEFAULT_LOCATION } from '../data/churchDomain';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// ==================== Members and households ====================
+
+export const MEMBER_STATUS_LABELS: Record<MemberStatus, string> = {
+  active: 'Active',
+  transferred: 'Transferred out',
+  deceased: 'Deceased',
+  inactive: 'Inactive',
+};
+
+export const BAPTISM_LABELS: Record<BaptismType, string> = {
+  baptized: 'Baptized (Believer)',
+  dedicated: 'Child Dedication',
+  none: 'Baptism & Communion Pending',
+};
+
+/** `YYYY-MM-DD`, the form a date input and the API both accept. */
+export function toDay(iso: string | null | undefined): string {
+  return iso ? iso.slice(0, 10) : '';
+}
+
+/**
+ * A member as the register shows one.
+ *
+ * Two decisions are worth naming. A field the API did not send is left **empty rather than filled**,
+ * because the register is a record of what the church wrote down: a date of birth nobody recorded is
+ * not "Jan 12, 2025", and an officiant nobody entered is not the bishop. And the register number is
+ * shown as it is stored (`MBR-1092`) rather than dressed with a `#` the database never held.
+ */
+export function toParishMember(dto: MemberDto): ParishMember {
+  const status = dto.status as MemberStatus;
+  const baptismType = dto.baptismType as BaptismType;
+  return {
+    id: dto.id,
+    name: `${dto.firstName} ${dto.lastName}`.trim(),
+    memberId: dto.memberId,
+    initials: dto.initials ?? `${dto.firstName.charAt(0)}${dto.lastName.charAt(0)}`.toUpperCase(),
+    church: dto.location,
+    status,
+    statusLabel: MEMBER_STATUS_LABELS[status] ?? dto.status,
+    baptismType,
+    baptismLabel: BAPTISM_LABELS[baptismType] ?? dto.baptismType,
+    ...(dto.baptismDate ? { baptismDate: formatDate(dto.baptismDate) } : {}),
+    ...(dto.baptismOfficiant ? { baptismOfficiant: dto.baptismOfficiant } : {}),
+    ...(dto.householdId ? { householdId: dto.householdId } : {}),
+    ...(dto.household?.name ? { householdName: dto.household.name } : {}),
+    ...(dto.household?.unitNumber ? { householdUnitNumber: dto.household.unitNumber } : {}),
+    ...(dto.householdRole ? { householdRole: dto.householdRole } : {}),
+    isHouseholdHead: dto.isHouseholdHead,
+    email: dto.email ?? '',
+    phone: dto.phone ?? '',
+    ...(dto.dateOfBirth ? { dateOfBirth: toDay(dto.dateOfBirth) } : {}),
+    ...(dto.pastoralNotes ? { pastoralNotes: dto.pastoralNotes } : {}),
+    tags: dto.tags ?? [],
+    ...(dto.envelopeNumber ? { envelopeNumber: dto.envelopeNumber } : {}),
+    joinedAt: dto.joinedAt,
+    photoFileId: dto.photoFileId ?? null,
+    ministries: (dto.ministries ?? []).map((row) => ({
+      id: row.id,
+      ministryId: row.ministryId,
+      ministryName: row.ministry?.name ?? '',
+      roleTitle: row.roleTitle,
+    })),
+  };
+}
+
+/** One person on a household's roll, as the card lists them. */
+export function toHouseholdUnit(dto: HouseholdDto): HouseholdUnit {
+  // A read that only counted the roll sends no members, so nothing here assumes them.
+  const members = dto.members ?? [];
+  const head = members.find((member) => member.isHouseholdHead);
+  const dependents: HouseholdDependent[] = members
+    .filter((member) => !member.isHouseholdHead)
+    .map((member) => ({ name: `${member.firstName} ${member.lastName}`.trim(), relation: member.householdRole ?? 'Member' }));
+  return {
+    id: dto.id,
+    name: dto.name,
+    unitNumber: dto.unitNumber,
+    campus: dto.location,
+    statusBadge: 'Active Household',
+    statusType: 'secondary',
+    headName: head ? `${head.firstName} ${head.lastName}`.trim() : 'No head recorded',
+    headInitials: head?.initials ?? '',
+    headDetail: head ? `${head.householdRole ?? 'Head'} · ${head.memberId}` : '',
+    dependents,
+    memberCount: dto._count?.members ?? members.length,
+    address: dto.address ?? '',
+    phone: head?.phone ?? '',
+  };
+}
 
 export function formatDate(iso: string): string {
   const date = new Date(iso);
@@ -34,145 +118,6 @@ export function formatClock(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-}
-
-// ==================== Announcements ====================
-
-const AUDIENCE_LABELS: Record<AnnouncementAudience, string> = {
-  everyone: 'All Members & Guests',
-  'members-only': 'Members & Baptized Believers',
-  'ministry-leaders': 'Group Leaders & Deacons',
-  'youth-roll': 'Youth & Discipleship Class',
-  'church-council': 'Church Council Only',
-};
-
-const AUDIENCES = Object.keys(AUDIENCE_LABELS) as AnnouncementAudience[];
-
-export function asAudience(value: string): AnnouncementAudience {
-  return (AUDIENCES as string[]).includes(value) ? (value as AnnouncementAudience) : 'everyone';
-}
-
-export function audienceLabel(audience: AnnouncementAudience): string {
-  return AUDIENCE_LABELS[audience];
-}
-
-export function toAnnouncementItem(dto: AnnouncementDto): AnnouncementItem {
-  const now = Date.now();
-  const published = new Date(dto.publishedAt).getTime();
-  const expires = dto.expiresAt ? new Date(dto.expiresAt).getTime() : null;
-  const audience = asAudience(dto.audience);
-  return {
-    id: dto.id,
-    title: dto.title,
-    content: dto.body,
-    audience,
-    audienceLabel: AUDIENCE_LABELS[audience],
-    isPinned: dto.isPinned,
-    // The backend stores no priority or category; the console keeps its columns and shows defaults.
-    priority: 'normal',
-    publishDate: formatDate(dto.publishedAt),
-    expiryDate: dto.expiresAt ? formatDate(dto.expiresAt) : '—',
-    author: dto.author?.name ?? 'Church Office',
-    category: 'worship',
-    status: expires !== null && expires < now ? 'expired' : published > now ? 'scheduled' : 'active',
-  };
-}
-
-// ==================== Events ====================
-
-/** The console's categories are finer than the four kinds the events table stores, so scheduling a
- *  fellowship or a youth class has to land on one of them. */
-export const EVENT_KIND: Record<ChurchEventItem['category'], EventDto['kind']> = {
-  worship: 'service',
-  fellowship: 'service',
-  youth: 'service',
-  outreach: 'outreach',
-  governance: 'meeting',
-  training: 'conference',
-};
-
-const EVENT_CATEGORY: Record<EventDto['kind'], ChurchEventItem['category']> = {
-  service: 'worship',
-  conference: 'training',
-  meeting: 'governance',
-  outreach: 'outreach',
-};
-
-const EVENT_COLOR: Record<EventDto['kind'], string> = {
-  service: '#C2410C',
-  conference: '#0891B2',
-  meeting: '#059669',
-  outreach: '#2563EB',
-};
-
-/** The card composes its own day range, so an event carries a plain `YYYY-MM-DD` day, in the same
- *  local calendar the event was scheduled in. */
-function formatDay(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso.slice(0, 10);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-export function toChurchEventItem(dto: EventDto): ChurchEventItem {
-  const spansDays = new Date(dto.startsAt).toDateString() !== new Date(dto.endsAt).toDateString();
-  return {
-    id: dto.id,
-    title: dto.title,
-    category: EVENT_CATEGORY[dto.kind] ?? 'worship',
-    date: formatDay(dto.startsAt),
-    ...(spansDays ? { endDate: formatDay(dto.endsAt) } : {}),
-    startTime: formatClock(dto.startsAt),
-    endTime: formatClock(dto.endsAt),
-    location: dto.venue,
-    description: dto.description ?? '',
-    colorTag: EVENT_COLOR[dto.kind] ?? EVENT_COLOR.service,
-  };
-}
-
-// ==================== Prayer requests ====================
-
-function prayerPrivacy(isPrivate: boolean): PrayerPrivacyLevel {
-  return isPrivate ? 'pastoral-private' : 'public';
-}
-
-export function toPrayerRequestItem(dto: PrayerRequestDto): PrayerRequestItem {
-  const requestedBy = dto.requesterName ?? (dto.member ? `${dto.member.firstName} ${dto.member.lastName}` : undefined);
-  return {
-    id: dto.id,
-    title: dto.request.length > 60 ? `${dto.request.slice(0, 57)}…` : dto.request,
-    requestedBy,
-    requesterName: requestedBy,
-    isAnonymous: !requestedBy,
-    // No category column on the backend; the console's grouping falls back to `guidance`.
-    category: 'guidance',
-    details: dto.request,
-    privacyLevel: prayerPrivacy(dto.isPrivate),
-    submittedDate: formatDate(dto.submittedAt),
-    dateSubmitted: formatDate(dto.submittedAt),
-    status: dto.status === 'answered' ? 'answered' : 'active',
-    prayerCount: 0,
-    intercessorCount: 0,
-    isAnswered: dto.status === 'answered',
-    answerDate: dto.answeredAt ? formatDate(dto.answeredAt) : undefined,
-  };
-}
-
-// ==================== Celebrations ====================
-
-export function toBirthdayAnniversaryItem(dto: CelebrationDto): BirthdayAnniversaryItem {
-  return {
-    id: `${dto.type}-${dto.memberId}-${dto.date}`,
-    type: dto.type,
-    memberName: dto.memberName,
-    // The backend returns no household for a celebration; the card shows the church default.
-    householdName: '—',
-    date: formatDate(dto.date),
-    yearsCount: dto.yearsCount ?? undefined,
-    phone: dto.phone ?? '',
-    email: '',
-    greetingSent: false,
-  };
 }
 
 // ==================== Services ====================

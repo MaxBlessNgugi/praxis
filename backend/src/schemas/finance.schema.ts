@@ -20,12 +20,17 @@ export const financeAuditActionSchema = z.enum([
 /**
  * Money in. Positive and finite, and capped at a billion shillings — a figure larger than that in a
  * parish ledger is a typo, not a gift, and catching it here is cheaper than catching it in an audit.
+ *
+ * At most two decimal places: the shilling is the smallest unit this ledger counts, and `toFixed(2)`
+ * at the storage boundary would otherwise *round* a third decimal rather than refuse it — recording
+ * 0.005 as 0.01 books a cent nobody gave. What was keyed is what must be stored, or not stored.
  */
 const amountSchema = z
   .number()
   .positive('Enter an amount greater than zero')
   .max(1_000_000_000, 'That amount looks like a typo')
-  .refine(Number.isFinite, 'Enter a real number');
+  .refine(Number.isFinite, 'Enter a real number')
+  .refine((value) => Math.round(value * 100) === value * 100, 'Enter the amount in shillings and cents — at most two decimal places');
 
 const dateRange = window;
 
@@ -59,7 +64,10 @@ export const listGivingQuerySchema = z.object({
   memberId: z.string().uuid().optional(),
   method: paymentMethodSchema.optional(),
   category: z.string().trim().max(80).optional(),
+  /** The service an offering was collected at. Tithes ignore it — they name a giver, not a service. */
+  serviceId: z.string().uuid().optional(),
   minAmount: z.coerce.number().positive().optional(),
+  maxAmount: z.coerce.number().positive().optional(),
   ...dateRange,
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),

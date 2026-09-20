@@ -34,6 +34,9 @@ export const createMemberSchema = z.object({
   phone: phoneSchema.optional(),
   nationalId: z.string().trim().min(5).max(20).optional(),
   dateOfBirth: z.coerce.date().optional(),
+  /** The register's other calendar date: the celebrations screen reads its wedding anniversaries from
+   *  here, so a marriage that is never recorded is a card the pastoral office never sees. */
+  weddingAnniversary: z.coerce.date().optional(),
   location: z.string().trim().min(2, 'Say which congregation this member belongs to').max(120),
   householdId: z.string().uuid().optional(),
   householdRole: z.string().trim().max(60).optional(),

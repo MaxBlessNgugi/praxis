@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as financeController from '../controllers/finance.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { moduleGate } from '../middleware/authorize';
 import { requireAuth, requireRole } from '../middleware/authenticate';
 import { requireWritableSubscription } from '../middleware/subscription';
 
@@ -22,7 +23,7 @@ export const financeRouter = Router();
 const WRITERS = requireRole('super_admin', 'admin', 'staff');
 const ADMINS = requireRole('admin');
 
-financeRouter.use(requireAuth, requireWritableSubscription);
+financeRouter.use(requireAuth, moduleGate('giving'), requireWritableSubscription);
 
 // Named paths are declared before `/:entity/:id`, or "summary" parses as an entity and "audit" as
 // one. This is the same ordering rule the services router documents for `/roster`.

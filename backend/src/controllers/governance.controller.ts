@@ -34,6 +34,10 @@ export async function updateMeeting(req: Request, res: Response): Promise<void> 
   ok(res, await governance.updateMeeting(id(req), updateMeetingSchema.parse(req.body), actor(req)));
 }
 
+export async function sealMinutes(req: Request, res: Response): Promise<void> {
+  ok(res, await governance.sealMinutes(id(req), actor(req)));
+}
+
 export async function retireMeeting(req: Request, res: Response): Promise<void> {
   ok(res, await governance.retireMeeting(id(req), retireReasonSchema.parse(req.query), actor(req)));
 }

@@ -1,525 +1,691 @@
-import { useDialog } from '../dialog';
 import React, { useState } from 'react';
-import { useDemoData } from '../../../data/demoStore';
+import { useDialog } from '../dialog';
+import { errorMessage, useMemberOptions, useMutation, useTithes } from '../../../hooks/useApi';
+import { memberRefName, reportsApi, tithesApi, type PaymentMethod, type TitheDto } from '../../../lib/api';
 import { usePermissions } from '../../../lib/permissions';
-import { exportCsv } from '../../../lib/export';
-import type { TitheTransaction } from '../../../types';
-
-/** The columns the ledger leaves the app as, matching ECCLESIA's export panels. */
-const LEDGER_COLUMNS = [
-  { label: 'Transaction', value: (t: TitheTransaction) => t.txCode },
-  { label: 'Date', value: (t: TitheTransaction) => t.date },
-  { label: 'Donor', value: (t: TitheTransaction) => t.donor },
-  { label: 'Envelope', value: (t: TitheTransaction) => t.envelopeNo },
-  { label: 'Designation', value: (t: TitheTransaction) => t.category },
-  { label: 'Method', value: (t: TitheTransaction) => t.method },
-  { label: 'Amount (KES)', value: (t: TitheTransaction) => t.amount },
-  { label: 'Status', value: (t: TitheTransaction) => t.status },
-];
+import { useGivingReceipt } from '../../../hooks/useGivingReceipt';
+import { EmptyBlock, ErrorBlock, LoadingBlock } from '../DataState';
+import { downloadBlob, exportCsv, type ExportColumn } from '../../../lib/export';
 import { formatKes } from '../../../data/churchDomain';
+import { day } from '../../../lib/period';
+import {
+  fieldClass,
+  LedgerPager,
+  methodLabel,
+  PAYMENT_METHODS,
+  ShareBars,
+  VoidFinanceDialog,
+  type GivingLedgerProps,
+} from './GivingLedgerParts';
 
 /**
  * Giving & Stewardship — the tithe ledger.
  *
- * The rows live in the demo store and every figure on the screen is totaled from them,
- * so logging an envelope below moves the KPI band, this table and the Home dashboard
- * together. The band used to be hand-written (KSh 142,850 / 68.2% / KSh 45,420) beside a
- * module constant, which meant a visitor's gift changed nothing anywhere.
+ * Every figure on this screen is the server's. The band reads `/api/finance/summary` for the window
+ * the tabbed view above owns, and the table reads `/api/finance/tithes` with the clerk's filters, so
+ * the total at the top is the total *for the filter* rather than a sum of the fifty rows that happen
+ * to be on the page. The screen this replaced carried a hand-written KPI band beside a chart drawn
+ * from fixed coordinates, so a gift logged below moved nothing.
+ *
+ * Two things it deliberately does not offer: an in-place edit of a payment, and a delete. A wrongly
+ * keyed gift is voided with a reason — the row stays and the chained ledger keeps the line — and the
+ * corrected figure is recorded as a new transaction.
  */
-export const FinancesTithesPanel: React.FC = () => {
-  const { tithes, titheStats, recordTithe, voidTithe } = useDemoData();
+
+const LEDGER_COLUMNS: ExportColumn<TitheDto>[] = [
+  { label: 'Transaction', value: (t) => t.txCode },
+  { label: 'Date', value: (t) => day(new Date(t.receivedAt)) },
+  { label: 'Giver', value: (t) => t.donorName },
+  { label: 'Member', value: (t) => memberRefName(t.member) || '' },
+  { label: 'Envelope', value: (t) => t.envelopeNo ?? '' },
+  { label: 'Designation', value: (t) => t.category },
+  { label: 'Method', value: (t) => t.method },
+  { label: 'Amount (KES)', value: (t) => t.amount },
+  { label: 'Reference', value: (t) => t.reference ?? '' },
+  { label: 'Recorded by', value: (t) => t.recordedBy?.name ?? '' },
+];
+
+interface FormState {
+  memberId: string;
+  donorName: string;
+  envelopeNo: string;
+  amount: string;
+  method: PaymentMethod;
+  category: string;
+  reference: string;
+  receivedAt: string;
+}
+
+const emptyForm = (category: string): FormState => ({
+  memberId: '',
+  donorName: '',
+  envelopeNo: '',
+  amount: '',
+  method: 'cash',
+  category,
+  reference: '',
+  receivedAt: day(new Date()),
+});
+
+export const FinancesTithesPanel: React.FC<GivingLedgerProps> = ({ window, periodLabel, summary, onChanged }) => {
   const { canEdit, canDelete } = usePermissions();
-  const [search, setSearch] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState('All Payment Methods');
-  const [dateRange, setDateRange] = useState('February 2025 (MTD)');
-  const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
-  const offlineModalOpenDialog = useDialog(() => setIsOfflineModalOpen(false), "Record Offline Envelope / Cheque");
-  const [donor, setDonor] = useState('');
-  const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState('Cheque');
-  const [reference, setReference] = useState('');
+  const { printTithe } = useGivingReceipt();
+  const memberOptions = useMemberOptions();
 
-  const amountValue = parseFloat(amount);
-  const canLogTithe = donor.trim().length > 0 && !isNaN(amountValue) && amountValue > 0;
+  const [q, setQ] = useState('');
+  const [method, setMethod] = useState<PaymentMethod | ''>('');
+  const [category, setCategory] = useState('');
+  const [memberId, setMemberId] = useState('');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [sort, setSort] = useState<'recent' | 'oldest' | 'amount'>('recent');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
-  const handleLogTithe = () => {
-    if (!canLogTithe) return;
-    recordTithe({ donor: donor.trim(), amount: amountValue, method, reference: reference.trim() || undefined });
-    setIsOfflineModalOpen(false);
-    setDonor('');
-    setAmount('');
-    setReference('');
+  const ledger = useTithes({
+    q: q.trim() || undefined,
+    method: method || undefined,
+    category: category.trim() || undefined,
+    memberId: memberId || undefined,
+    minAmount: minAmount ? Number(minAmount) : undefined,
+    maxAmount: maxAmount ? Number(maxAmount) : undefined,
+    from: window.from,
+    to: window.to,
+    sort,
+    page,
+    pageSize,
+  });
+
+  const [exporting, setExporting] = useState(false);
+  /** The whole filtered ledger, as the server composes it — not just the fifty rows on this page. */
+  const handleExportAll = async () => {
+    setExporting(true);
+    setFailure(null);
+    try {
+      downloadBlob(
+        'praxis-tithes.csv',
+        await reportsApi.tithesCsv({
+          q: q.trim() || undefined,
+          method: method || undefined,
+          category: category.trim() || undefined,
+          memberId: memberId || undefined,
+          minAmount: minAmount || undefined,
+          maxAmount: maxAmount || undefined,
+          from: window.from,
+          to: window.to,
+        }),
+      );
+    } catch (cause) {
+      setFailure(errorMessage(cause));
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const filteredTx = tithes.filter(t => {
-    const matchesSearch = [t.donor, t.txCode, t.envelopeNo].some((field) =>
-      field.toLowerCase().includes(search.toLowerCase())
-    );
-    // The filter labels are the method families, so "Cheque" also covers "Cheque #4082".
-    const matchesMethod = paymentFilter === 'All Payment Methods' || t.method.startsWith(paymentFilter);
-    return matchesSearch && matchesMethod;
-  });
+  const [notice, setNotice] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [isRecordOpen, setIsRecordOpen] = useState(false);
+  const recordDialog = useDialog(() => setIsRecordOpen(false), 'Record a Tithe');
+  const [voidRow, setVoidRow] = useState<TitheDto | null>(null);
+  const [form, setForm] = useState<FormState>(() => emptyForm('Tithe'));
+
+  const recordTithe = useMutation(tithesApi.create);
+  const tithes = summary?.giving.tithes;
+  const methods = summary?.tithesByMethod ?? [];
+  const designations = summary?.tithesByCategory ?? [];
+  const methodTotal = methods.reduce((sum, row) => sum + row.amount, 0);
+  const average = tithes && tithes.count > 0 ? tithes.total / tithes.count : 0;
+  const filtered = [q, method, category, memberId, minAmount, maxAmount].filter(Boolean).length > 0;
+
+  /** Changing a filter restarts at page one: page seven of the old filter is a page of new results. */
+  const onFilter =
+    <T,>(setter: React.Dispatch<React.SetStateAction<T>>) =>
+    (value: T) => {
+      setter(value);
+      setPage(1);
+    };
+
+  const handleRecord = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setFailure(null);
+    const amount = Number(form.amount);
+    if (!form.donorName.trim() || !Number.isFinite(amount) || amount <= 0) return;
+    try {
+      await recordTithe.run({
+        memberId: form.memberId || undefined,
+        donorName: form.donorName.trim(),
+        envelopeNo: form.envelopeNo.trim() || undefined,
+        amount,
+        method: form.method,
+        category: form.category.trim() || undefined,
+        reference: form.reference.trim() || undefined,
+        receivedAt: form.receivedAt,
+      });
+      await ledger.refetch();
+      onChanged();
+      setIsRecordOpen(false);
+      setNotice('Recorded. The transaction is in the ledger and in the Finance Audit screen.');
+      setForm(emptyForm(form.category));
+    } catch (error) {
+      setFailure(errorMessage(error));
+    }
+  };
+
+  /**
+   * The half of a correction that makes it a correction: the original has been voided, and the clerk is
+   * handed the same figures to key in again rather than retyping them from memory.
+   */
+  const startCorrection = (voided: TitheDto) => {
+    setForm({
+      memberId: voided.memberId ?? '',
+      donorName: voided.donorName,
+      envelopeNo: voided.envelopeNo ?? '',
+      amount: String(voided.amount),
+      method: voided.method,
+      category: voided.category,
+      reference: voided.reference ?? '',
+      receivedAt: day(new Date(voided.receivedAt)),
+    });
+    setVoidRow(null);
+    setIsRecordOpen(true);
+    setNotice(`${voided.txCode} was voided and stays in the ledger. Record the corrected figure now.`);
+  };
 
   return (
     <div className="flex flex-col w-full space-y-6">
-      {/* 4 Stewardship KPI Cards */}
+      {notice && (
+        <div role="status" className="rounded-2xl border border-[#85f8c4]/60 bg-[#85f8c4]/20 px-4 py-3 text-xs font-semibold text-[#005137]">
+          {notice}
+        </div>
+      )}
+
+      {/* The church's tithe figures for the window the tabbed view above owns. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1 */}
         <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              Total Tithes MTD
-            </span>
+            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">Tithes · {periodLabel}</span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#9b2f00] flex items-center justify-center">
               <span aria-hidden="true" className="material-symbols-outlined text-[20px]">volunteer_activism</span>
             </span>
           </div>
-          <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19]">{formatKes(titheStats.total)}</div>
-            <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">trending_up</span>
-              <span>Largest gift {formatKes(titheStats.largestGift)}</span>
-            </div>
-          </div>
+          <div className="font-headline text-3xl font-bold text-[#1e1b19]">{formatKes(tithes?.total ?? 0)}</div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
-            {titheStats.count} MTD Contributions Logged
+            {tithes?.count ?? 0} contribution{tithes?.count === 1 ? '' : 's'} recorded
           </div>
         </div>
 
-        {/* Metric 2 */}
         <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              Recurring Tithe Ratio
-            </span>
-            <span className="p-2 rounded-xl bg-[#f4ece8] text-[#006243] flex items-center justify-center">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">cached</span>
-            </span>
-          </div>
-          <div>
-            <div className="flex items-baseline gap-2">
-              <span className="font-headline text-3xl font-bold text-[#006243]">{titheStats.recurringShare}%</span>
-              <span className="text-xs text-[#59413a]">of volume</span>
-            </div>
-            <div className="w-full bg-[#f4ece8] rounded-full h-1.5 mt-2 overflow-hidden">
-              <div className="bg-[#006243] h-full rounded-full" style={{ width: `${titheStats.recurringShare}%` }}></div>
-            </div>
-          </div>
-          <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
-            {titheStats.recurringCount} Automated Gifts · {formatKes(titheStats.recurringTotal)}
-          </div>
-        </div>
-
-        {/* Metric 3 */}
-        <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              One-Time Tithes
-            </span>
+            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">Average Gift</span>
             <span className="p-2 rounded-xl bg-[#f4ece8] text-[#904d00] flex items-center justify-center">
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">calculate</span>
+            </span>
+          </div>
+          <div className="font-headline text-3xl font-bold text-[#1e1b19]">
+            {/* Rounded to the shilling: an average of 8,283.784 is arithmetic, not money. */}
+            {tithes && tithes.count > 0 ? formatKes(Math.round(average)) : '—'}
+          </div>
+          <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
+            The window's total divided by its gifts
+          </div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">Largest Designation</span>
+            <span className="p-2 rounded-xl bg-[#f4ece8] text-[#c2410c] flex items-center justify-center">
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">sell</span>
+            </span>
+          </div>
+          <div className="font-headline text-2xl font-bold text-[#1e1b19] truncate" title={designations[0]?.category}>
+            {designations[0]?.category ?? '—'}
+          </div>
+          <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
+            {designations[0]
+              ? `${formatKes(designations[0].amount)} across ${designations[0].count} gift${designations[0].count === 1 ? '' : 's'}`
+              : 'Nothing recorded in this window'}
+          </div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">How It Arrived</span>
+            <span className="p-2 rounded-xl bg-[#85f8c4]/40 text-[#002114] flex items-center justify-center">
               <span aria-hidden="true" className="material-symbols-outlined text-[20px]">payments</span>
             </span>
           </div>
-          <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19]">{formatKes(titheStats.oneTimeTotal)}</div>
-            <div className="flex items-center gap-1 mt-1 text-[#904d00] text-xs font-semibold">
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">pin_drop</span>
-              <span>{titheStats.envelopes} distinct envelopes</span>
-            </div>
+          <div className="font-headline text-xl font-bold text-[#006243] leading-tight">
+            {methods[0] ? methodLabel(methods[0].method) : '—'}
           </div>
           <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
-            Avg. Gift: {titheStats.oneTimeCount === 0 ? '—' : formatKes(titheStats.averageGift)}
-          </div>
-        </div>
-
-        {/* Metric 4 */}
-        <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              Tax Compliance
-            </span>
-            <span className="p-2 rounded-xl bg-[#85f8c4]/40 text-[#002114] flex items-center justify-center">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">verified</span>
-            </span>
-          </div>
-          <div>
-            <div className="font-headline text-3xl font-bold text-[#006243]">100%</div>
-            <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span>
-              <span>Registered Society · Audited Receipts</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-2 border-t border-[#f4ece8] text-xs text-[#59413a]">
-            Tax receipts issued instantaneously
+            {methods[0] && methodTotal > 0
+              ? `${Math.round((methods[0].amount / methodTotal) * 1000) / 10}% of the window's tithes`
+              : 'Nothing recorded in this window'}
           </div>
         </div>
       </div>
 
-      {/* Tithe Inflow Visualizer & Campaign Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Trend Chart (8 Cols) */}
-        <div className="lg:col-span-8 bg-white p-5 rounded-2xl shadow-sm border border-[#EAE1D7] flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-headline text-base font-bold text-[#1e1b19]">
-                February Tithe Flow Velocity
-              </h3>
-              <p className="text-xs text-[#59413a]">Weekly recurring vs one-time giving trajectory</p>
-            </div>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1.5 text-[#9b2f00] font-semibold">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#9b2f00]"></span> Recurring Tithes
-              </span>
-              <span className="flex items-center gap-1.5 text-[#904d00] font-semibold">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#fe932c]"></span> One-Time Envelopes
-              </span>
-            </div>
-          </div>
-
-          {/* SVG Line Chart */}
-          <div className="h-44 w-full relative pt-2">
-            <svg
-              role="img"
-              aria-label="Tithe flow by week across the four weeks of February: automated standing-order and paybill giving, with one-time envelope gifts tracked beneath it."
-              className="w-full h-full overflow-visible"
-              viewBox="0 0 600 120"
-              preserveAspectRatio="none"
-            >
-              {/* Grid Lines */}
-              <line x1="0" y1="20" x2="600" y2="20" stroke="#f4ece8" strokeDasharray="3 3" />
-              <line x1="0" y1="60" x2="600" y2="60" stroke="#f4ece8" strokeDasharray="3 3" />
-              <line x1="0" y1="100" x2="600" y2="100" stroke="#f4ece8" strokeDasharray="3 3" />
-
-              {/* Area 1 Recurring */}
-              <path
-                d="M 50 80 Q 180 55, 300 45 T 550 25 L 550 120 L 50 120 Z"
-                fill="rgba(194, 65, 12, 0.08)"
-              />
-              {/* Line 1 Recurring */}
-              <path
-                d="M 50 80 Q 180 55, 300 45 T 550 25"
-                fill="none"
-                stroke="#c2410c"
-                strokeWidth="3"
-              />
-
-              {/* Line 2 One-Time */}
-              <path
-                d="M 50 100 Q 180 90, 300 70 T 550 85"
-                fill="none"
-                stroke="#fe932c"
-                strokeWidth="2.5"
-                strokeDasharray="4 2"
-              />
-
-              {/* Points & Labels */}
-              <circle cx="50" cy="80" r="4" fill="#c2410c" />
-              <circle cx="210" cy="55" r="4" fill="#c2410c" />
-              <circle cx="370" cy="40" r="5" fill="#c2410c" stroke="#fff" strokeWidth="2" />
-              <circle cx="550" cy="25" r="4" fill="#c2410c" />
-
-              <circle cx="370" cy="72" r="4" fill="#fe932c" />
-            </svg>
-
-            {/* Simulated Tooltip on Feb W2 */}
-            <div className="absolute left-[30%] top-2 bg-[#1e1b19] text-white p-2 rounded-xl text-[11px] shadow-lg pointer-events-none">
-              <div className="font-bold text-[#ffdcc3]">Feb Week 2</div>
-              <div>Recurring: KSh 36,200</div>
-              <div>One-Time: KSh 14,100</div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-[#59413a] pt-3 border-t border-[#f4ece8] font-mono">
-            <span>Week 1 (Feb 1–7)</span>
-            <span className="font-bold text-[#9b2f00]">Week 2 (Feb 8–14)</span>
-            <span>Week 3 (Feb 15–21)</span>
-            <span>Week 4 (Feb 22–28)</span>
-          </div>
-        </div>
-
-        {/* Campaign Drive Card (4 Cols) */}
-        <div className="lg:col-span-4 bg-white p-5 rounded-2xl shadow-sm border border-[#EAE1D7] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="px-2.5 py-0.5 rounded-full bg-[#ffdcc3] text-[#2f1500] text-xs font-bold">
-                Active Campaign
-              </span>
-              <span className="font-mono text-xs text-[#59413a]">11 Days Left</span>
-            </div>
-            <h3 className="font-headline text-base font-bold text-[#1e1b19]">
-              January Stewardship Drive
-            </h3>
-            <p className="text-xs text-[#59413a] mt-1 leading-relaxed">
-              Targeted member pledges for sanctuary audio upgrades and pastoral residency stipends.
-            </p>
-
-            <div className="mt-4 p-3.5 bg-[#faf2ee] rounded-xl space-y-2 border border-[#EAE1D7]">
-              <div className="flex justify-between text-xs">
-                <span className="text-[#59413a]">Pledged Raised:</span>
-                <span className="font-bold text-[#1e1b19]">KSh 140,400</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-[#59413a]">Goal:</span>
-                <span className="font-semibold text-[#59413a]">KSh 180,000</span>
-              </div>
-              <div className="w-full bg-[#EAE1D7] h-2.5 rounded-full overflow-hidden">
-                <div className="bg-[#c2410c] h-full rounded-full" style={{ width: '78%' }}></div>
-              </div>
-              <div className="flex justify-between text-[11px] font-mono text-[#9b2f00] font-bold">
-                <span>78% Achieved</span>
-                <span>KSh 39,600 Needed</span>
-              </div>
-            </div>
-          </div>
-
-          <button className="w-full h-9 mt-4 rounded-xl bg-[#faf2ee] hover:bg-[#f4ece8] text-[#9b2f00] text-xs font-bold border border-[#EAE1D7] transition-colors flex items-center justify-center gap-1.5">
-            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">campaign</span>
-            <span>View Campaign Roster</span>
-          </button>
-        </div>
+      {/* Both breakdowns come from the ledger's own grouping, not from the rows on this page. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ShareBars
+          title={`Tithes by payment method · ${periodLabel}`}
+          rows={methods.map((row) => ({
+            label: methodLabel(row.method),
+            amount: row.amount,
+            count: row.count,
+            share: methodTotal > 0 ? (row.amount / methodTotal) * 100 : 0,
+          }))}
+        />
+        <ShareBars
+          title={`Tithes by designation · ${periodLabel}`}
+          rows={designations.map((row) => ({
+            label: row.category,
+            amount: row.amount,
+            count: row.count,
+            share: tithes && tithes.total > 0 ? (row.amount / tithes.total) * 100 : 0,
+          }))}
+        />
       </div>
 
-      {/* End of Year Statements Banner */}
-      <div className="p-4 rounded-2xl bg-[#faf2ee] border border-[#EAE1D7] flex flex-col md:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#007d57] text-white flex items-center justify-center shrink-0">
-            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">receipt_long</span>
-          </div>
-          <div>
-            <h4 className="font-headline text-xs font-bold text-[#1e1b19]">
-              End-of-Year Tax Contribution Statements
-            </h4>
-            <p className="text-xs text-[#59413a]">
-              Automated compilation of KRA-compliant giving statements for all tithers with active email or postal records.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button className="h-8 px-3 rounded-lg bg-white border border-[#EAE1D7] text-xs font-semibold text-[#1e1b19] hover:bg-[#f4ece8]">
-            View Templates
-          </button>
-          <button className="h-8 px-3.5 rounded-lg bg-[#904d00] hover:bg-[#6e3900] text-white text-xs font-bold shadow-xs">
-            Generate 2025 Statements
-          </button>
-        </div>
-      </div>
-
-      {/* Tithe Transaction Journal Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden flex flex-col">
-        {/* Table Toolbar */}
-        <div className="p-4 border-b border-[#EAE1D7] flex flex-col md:flex-row items-center justify-between gap-3 bg-[#faf2ee]/40">
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
+        <div className="p-4 border-b border-[#EAE1D7] flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-[#faf2ee]/40">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
               <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2.5 text-[#8d7168] text-[18px]">search</span>
-              <input aria-label="Search donor or envelope"
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search donor or envelope..."
-                className="w-full h-9 pl-9 pr-3 rounded-xl bg-white border border-[#EAE1D7] text-xs text-[#1e1b19] placeholder:text-[#8d7168] focus:outline-none"
+              <input
+                aria-label="Search tithes"
+                value={q}
+                onChange={(event) => onFilter(setQ)(event.target.value)}
+                placeholder="Transaction, giver, envelope or reference"
+                className={`${fieldClass} pl-9 w-64`}
               />
             </div>
-            <select aria-label="Payment type filter"
-              value={paymentFilter}
-              onChange={(e) => setPaymentFilter(e.target.value)}
-              className="h-9 px-3 rounded-xl bg-white border border-[#EAE1D7] text-xs font-medium text-[#1e1b19] outline-none"
+
+            <select
+              aria-label="Payment method"
+              value={method}
+              onChange={(event) => onFilter(setMethod)(event.target.value as PaymentMethod | '')}
+              className={`${fieldClass} w-40 cursor-pointer`}
             >
-              <option>All Payment Methods</option>
-              <option>Bank Standing Order</option>
-              <option>Debit / Credit Card</option>
-              <option>Cheque</option>
-              <option>Cash Offering</option>
+              <option value="">Any method</option>
+              {PAYMENT_METHODS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Giver on the register"
+              value={memberId}
+              onChange={(event) => onFilter(setMemberId)(event.target.value)}
+              className={`${fieldClass} w-48 cursor-pointer`}
+            >
+              <option value="">Any giver</option>
+              {memberOptions.members.map((member) => (
+                <option key={member.id} value={member.id}>{memberRefName(member)}</option>
+              ))}
+            </select>
+
+            <input
+              aria-label="Designation"
+              list="tithe-designations"
+              value={category}
+              onChange={(event) => onFilter(setCategory)(event.target.value)}
+              placeholder="Designation"
+              className={`${fieldClass} w-40`}
+            />
+            <input
+              aria-label="Minimum amount"
+              type="number"
+              min="0"
+              value={minAmount}
+              onChange={(event) => onFilter(setMinAmount)(event.target.value)}
+              placeholder="Min KSh"
+              className={`${fieldClass} w-24`}
+            />
+            <input
+              aria-label="Maximum amount"
+              type="number"
+              min="0"
+              value={maxAmount}
+              onChange={(event) => onFilter(setMaxAmount)(event.target.value)}
+              placeholder="Max KSh"
+              className={`${fieldClass} w-24`}
+            />
+
+            <select
+              aria-label="Order"
+              value={sort}
+              onChange={(event) => onFilter(setSort)(event.target.value as typeof sort)}
+              className={`${fieldClass} w-36 cursor-pointer`}
+            >
+              <option value="recent">Most recent</option>
+              <option value="oldest">Oldest first</option>
+              <option value="amount">Largest gift</option>
             </select>
           </div>
 
-          <div className="flex items-center gap-2 self-end md:self-auto">
+          <div className="flex items-center gap-2 self-end xl:self-auto">
+            {filtered && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQ('');
+                  setMethod('');
+                  setCategory('');
+                  setMemberId('');
+                  setMinAmount('');
+                  setMaxAmount('');
+                  setPage(1);
+                }}
+                className="h-9 px-3 rounded-xl text-xs font-semibold text-[#59413a] hover:text-[#9b2f00] cursor-pointer"
+              >
+                Clear filters
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => exportCsv('destiny-sanctuary-tithes', LEDGER_COLUMNS, tithes)}
+              onClick={() => exportCsv('praxis-tithes', LEDGER_COLUMNS, ledger.items)}
               className="h-9 px-3 rounded-xl bg-white border border-[#EAE1D7] text-xs font-semibold text-[#1e1b19] hover:bg-[#f4ece8] flex items-center gap-1.5 cursor-pointer"
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">file_download</span>
-              <span>Export CSV</span>
+              <span>Export this page</span>
             </button>
-            {/* Recording a gift is the ledger's `edit` right, as it is in ECCLESIA. */}
+            <button
+              type="button"
+              onClick={() => void handleExportAll()}
+              disabled={exporting}
+              className="h-9 px-3 rounded-xl bg-white border border-[#EAE1D7] text-xs font-semibold text-[#1e1b19] hover:bg-[#f4ece8] disabled:opacity-60 flex items-center gap-1.5 cursor-pointer"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">download</span>
+              <span>{exporting ? 'Preparing…' : 'Export all (filtered)'}</span>
+            </button>
             {canEdit('giving') && (
               <button
-                onClick={() => setIsOfflineModalOpen(true)}
+                type="button"
+                onClick={() => {
+                  setFailure(null);
+                  setNotice(null);
+                  setIsRecordOpen(true);
+                }}
                 className="h-9 px-3.5 rounded-xl bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_card</span>
-                <span>Record Offline Tithe</span>
+                <span>Record Tithe</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Data Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-[#faf2ee] text-[#59413a] font-semibold uppercase tracking-wider border-b border-[#EAE1D7]">
-                <th className="py-3 px-4">Transaction Code</th>
-                <th className="py-3 px-4">Donor & Envelope</th>
-                <th className="py-3 px-4">Payment Method</th>
-                <th className="py-3 px-4">Designation</th>
-                <th className="py-3 px-4 text-right">Amount</th>
-                <th className="py-3 px-4">Timestamp</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Receipt</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#EAE1D7] text-[#1e1b19]">
-              {filteredTx.map((tx) => (
-                <tr key={tx.id} className="hover:bg-[#faf2ee]/50 transition-colors">
-                  <td className="py-3.5 px-4 font-mono font-semibold text-[#9b2f00]">
-                    {tx.txCode}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-[#1e1b19]">{tx.donor}</span>
-                      <span className="font-mono text-[10px] text-[#59413a]">{tx.envelopeNo}</span>
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <div className="inline-flex items-center gap-1.5 text-[#59413a]">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[#9b2f00]">{tx.methodIcon}</span>
-                      <span>{tx.method}</span>
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 text-[#59413a]">
-                    {tx.category}
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">
-                    KSh {tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="py-3.5 px-4 text-[#59413a] font-mono text-[11px]">
-                    {tx.date}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#85f8c4]/30 text-[#005137] text-[11px] font-bold">
-                      {tx.status}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button className="p-1 rounded text-[#59413a] hover:text-[#9b2f00] hover:bg-[#f4ece8] transition-colors" title="Download Receipt PDF">
-                        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">download</span>
-                      </button>
-                      {/* Voiding is the `delete` right: staff may record a gift, only an
-                          administrator may take one off the ledger. */}
-                      {canDelete('giving') && (
+        {ledger.loading && ledger.items.length === 0 ? (
+          <LoadingBlock label="Reading the tithe ledger…" />
+        ) : ledger.error ? (
+          <div className="p-4">
+            <ErrorBlock message={ledger.error} onRetry={() => void ledger.refetch()} />
+          </div>
+        ) : ledger.items.length === 0 ? (
+          <EmptyBlock
+            icon="volunteer_activism"
+            title={filtered ? 'No tithes match these filters' : `No tithes in ${periodLabel.toLowerCase()}`}
+            hint={
+              filtered
+                ? 'Widen the window or clear a filter to see more.'
+                : 'Record a gift and it appears here, in the totals above, and in the Finance Audit ledger.'
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-[#faf2ee] text-[#59413a] font-semibold uppercase tracking-wider border-b border-[#EAE1D7]">
+                  <th className="py-3 px-4">Transaction</th>
+                  <th className="py-3 px-4">Giver</th>
+                  <th className="py-3 px-4">Method</th>
+                  <th className="py-3 px-4">Designation</th>
+                  <th className="py-3 px-4 text-right">Amount</th>
+                  <th className="py-3 px-4">Received</th>
+                  <th className="py-3 px-4">Recorded by</th>
+                  <th className="py-3 px-4 text-right">Receipt</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#EAE1D7] text-[#1e1b19]">
+                {ledger.items.map((row) => (
+                  <tr key={row.id} className="hover:bg-[#faf2ee]/50 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-semibold text-[#9b2f00]">{row.txCode}</td>
+                    <td className="py-3.5 px-4">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-[#1e1b19]">{row.donorName}</span>
+                        <span className="text-[10px] text-[#59413a]">
+                          {[memberRefName(row.member) || 'Not on the register', row.envelopeNo].filter(Boolean).join(' · ')}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-[#59413a]">{methodLabel(row.method)}</td>
+                    <td className="py-3.5 px-4 text-[#59413a]">{row.category}</td>
+                    <td className="py-3.5 px-4 text-right font-headline font-bold text-sm text-[#1e1b19]">{formatKes(row.amount)}</td>
+                    <td className="py-3.5 px-4 text-[#59413a] font-mono text-[11px]">
+                      {new Date(row.receivedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="py-3.5 px-4 text-[#59413a]">{row.recordedBy?.name ?? '—'}</td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
-                          onClick={() => voidTithe(tx.id)}
-                          aria-label={`Void ${tx.txCode}`}
-                          title="Void this transaction"
-                          className="p-1 rounded text-[#59413a] hover:text-[#ba1a1a] hover:bg-[#f4ece8] transition-colors cursor-pointer"
+                          onClick={() => void printTithe(row)}
+                          aria-label={`Receipt for ${row.txCode}`}
+                          title="Print the giver's receipt"
+                          className="p-1 rounded text-[#59413a] hover:text-[#9b2f00] hover:bg-[#f4ece8] transition-colors cursor-pointer"
                         >
-                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete</span>
+                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">receipt_long</span>
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredTx.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-10 px-4 text-center text-[#59413a]">
-                    No tithes match this view yet — log one with “Record Offline Tithe”.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                        {canDelete('giving') && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNotice(null);
+                              setVoidRow(row);
+                            }}
+                            aria-label={`Void ${row.txCode}`}
+                            title="Void and record a correction"
+                            className="p-1 rounded text-[#59413a] hover:text-[#ba1a1a] hover:bg-[#f4ece8] transition-colors cursor-pointer"
+                          >
+                            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">block</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <LedgerPager
+          page={ledger.meta?.page ?? page}
+          pages={ledger.meta?.pages ?? 1}
+          total={ledger.meta?.total ?? ledger.total}
+          pageSize={pageSize}
+          noun="tithes"
+          onPage={setPage}
+          onPageSize={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       </div>
 
-      {/* Offline Tithe Modal */}
-      {isOfflineModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...offlineModalOpenDialog}>
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-[#EAE1D7] pb-3">
-              <h3 className="font-headline text-base font-bold text-[#1e1b19]">Record Offline Envelope / Cheque</h3>
-              <button onClick={() => setIsOfflineModalOpen(false)} className="text-[#59413a] hover:text-[#1e1b19]" aria-label="Close">
+      <datalist id="tithe-designations">
+        {designations.map((row) => (
+          <option key={row.category} value={row.category} />
+        ))}
+      </datalist>
+
+      {isRecordOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4" {...recordDialog}>
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-start justify-between border-b border-[#EAE1D7] pb-3 gap-3">
+              <div>
+                <h3 className="font-headline text-base font-bold text-[#1e1b19]">Record a Tithe</h3>
+                <p className="text-xs text-[#59413a] mt-0.5">
+                  A transaction code is issued from the year's series; nothing here can overwrite an earlier gift.
+                </p>
+              </div>
+              <button type="button" onClick={() => setIsRecordOpen(false)} className="text-[#59413a] hover:text-[#1e1b19] cursor-pointer" aria-label="Close">
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
-            <div className="space-y-3 text-xs">
+
+            <form onSubmit={handleRecord} className="space-y-3 text-xs">
               <div>
-                <label htmlFor="offline-donor" className="block font-semibold mb-1">Donor Name / Member ID</label>
-                <input
-                  id="offline-donor"
-                  aria-label="Donor Name / Member ID"
-                  type="text"
-                  value={donor}
-                  onChange={(e) => setDonor(e.target.value)}
-                  placeholder="e.g. Arthur Wanjala (#ENV-012)"
-                  className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"
-                />
-                <span className="block mt-1 text-[10px] text-[#59413a]">
-                  A name on the members roll picks up that member's envelope number.
-                </span>
+                <label htmlFor="tithe-member" className="block font-semibold mb-1">Member on the register</label>
+                <select
+                  id="tithe-member"
+                  value={form.memberId}
+                  onChange={(event) => {
+                    const member = memberOptions.members.find((row) => row.id === event.target.value);
+                    setForm((prev) => ({
+                      ...prev,
+                      memberId: event.target.value,
+                      // Picking a member files the gift against them and fills in what the register already
+                      // knows, so the clerk does not retype a name the church can spell reliably.
+                      donorName: member ? memberRefName(member) : prev.donorName,
+                      envelopeNo: member?.envelopeNumber ?? prev.envelopeNo,
+                    }));
+                  }}
+                  className={`${fieldClass} cursor-pointer`}
+                >
+                  <option value="">Not a member — a visitor or an unnamed gift</option>
+                  {memberOptions.members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {memberRefName(member)}
+                      {member.envelopeNumber ? ` · ${member.envelopeNumber}` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="offline-amount" className="block font-semibold mb-1">Amount (KSh)</label>
+                  <label htmlFor="tithe-donor" className="block font-semibold mb-1">Giver *</label>
                   <input
-                    id="offline-amount"
-                    aria-label="Amount (KSh)"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="500.00"
-                    className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"
+                    id="tithe-donor"
+                    required
+                    minLength={2}
+                    value={form.donorName}
+                    onChange={(event) => setForm((prev) => ({ ...prev, donorName: event.target.value }))}
+                    placeholder="e.g. Arthur Wanjala"
+                    className={fieldClass}
                   />
                 </div>
                 <div>
-                  <label htmlFor="offline-payment-type" className="block font-semibold mb-1">Payment Type</label>
-                  <select
-                    id="offline-payment-type"
-                    aria-label="Payment Type"
-                    value={method}
-                    onChange={(e) => setMethod(e.target.value)}
-                    className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"
-                  >
-                    <option>Cheque</option>
-                    <option>Cash Envelope</option>
-                    <option>Bank Transfer</option>
-                  </select>
+                  <label htmlFor="tithe-envelope" className="block font-semibold mb-1">Envelope</label>
+                  <input
+                    id="tithe-envelope"
+                    value={form.envelopeNo}
+                    onChange={(event) => setForm((prev) => ({ ...prev, envelopeNo: event.target.value }))}
+                    placeholder="e.g. ENV-1042"
+                    className={fieldClass}
+                  />
                 </div>
               </div>
-              <div>
-                <label htmlFor="offline-reference" className="block font-semibold mb-1">Cheque / Reference #</label>
-                <input
-                  id="offline-reference"
-                  aria-label="Cheque / Reference #"
-                  type="text"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder="e.g. Cheque #4082"
-                  className="w-full h-9 px-3 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]"
-                />
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label htmlFor="tithe-amount" className="block font-semibold mb-1">Amount (KSh) *</label>
+                  <input
+                    id="tithe-amount"
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    required
+                    value={form.amount}
+                    onChange={(event) => setForm((prev) => ({ ...prev, amount: event.target.value }))}
+                    placeholder="500.00"
+                    className={fieldClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="tithe-method" className="block font-semibold mb-1">Method</label>
+                  <select
+                    id="tithe-method"
+                    value={form.method}
+                    onChange={(event) => setForm((prev) => ({ ...prev, method: event.target.value as PaymentMethod }))}
+                    className={`${fieldClass} cursor-pointer`}
+                  >
+                    {PAYMENT_METHODS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="tithe-date" className="block font-semibold mb-1">Received</label>
+                  <input
+                    id="tithe-date"
+                    type="date"
+                    value={form.receivedAt}
+                    onChange={(event) => setForm((prev) => ({ ...prev, receivedAt: event.target.value }))}
+                    className={fieldClass}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EAE1D7]">
-              <button onClick={() => setIsOfflineModalOpen(false)} className="px-3.5 py-1.5 text-xs text-[#59413a] cursor-pointer">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleLogTithe}
-                disabled={!canLogTithe}
-                className="px-4 py-2 bg-[#c2410c] hover:bg-[#9b2f00] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
-              >
-                Log Tithe
-              </button>
-            </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="tithe-category" className="block font-semibold mb-1">Designation</label>
+                  <input
+                    id="tithe-category"
+                    list="tithe-designations"
+                    value={form.category}
+                    onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
+                    className={fieldClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="tithe-reference" className="block font-semibold mb-1">Reference</label>
+                  <input
+                    id="tithe-reference"
+                    value={form.reference}
+                    onChange={(event) => setForm((prev) => ({ ...prev, reference: event.target.value }))}
+                    placeholder="M-PESA code, cheque number"
+                    className={fieldClass}
+                  />
+                </div>
+              </div>
+
+              {failure && (
+                <div role="alert" className="rounded-xl border border-[#ffdad6] bg-[#ffdad6]/40 px-3 py-2 text-[11px] font-semibold text-[#ba1a1a]">
+                  {failure}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EAE1D7]">
+                <button type="button" onClick={() => setIsRecordOpen(false)} className="px-3.5 py-1.5 text-xs text-[#59413a] cursor-pointer">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={recordTithe.pending}
+                  className="px-4 py-2 bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold rounded-xl shadow-xs disabled:opacity-70 cursor-pointer"
+                >
+                  {recordTithe.pending ? 'Recording…' : 'Record Tithe'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
+
+      <VoidFinanceDialog
+        entity="tithe"
+        record={voidRow ? { id: voidRow.id, label: `${voidRow.txCode} · ${voidRow.donorName}`, amount: voidRow.amount } : null}
+        onClose={() => setVoidRow(null)}
+        onVoided={() => {
+          const voided = voidRow;
+          void ledger.refetch();
+          onChanged();
+          if (voided) startCorrection(voided);
+        }}
+      />
     </div>
   );
 };

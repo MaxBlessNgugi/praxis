@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { prisma } from '../lib/prisma';
+import { prisma, type Db } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { page } from '../lib/respond';
 import { findLive, live } from '../lib/live';
@@ -36,6 +36,41 @@ export async function listRoster(query: ListRosterQuery) {
   return { data, meta: page(total, query) };
 }
 
+/**
+ * One person, one role, one service.
+ *
+ * The roster is a list of people with something to do, and the same person in the same role twice is
+ * how a volunteer ends up printed twice and counted as two. It has two callers because the rule holds
+ * wherever a duty changes hands — rostering somebody, and approving a swap onto them.
+ *
+ * The database already carries a unique key over the same three columns, so this is not the only thing
+ * standing in the way: but a key cannot see `Welcome & Ushering Lead` and `welcome & ushering lead` as
+ * one role, and its refusal names columns rather than people.
+ */
+async function assertRoleFree(
+  client: Db,
+  slot: { serviceId: string; serviceTitle: string },
+  member: { id: string; firstName: string; lastName: string },
+  roleTitle: string,
+): Promise<void> {
+  const taken = await client.rosterDuty.findFirst({
+    where: {
+      ...live,
+      serviceId: slot.serviceId,
+      memberId: member.id,
+      roleTitle: { equals: roleTitle, mode: 'insensitive' },
+    },
+    select: { id: true },
+  });
+  if (taken) {
+    throw new AppError(
+      409,
+      `${member.firstName} ${member.lastName} is already rostered as ${roleTitle} for ${slot.serviceTitle}`,
+      'duty_exists',
+    );
+  }
+}
+
 export async function createDuty(serviceId: string, input: CreateDutyInput, actorId: string) {
   const [service, member] = await Promise.all([
     prisma.service.findFirst({ where: { id: serviceId, ...live } }),
@@ -43,6 +78,8 @@ export async function createDuty(serviceId: string, input: CreateDutyInput, acto
   ]);
   if (!service) throw new AppError(404, 'That service does not exist', 'not_found');
   if (!member) throw new AppError(400, 'That volunteer is not on the register', 'unknown_member');
+
+  await assertRoleFree(prisma, { serviceId, serviceTitle: service.title }, member, input.roleTitle);
 
   return prisma.$transaction(async (tx) => {
     const duty = await tx.rosterDuty.create({ data: { ...input, serviceId }, include: dutyInclude });
@@ -157,13 +194,34 @@ export async function decideSwap(id: string, decision: 'approved' | 'declined', 
   if (!request) throw new AppError(404, 'That swap request does not exist', 'not_found');
   if (request.status !== 'requested') throw new AppError(409, `This request was already ${request.status}`, 'already_decided');
 
+  // Whoever the cover is going to has to be free to take it, and the answer has to be given before the
+  // duty moves rather than by a constraint halfway through — an administrator approving a swap is
+  // choosing a person for a role, and a refusal that names them is something they can act on.
+  const replacement = request.replacementId
+    ? await findLive(prisma.member, request.replacementId, 'That replacement is not on the register')
+    : null;
+  const service = replacement
+    ? await findLive(prisma.service, request.duty.serviceId, 'That service does not exist')
+    : null;
+
   return prisma.$transaction(async (tx) => {
     const decided = await tx.swapRequest.update({
       where: { id },
       data: { status: decision, decidedById: actorId, decidedAt: new Date(), ...(note ? { reason: note } : {}) },
     });
 
+    // Only approving moves anything. Declining a request whose cover has since taken another duty in
+    // that role must still go through — refusing the decision as well would leave the request stuck
+    // open with no way to close it.
     if (decision === 'approved') {
+      if (replacement && service) {
+        await assertRoleFree(
+          tx,
+          { serviceId: service.id, serviceTitle: service.title },
+          replacement,
+          request.duty.roleTitle,
+        );
+      }
       await tx.rosterDuty.update({
         where: { id: request.dutyId },
         data: request.replacementId

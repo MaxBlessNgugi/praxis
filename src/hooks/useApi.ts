@@ -14,10 +14,13 @@ import {
   eventsApi,
   financeApi,
   governanceApi,
+  inventoryApi,
+  groupsApi,
   ministriesApi,
   offeringsApi,
   prayerApi,
   projectsApi,
+  certificatesApi,
   reportsApi,
   rosterApi,
   servicesApi,
@@ -28,6 +31,7 @@ import {
   welfareApi,
   type AdminUserDto,
   type AnnouncementDto,
+  type AnnouncementPriority,
   type AttendanceDto,
   type PlanDto,
   type SubscriptionDto,
@@ -37,36 +41,50 @@ import {
   type AuditLogDto,
   type BroadcastDto,
   type CelebrationDto,
+  type CountedEnvelope,
   type CelebrationsMeta,
   type CharityActivityDto,
   type ContributionDto,
-  type DocumentKind,
   type DutyDto,
   type EventDto,
+  type EventKind,
   type FinanceAuditEntryDto,
   type FinanceAuditAction,
+  type GivingFilter,
   type GovernanceDocumentDto,
+  type InventoryItemDto,
+  type InventoryKind,
+  type InventoryReportDto,
+  type MaintenanceRecordDto,
+  type InventoryStatus,
+  type IssueDto,
   type ListEnvelope,
   type MemberRefWithPhone,
   type MeetingDto,
-  type MeetingKind,
-  type MeetingStatus,
+  type GroupDto,
   type MinistryDto,
   type MinistryMemberDto,
   type OfferingDto,
   type OrganizationProfileDto,
   type PageMeta,
+  type MemberReportDto,
   type PrayerRequestDto,
   type ProjectDto,
+  type PurchaseDto,
   type ReportOverviewDto,
   type ResolutionDto,
-  type ResolutionStage,
   type RoleDto,
   type ServiceDto,
   type SettingKey,
   type SoftDeletedRecordDto,
+  type StockMovementDto,
+  type StockMovementKind,
+  type StockTakeDto,
+  type StockTakeStatus,
+  type SupplierDto,
   type SwapDto,
   type TitheDto,
+  type TransferDto,
   type WelfareCaseDto,
   type WelfareCategory,
   type WelfareStatus,
@@ -130,9 +148,11 @@ export function useResource<T>(fetcher: () => Promise<T>, deps: unknown[] = []):
   return { data, loading, error, refetch, setData };
 }
 
-export interface ListResource<T> {
+export interface ListResource<T, E extends ListEnvelope<T> = ListEnvelope<T>> {
   items: T[];
   meta: PageMeta | null;
+  /** The untouched envelope, for the endpoints that send their own totals beside `data` and `meta`. */
+  envelope: E | null;
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -144,10 +164,10 @@ export interface ListResource<T> {
  * A list endpoint. The envelope is unwrapped here so a panel reads `items` and `meta` rather than
  * reaching through `data.data` at every render.
  */
-function useList<T>(
-  fetcher: () => Promise<ListEnvelope<T>>,
+function useList<T, E extends ListEnvelope<T> = ListEnvelope<T>>(
+  fetcher: () => Promise<E>,
   deps: unknown[],
-): ListResource<T> {
+): ListResource<T, E> {
   const resource = useResource(fetcher, deps);
   const items = resource.data?.data ?? [];
   const meta = resource.data?.meta ?? null;
@@ -157,13 +177,13 @@ function useList<T>(
       resource.setData((prev) => {
         const current = prev?.data ?? [];
         const next = typeof update === 'function' ? (update as (prev: T[]) => T[])(current) : update;
-        return { data: next, meta: prev?.meta ?? { page: 1, pageSize: next.length, total: next.length, pages: 1 } };
+        return { ...(prev as E), data: next, meta: prev?.meta ?? { page: 1, pageSize: next.length, total: next.length, pages: 1 } };
       });
     },
     [resource],
   );
 
-  return { items, meta, loading: resource.loading, error: resource.error, refetch: resource.refetch, setItems };
+  return { items, meta, envelope: resource.data, loading: resource.loading, error: resource.error, refetch: resource.refetch, setItems };
 }
 
 export interface Mutation<Args extends unknown[], R> {
@@ -258,28 +278,54 @@ export function useMemberOptions() {
 }
 
 // ==================== FINANCES ====================
-export function useTithes(params?: { q?: string; method?: TitheDto['method']; sort?: 'amount' | 'recent' | 'oldest' }) {
-  const resource = useResource(() => tithesApi.list(params), [params?.q, params?.method, params?.sort]);
+/**
+ * A giving ledger — tithes or offerings — as the API has it: one page of the filtered rows plus the
+ * authoritative total for that filter. The total is the server's arithmetic, not a sum of the rows on
+ * screen, so paging through a year of gifts never changes the figure at the top.
+ */
+function useGivingLedger<T>(
+  fetcher: () => Promise<ListEnvelope<T> & { totals: { amount: number } }>,
+  deps: unknown[],
+): ListResource<T, ListEnvelope<T> & { totals: { amount: number } }> & { total: number } {
+  const list = useList<T, ListEnvelope<T> & { totals: { amount: number } }>(fetcher, deps);
+  return { ...list, total: list.envelope?.totals.amount ?? 0 };
+}
+
+/**
+ * The filter is serialised rather than listed field by field in the dependency array: every caller
+ * builds it inline, so depending on the object itself would refetch on every render. */
+const filterKey = (params?: unknown) => JSON.stringify(params ?? {});
+
+export function useTithes(params?: GivingFilter) {
+  return useGivingLedger<TitheDto>(() => tithesApi.list(params), [filterKey(params)]);
+}
+
+export function useOfferings(params?: GivingFilter) {
+  return useGivingLedger<OfferingDto>(() => offeringsApi.list(params), [filterKey(params)]);
+}
+
+/**
+ * The giving totals for one window — the band above the ledgers, the tab badges, and the printed
+ * treasury summary. Dates in, money out: every figure here is the server's.
+ */
+export function useFinanceSummary(params?: { from?: string; to?: string }) {
+  const resource = useResource(() => financeApi.summary(params), [params?.from, params?.to]);
   return {
-    items: resource.data?.data ?? [],
-    total: resource.data?.totals.amount ?? 0,
+    summary: resource.data?.data ?? null,
     loading: resource.loading,
     error: resource.error,
     refetch: resource.refetch,
-    setItems: (update: TitheDto[] | ((prev: TitheDto[]) => TitheDto[])) =>
-      resource.setData((prev) => {
-        const current = prev?.data ?? [];
-        const next = typeof update === 'function' ? update(current) : update;
-        return { data: next, meta: prev?.meta ?? { page: 1, pageSize: next.length, total: next.length, pages: 1 }, totals: prev?.totals ?? { amount: 0 } };
-      }),
   };
 }
 
-export function useOfferings(params?: { q?: string; method?: OfferingDto['method'] }) {
-  const resource = useResource(() => offeringsApi.list(params), [params?.q, params?.method]);
+/** The certificate register, newest first — what the church has officially issued. */
+export function useCertificates(params?: { kind?: 'baptism' | 'dedication'; q?: string }) {
+  const resource = useResource(
+    () => certificatesApi.list({ ...params, pageSize: 50 }),
+    [params?.kind, params?.q],
+  );
   return {
-    items: resource.data?.data ?? [],
-    total: resource.data?.totals.amount ?? 0,
+    certificates: resource.data?.data ?? [],
     loading: resource.loading,
     error: resource.error,
     refetch: resource.refetch,
@@ -302,15 +348,19 @@ export function useProjectContributions(projectId: string | null) {
 }
 
 // ==================== COMMUNICATIONS ====================
-export function useAnnouncements(params?: { audience?: string; live?: boolean }) {
+export function useAnnouncements(params?: { audience?: string; priority?: AnnouncementPriority; live?: boolean; pageSize?: number }) {
   return useList<AnnouncementDto>(
     () => announcementsApi.list(params),
-    [params?.audience, params?.live],
+    [params?.audience, params?.priority, params?.live, params?.pageSize],
   );
 }
 
-export function useBroadcasts(params?: { channel?: BroadcastDto['channel']; status?: BroadcastDto['status'] }) {
-  return useList<BroadcastDto>(() => broadcastsApi.list(params), [params?.channel, params?.status]);
+export function useBroadcasts(params?: {
+  channel?: BroadcastDto['channel'];
+  status?: BroadcastDto['status'];
+  pageSize?: number;
+}) {
+  return useList<BroadcastDto>(() => broadcastsApi.list(params), [params?.channel, params?.status, params?.pageSize]);
 }
 
 /** Whether each channel can actually send, read by the screen before it offers a "Send" button. */
@@ -319,12 +369,12 @@ export function useChannels() {
   return { channels: resource.data?.data ?? null, loading: resource.loading, error: resource.error, refetch: resource.refetch };
 }
 
-export function useEvents(params?: { kind?: EventDto['kind']; upcoming?: boolean }) {
-  return useList<EventDto>(() => eventsApi.list(params), [params?.kind, params?.upcoming]);
+export function useEvents(params?: { kind?: EventKind; pageSize?: number }) {
+  return useList<EventDto>(() => eventsApi.list(params), [params?.kind, params?.pageSize]);
 }
 
-export function usePrayerRequests(params?: { status?: PrayerRequestDto['status'] }) {
-  return useList<PrayerRequestDto>(() => prayerApi.list(params), [params?.status]);
+export function usePrayerRequests(params?: { status?: PrayerRequestDto['status']; pageSize?: number }) {
+  return useList<PrayerRequestDto>(() => prayerApi.list(params), [params?.status, params?.pageSize]);
 }
 
 export function useCelebrations(params?: { days?: number; kind?: 'all' | 'birthday' | 'anniversary' }) {
@@ -381,6 +431,19 @@ export function useMinistries(params?: { q?: string; isActive?: boolean }) {
   return useList<MinistryDto>(() => ministriesApi.list(params), [params?.q, params?.isActive]);
 }
 
+/** The fellowships that meet midweek — the Groups & Fellowships screen's rows. */
+export function useGroups(params?: { q?: string; isActive?: boolean }) {
+  return useList<GroupDto>(() => groupsApi.list(params), [params?.q, params?.isActive]);
+}
+
+/**
+ * One circle's own record: its roll and its recent gatherings, which the list endpoint deliberately
+ * does not carry. Null while no circle is open, so a closed panel costs no request.
+ */
+export function useGroupDetail(groupId: string | null) {
+  return useResource(() => (groupId ? groupsApi.get(groupId) : Promise.resolve(null)), [groupId]);
+}
+
 /** Both Leadership Roles and Volunteer Roles: the same roll, read with and without `leadershipOnly`. */
 export function useMinistryRoster(params?: { q?: string; ministryId?: string; leadershipOnly?: boolean }) {
   const resource = useResource(() => ministriesApi.roster(params), [params?.q, params?.ministryId, params?.leadershipOnly]);
@@ -394,41 +457,55 @@ export function useMinistryRoster(params?: { q?: string; ministryId?: string; le
 }
 
 // ==================== GOVERNANCE ====================
-export function useMeetings(params?: { q?: string; kind?: MeetingKind; status?: MeetingStatus }) {
-  return useList<MeetingDto>(() => governanceApi.listMeetings(params), [params?.q, params?.kind, params?.status]);
+/**
+ * One sitting as the docket sees it: the meeting plus the resolutions tabled at it.
+ *
+ * The list rows carry enough for a register; this is the read that answers "what did this sitting
+ * decide", so the detail panel does not have to filter a second list against a meeting id.
+ */
+export function useMeeting(id: string | null) {
+  const resource = useResource(() => (id ? governanceApi.getMeeting(id) : Promise.resolve(null)), [id]);
+  return { meeting: resource.data?.data ?? null, loading: resource.loading, error: resource.error, refetch: resource.refetch };
 }
 
-export function useResolutions(params?: { q?: string; stage?: ResolutionStage }) {
-  const resource = useResource(() => governanceApi.listResolutions(params), [params?.q, params?.stage]);
-  return {
-    items: resource.data?.data ?? ([] as ResolutionDto[]),
-    /** How many sit at each stage — the tracker's own header counts. */
-    counts: resource.data?.counts ?? ({} as Record<string, number>),
-    loading: resource.loading,
-    error: resource.error,
-    refetch: resource.refetch,
-  };
+export function useMeetings(params?: Parameters<typeof governanceApi.listMeetings>[0]) {
+  return useList<MeetingDto>(() => governanceApi.listMeetings(params), [filterKey(params)]);
 }
 
-export function useGovernanceDocuments(params?: { q?: string; kind?: DocumentKind; isActive?: boolean }) {
-  const resource = useResource(() => governanceApi.listDocuments(params), [params?.q, params?.kind, params?.isActive]);
-  return {
-    items: resource.data?.data ?? ([] as GovernanceDocumentDto[]),
-    counts: resource.data?.counts ?? ({} as Record<string, number>),
-    loading: resource.loading,
-    error: resource.error,
-    refetch: resource.refetch,
-  };
+export function useResolutions(params?: Parameters<typeof governanceApi.listResolutions>[0]) {
+  const resource = useList<ResolutionDto, CountedEnvelope<ResolutionDto>>(
+    () => governanceApi.listResolutions(params),
+    [filterKey(params)],
+  );
+  /** How many sit at each stage — the docket's own counts, not the page's. */
+  return { ...resource, counts: resource.envelope?.counts ?? ({} as Record<string, number>) };
+}
+
+export function useGovernanceDocuments(params?: Parameters<typeof governanceApi.listDocuments>[0]) {
+  const resource = useList<GovernanceDocumentDto, CountedEnvelope<GovernanceDocumentDto>>(
+    () => governanceApi.listDocuments(params),
+    [filterKey(params)],
+  );
+  return { ...resource, counts: resource.envelope?.counts ?? ({} as Record<string, number>) };
 }
 
 // ==================== REPORTS ====================
 /** The home screen's cards plus its activity feed, in one request. */
-export function useReportOverview(params?: { from?: string; to?: string }) {
-  return useResource(() => reportsApi.overview(params), [params?.from, params?.to]);
+/**
+ * The home screen's cards and activity feed, in the one request the dashboard is built around.
+ */
+export function useOverviewReport(): Resource<ReportOverviewDto> {
+  return useResource(() => reportsApi.overview().then((r) => r.data), []);
 }
 
-export function useMemberReport() {
-  return useResource(() => reportsApi.members(), []);
+/**
+ * The register's own counts, for the census cards above the Members screens.
+ *
+ * Those cards report the whole roll, so they cannot read the page of rows underneath them: that
+ * list is filtered by the search box and paged, and a filtered page is not a census.
+ */
+export function useMemberReport(): Resource<MemberReportDto> {
+  return useResource(() => reportsApi.members().then((r) => r.data), []);
 }
 
 export function useGivingReport(params?: { from?: string; to?: string }) {
@@ -445,6 +522,45 @@ export function useMinistryReport() {
 
 export function useGovernanceReport(params?: { from?: string; to?: string }) {
   return useResource(() => reportsApi.governance(params), [params?.from, params?.to]);
+}
+
+// ==================== INVENTORY ====================
+export function useSuppliers(params?: { q?: string }) {
+  return useList<SupplierDto>(() => inventoryApi.suppliers(params), [params?.q]);
+}
+
+export function useInventoryItems(params?: { q?: string; category?: string; kind?: InventoryKind; status?: InventoryStatus; lowStock?: boolean; page?: number; pageSize?: number }) {
+  return useList<InventoryItemDto>(() => inventoryApi.items({ ...params, lowStock: params?.lowStock ? 'true' : undefined }), [params?.q, params?.category, params?.kind, params?.status, params?.lowStock, params?.page, params?.pageSize]);
+}
+
+export function useStockMovements(params?: { itemId?: string; kind?: StockMovementKind; page?: number; pageSize?: number }) {
+  return useList<StockMovementDto>(() => inventoryApi.movements(params), [params?.itemId, params?.kind, params?.page, params?.pageSize]);
+}
+
+export function useStockTakes(params?: { status?: StockTakeStatus; page?: number; pageSize?: number }) {
+  return useList<StockTakeDto>(() => inventoryApi.stockTakes(params), [params?.status, params?.page, params?.pageSize]);
+}
+
+export function useInventoryPurchases(params?: { page?: number; pageSize?: number }) {
+  return useList<PurchaseDto>(() => inventoryApi.purchases(params), [params?.page, params?.pageSize]);
+}
+
+export function useInventoryIssues(params?: { page?: number; pageSize?: number }) {
+  return useList<IssueDto>(() => inventoryApi.issues(params), [params?.page, params?.pageSize]);
+}
+
+export function useInventoryTransfers(params?: { page?: number; pageSize?: number }) {
+  return useList<TransferDto>(() => inventoryApi.transfers(params), [params?.page, params?.pageSize]);
+}
+
+export function useMaintenance(params?: { itemId?: string; due?: 'true'; page?: number; pageSize?: number }) {
+  return useList<MaintenanceRecordDto>(() => inventoryApi.maintenance(params), [params?.itemId, params?.due, params?.page, params?.pageSize]);
+}
+
+export function useInventoryReport() {
+  const resource = useResource(() => reportsApi.inventory(), []);
+  const report: InventoryReportDto | null = resource.data?.data ?? null;
+  return { report, loading: resource.loading, error: resource.error, refetch: resource.refetch };
 }
 
 // ==================== SETTINGS ====================
@@ -508,11 +624,25 @@ export function useTrash(params?: { entityName?: string; q?: string; includeRest
   };
 }
 
-export function useAuditLog(params?: { q?: string; action?: AuditLogDto['action']; entityName?: string }) {
-  const resource = useResource(() => adminApi.listAudit(params), [params?.q, params?.action, params?.entityName]);
+export function useAuditLog(params?: {
+  q?: string;
+  action?: AuditLogDto['action'];
+  entityName?: string;
+  actorId?: string;
+  from?: string;
+  to?: string;
+}) {
+  const resource = useResource(() => adminApi.listAudit(params), [
+    params?.q,
+    params?.action,
+    params?.entityName,
+    params?.actorId,
+    params?.from,
+    params?.to,
+  ]);
   return {
     items: resource.data?.data ?? ([] as AuditLogDto[]),
-    totals: resource.data?.totals ?? { byAction: {}, byEntity: {} },
+    totals: resource.data?.totals ?? { byAction: {}, byEntity: {}, byActor: {} },
     loading: resource.loading,
     error: resource.error,
     refetch: resource.refetch,

@@ -16,14 +16,27 @@ export const liturgyItemKindSchema = z.enum([
 
 export const dutyStatusSchema = z.enum(['scheduled', 'confirmed', 'completed', 'missed', 'replaced', 'cancelled']);
 
+export const serviceKindSchema = z.enum(['worship', 'midweek', 'prayer', 'special', 'other']);
+
+/**
+ * The time of day, in the shapes a clerk types: `8:00 AM`, `08:00`, `6.30pm`.
+ *
+ * It is stored as the string they wrote rather than as a time column, because the bulletin prints
+ * what the church says — "8:00 AM", not "08:00:00" — and because the date is already on `heldAt`.
+ * What is checked here is only that it *is* a time, so a field nobody can parse cannot reach a
+ * bulletin, a roster or a reminder.
+ */
+const TIME_OF_DAY = /^\d{1,2}[:.]\d{2}\s*(am|pm)?$/i;
+
 // ---------------------------------------------------------------------------------------------
 // Services
 // ---------------------------------------------------------------------------------------------
 
 export const createServiceSchema = z.object({
   title: z.string().trim().min(2, 'Name the service').max(160),
+  kind: serviceKindSchema.default('worship'),
   heldAt: z.coerce.date(),
-  startTime: z.string().trim().max(20).optional(),
+  startTime: z.string().trim().regex(TIME_OF_DAY, 'Write the time as 8:00 AM').optional(),
   venue: z.string().trim().min(2, 'Say where it is held').max(160),
   theme: z.string().trim().max(200).optional(),
   officiantId: z.string().uuid().optional(),
@@ -37,6 +50,7 @@ export const updateServiceSchema = createServiceSchema
 
 export const listServicesQuerySchema = z.object({
   ...window,
+  kind: serviceKindSchema.optional(),
   venue: z.string().trim().max(160).optional(),
   isTemplate: booleanQuery.optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -171,6 +185,7 @@ export const upsertServiceReportSchema = z.object({
   highlights: z.string().trim().max(2000).optional(),
 });
 
+export type ServiceKind = z.infer<typeof serviceKindSchema>;
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;
 export type UpdateServiceInput = z.infer<typeof updateServiceSchema>;
 export type RetireServiceInput = z.infer<typeof retireServiceSchema>;

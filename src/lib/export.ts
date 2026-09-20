@@ -23,6 +23,16 @@ function download(filename: string, blob: Blob): void {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Save a file the server built — a CSV export, mostly — under a name the caller decides.
+ *
+ * Server exports arrive as Blobs through the same bearer-token client as everything else, so the
+ * console's whole job is to name the download and offer it.
+ */
+export function downloadBlob(filename: string, blob: Blob): void {
+  download(filename, blob);
+}
+
 /** RFC 4180: quote anything holding a comma, quote or newline, and double the quotes. */
 function csvEscape(value: string | number | null | undefined): string {
   const s = value == null ? '' : String(value);

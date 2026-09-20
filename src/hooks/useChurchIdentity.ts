@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react';
 import { useOrgProfile } from './useApi';
 import { filesApi } from '../lib/api';
 import { blobToDataUrl, type ChurchHeader } from '../lib/documents';
-import { CHURCH, DEFAULT_LOCATION } from '../data/churchDomain';
 
 /**
  * The church's identity, ready to print.
  *
- * Three facts, from the one place they live, with sensible fallbacks for an installation that has not
- * filled its profile in yet — a certificate that printed with a blank congregation name would be
- * worse than one that printed the baked-in default from `churchDomain`.
+ * Three facts, from the one place they live — the organisation profile. Until that profile is saved
+ * the fields are blank rather than guessed: a certificate printed before the church has filled in
+ * its own name should stop and be filled in, not print somebody else's.
  *
  * The logo is fetched and converted to a **data URL** rather than left as an object URL. A printed
  * document is written into a hidden frame and handed to the browser's print dialog; anything it has
@@ -59,9 +58,9 @@ export function useChurchIdentity(): ChurchIdentity {
 
   return {
     church: {
-      name: record?.name || CHURCH.name,
-      tagline: record?.tagline ?? CHURCH.tagline,
-      location: record?.location || DEFAULT_LOCATION,
+      name: record?.name ?? '',
+      tagline: record?.tagline ?? null,
+      location: record?.location ?? '',
       logoSrc,
     },
     loading: profile.loading || logoPending,

@@ -30,8 +30,27 @@ authRouter.post(
   asyncHandler(authController.signup),
 );
 
+// The reset pair, public for the same reason `/login` is — the whole point is that the caller cannot
+// sign in. Both are keyed on the client address, like `/login`, because the address is what an
+// attacker hammers; the token itself is single-use, expiring and stored only as a hash.
+authRouter.post(
+  '/password-reset/request',
+  rateLimit({ name: 'password-reset', windowMs: env.RATE_LIMIT_WINDOW_MS, max: env.AUTH_RATE_LIMIT_MAX }),
+  asyncHandler(authController.requestPasswordReset),
+);
+// Milder than the request: this endpoint cannot be used to mail anybody, it only checks a token that
+// was emailed already. Ten a minute is still far under a guess at a 256-bit value.
+authRouter.post(
+  '/password-reset/confirm',
+  rateLimit({ name: 'password-reset-confirm', windowMs: env.RATE_LIMIT_WINDOW_MS, max: env.AUTH_RATE_LIMIT_MAX }),
+  asyncHandler(authController.confirmPasswordReset),
+);
+
 authRouter.post('/logout', requireAuth, asyncHandler(authController.logout));
 authRouter.get('/me', requireAuth, asyncHandler(authController.me));
+// The account renaming itself. A PATCH on the same path the session reads, so "my profile" is one
+// idea in two verbs rather than a second endpoint to keep in step.
+authRouter.patch('/me', requireAuth, asyncHandler(authController.updateOwnProfile));
 
 // The church a session acts for is a claim in the token, so changing it is a token exchange rather
 // than a setting. The service refuses any church the account does not actually serve.
@@ -39,7 +58,8 @@ authRouter.post('/switch-organization', requireAuth, asyncHandler(authController
 
 // Changing your own password. Behind the auth gate, and behind the tight ceiling as well: each call
 // runs a bcrypt comparison, so this is the one authenticated endpoint where a client could burn real
-// CPU in a loop. Ten a minute is far more than anybody changing a password needs.
+// CPU in a loop. Ten a minute is far more than anybody changing a password needs. It answers with a
+// fresh token — see the controller for why.
 authRouter.post(
   '/password',
   requireAuth,

@@ -63,7 +63,17 @@ export const AuditLogPanel: React.FC = () => {
   const [query, setQuery] = useState('');
   const [action, setAction] = useState<AuditLogDto['action'] | ''>('');
   const [entityName, setEntityName] = useState('');
-  const log = useAuditLog({ q: query || undefined, action: action || undefined, entityName: entityName || undefined });
+  const [actorId, setActorId] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const log = useAuditLog({
+    q: query || undefined,
+    action: action || undefined,
+    entityName: entityName || undefined,
+    actorId: actorId || undefined,
+    from: from || undefined,
+    to: to || undefined,
+  });
 
   const [selected, setSelected] = useState<AuditLogDto | null>(null);
   const [history, setHistory] = useState<AuditLogDto[] | null>(null);
@@ -138,6 +148,38 @@ export const AuditLogPanel: React.FC = () => {
                 </option>
               ))}
             </select>
+            <label className="sr-only" htmlFor="audit-actor">Filter by actor</label>
+            <select
+              id="audit-actor"
+              value={actorId}
+              onChange={(event) => setActorId(event.target.value)}
+              className="rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] px-2.5 py-2 text-xs font-semibold text-[#1C1917] cursor-pointer"
+            >
+              <option value="">Everyone</option>
+              {log.totals.byActor
+                ? Object.entries(log.totals.byActor).map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))
+                : null}
+            </select>
+            <label className="sr-only" htmlFor="audit-from">From date</label>
+            <input
+              id="audit-from"
+              type="date"
+              value={from}
+              onChange={(event) => setFrom(event.target.value)}
+              className="rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] px-2.5 py-2 text-xs text-[#1C1917] focus:border-[#C2410C] focus:outline-none focus:ring-4 focus:ring-[#C2410C]/15"
+            />
+            <label className="sr-only" htmlFor="audit-to">To date</label>
+            <input
+              id="audit-to"
+              type="date"
+              value={to}
+              onChange={(event) => setTo(event.target.value)}
+              className="rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] px-2.5 py-2 text-xs text-[#1C1917] focus:border-[#C2410C] focus:outline-none focus:ring-4 focus:ring-[#C2410C]/15"
+            />
           </div>
         </div>
 

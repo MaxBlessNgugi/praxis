@@ -30,7 +30,7 @@ function check(label: string, ok: boolean, detail = ''): void {
 
 interface Answer {
   status: number;
-  body: any;
+  body: unknown;
 }
 
 async function call(method: string, path: string, token?: string, body?: unknown): Promise<Answer> {
@@ -43,13 +43,25 @@ async function call(method: string, path: string, token?: string, body?: unknown
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const text = await response.text();
-  let parsed: any = null;
+  let parsed: unknown = null;
   try {
     parsed = text ? JSON.parse(text) : null;
   } catch {
     parsed = text;
   }
   return { status: response.status, body: parsed };
+}
+
+/** The payload of a `{ data: … }` answer, read as the shape the check above it expects. */
+function data<T>(answer: Answer): T | undefined {
+  const body = answer.body as { data?: T } | null;
+  return body?.data;
+}
+
+/** The sentence a refusal carries, for a failure message. */
+function errorOf(answer: Answer): string {
+  const body = answer.body as { error?: string } | null;
+  return body?.error ?? `HTTP ${answer.status}`;
 }
 
 /** Remove every trace of the probe church: its rows first, then the church itself. */
@@ -76,9 +88,9 @@ async function main(): Promise<void> {
     password: PLATFORM_PASSWORD,
   });
   check('a platform administrator signs in', signIn.status === 200, `status ${signIn.status}`);
-  const token = signIn.body?.data?.token as string | undefined;
-  const houseId = signIn.body?.data?.organization?.id as string | undefined;
-  check('and is reported as platform staff', signIn.body?.data?.user?.isPlatformAdmin === true);
+  const token = data<{ token: string }>(signIn)?.token;
+  const houseId = data<{ organization?: { id: string } }>(signIn)?.organization?.id;
+  check('and is reported as platform staff', data<{ user?: { isPlatformAdmin?: boolean } }>(signIn)?.user?.isPlatformAdmin === true);
   if (!token || !houseId) {
     console.log(results.join('\n'));
     process.exitCode = 1;
@@ -94,10 +106,10 @@ async function main(): Promise<void> {
     phone: '+254 700 000 000',
     country: 'Kenya',
   });
-  const probeId = signup.body?.data?.organization?.id as string | undefined;
-  const probeToken = signup.body?.data?.token as string | undefined;
+  const probeId = data<{ organization?: { id: string } }>(signup)?.organization?.id;
+  const probeToken = data<{ token: string }>(signup)?.token;
   if (!probeId || !probeToken) {
-    check('a throwaway church can sign itself up', false, `status ${signup.status}: ${signup.body?.error ?? ''}`);
+    check('a throwaway church can sign itself up', false, `status ${signup.status}: ${errorOf(signup)}`);
     console.log(results.join('\n'));
     process.exitCode = 1;
     return;
@@ -107,17 +119,17 @@ async function main(): Promise<void> {
   try {
     console.log('\n1. The churches on the platform');
     const list = await call('GET', '/api/vendor/organizations', token);
-    check('the vendor list answers', list.status === 200 && Array.isArray(list.body?.data), `status ${list.status}`);
+    check('the vendor list answers', list.status === 200 && Array.isArray(data<unknown[]>(list)), `status ${list.status}`);
     check(
       'and includes the church that just signed up',
-      list.body?.data?.some((row: any) => row.id === probeId),
+      data<Array<{ id: string }>>(list)?.some((row) => row.id === probeId) === true,
     );
 
     const stats = await call('GET', `/api/vendor/organizations/${probeId}/stats`, token);
     check(
       'an operator can read a church’s usage',
-      stats.status === 200 && stats.body?.data?.members === 0,
-      `status ${stats.status}, members ${stats.body?.data?.members}`,
+      stats.status === 200 && data<{ members: number }>(stats)?.members === 0,
+      `status ${stats.status}, members ${data<{ members: number }>(stats)?.members}`,
     );
 
     console.log('\n2. Suspension is reversible, explained, and cannot trap the operator');
@@ -127,7 +139,7 @@ async function main(): Promise<void> {
     });
     check(
       'switching off your own church is refused, with the reason',
-      ownChurch.status === 409 && String(ownChurch.body?.error).includes('your own account'),
+      ownChurch.status === 409 && errorOf(ownChurch).includes('your own account'),
       `status ${ownChurch.status}`,
     );
 
@@ -135,7 +147,7 @@ async function main(): Promise<void> {
       suspended: true,
       reason: 'Vendor smoke: checking the switch.',
     });
-    check('a church can be switched off', suspended.status === 200 && suspended.body?.data?.isActive === false);
+    check('a church can be switched off', suspended.status === 200 && data<{ isActive: boolean }>(suspended)?.isActive === false);
 
     const again = await call('POST', `/api/vendor/organizations/${probeId}/suspension`, token, {
       suspended: true,
@@ -152,15 +164,15 @@ async function main(): Promise<void> {
     });
     check(
       'a suspended church cannot sign in, and is told it is suspended',
-      refused.status === 403 && String(refused.body?.error).includes('suspended'),
-      `${refused.status}: ${refused.body?.error}`,
+      refused.status === 403 && errorOf(refused).includes('suspended'),
+      `${refused.status}: ${errorOf(refused)}`,
     );
 
     const restored = await call('POST', `/api/vendor/organizations/${probeId}/suspension`, token, {
       suspended: false,
       reason: 'Vendor smoke: switching back on.',
     });
-    check('switching it back on works', restored.status === 200 && restored.body?.data?.isActive === true);
+    check('switching it back on works', restored.status === 200 && data<{ isActive: boolean }>(restored)?.isActive === true);
 
     const backIn = await call('POST', '/api/auth/login', undefined, {
       email: `admin-${stamp}@vendor-smoke.test`,
@@ -172,7 +184,7 @@ async function main(): Promise<void> {
     const session = await call('POST', `/api/vendor/organizations/${probeId}/support-sessions`, token, {
       reason: 'Vendor smoke: confirming a visit is scoped and audited.',
     });
-    const supportToken = session.body?.data?.token as string | undefined;
+    const supportToken = data<{ token: string }>(session)?.token;
     check('a support session opens', session.status === 200 && Boolean(supportToken), `status ${session.status}`);
     if (!supportToken) throw new Error('no support token to test with');
 
@@ -185,21 +197,21 @@ async function main(): Promise<void> {
     const me = await call('GET', '/api/auth/me', supportToken);
     check(
       'and /me answers for the visited church, not the operator’s own',
-      me.status === 200 && me.body?.data?.organization?.id === probeId,
-      `${me.body?.data?.organization?.name}`,
+      me.status === 200 && data<{ organization?: { id: string; name?: string } }>(me)?.organization?.id === probeId,
+      `${data<{ organization?: { name?: string } }>(me)?.organization?.name}`,
     );
 
     const history = await call('GET', '/api/admin/audit?pageSize=5', probeToken);
     check(
       'the church’s own audit log names the visit',
-      history.status === 200 && JSON.stringify(history.body?.data ?? []).includes('support session'),
+      history.status === 200 && JSON.stringify(data<unknown[]>(history) ?? []).includes('support session'),
       `status ${history.status}`,
     );
 
     const ended = await call('POST', '/api/vendor/support-sessions/end', supportToken, {
       reason: 'Vendor smoke finished.',
     });
-    check('the visit closes from inside', ended.status === 200 && ended.body?.data?.ended === true, `status ${ended.status}`);
+    check('the visit closes from inside', ended.status === 200 && data<{ ended: boolean }>(ended)?.ended === true, `status ${ended.status}`);
 
     const replayed = await call('GET', '/api/vendor/organizations', supportToken);
     check('and cannot be replayed for vendor actions', replayed.status === 403, `status ${replayed.status}`);
@@ -210,17 +222,17 @@ async function main(): Promise<void> {
       body: 'Vendor smoke notice sheet.',
       audience: 'Members & Baptized Believers',
     });
-    check('a broadcast can be composed', notice.status === 201, `status ${notice.status}: ${notice.body?.error ?? ''}`);
+    check('a broadcast can be composed', notice.status === 201, `status ${notice.status}: ${errorOf(notice)}`);
 
-    const sent = await call('POST', `/api/communications/broadcasts/${notice.body?.data?.id}/send`, probeToken, {
+    const sent = await call('POST', `/api/communications/broadcasts/${data<{ id: string }>(notice)?.id}/send`, probeToken, {
       recipients: 12,
     });
     check(
       'a notice sheet keeps the office’s own count',
-      sent.status === 200 && sent.body?.data?.recipients === 12,
-      `status ${sent.status}, recipients ${sent.body?.data?.recipients}`,
+      sent.status === 200 && data<{ recipients: number }>(sent)?.recipients === 12,
+      `status ${sent.status}, recipients ${data<{ recipients: number }>(sent)?.recipients}`,
     );
-    check('and stores a delivery report beside the campaign', Boolean(sent.body?.data?.lastReport));
+    check('and stores a delivery report beside the campaign', Boolean(data<{ lastReport?: unknown }>(sent)?.lastReport));
 
     const draft = await call('POST', '/api/communications/broadcasts', probeToken, {
       channel: 'email',
@@ -228,18 +240,20 @@ async function main(): Promise<void> {
       body: 'Vendor smoke email — refused while no provider is configured.',
       audience: 'Members & Baptized Believers',
     });
-    const emailSend = await call('POST', `/api/communications/broadcasts/${draft.body?.data?.id}/send`, probeToken, {});
+    const emailSend = await call('POST', `/api/communications/broadcasts/${data<{ id: string }>(draft)?.id}/send`, probeToken, {});
     check(
       'an email send with no provider is refused, naming the setting',
-      emailSend.status === 503 && String(emailSend.body?.error).includes('EMAIL_DRIVER'),
-      `${emailSend.status}: ${emailSend.body?.error}`,
+      emailSend.status === 503 && errorOf(emailSend).includes('EMAIL_DRIVER'),
+      `${emailSend.status}: ${errorOf(emailSend)}`,
     );
 
     const channels = await call('GET', '/api/communications/channels', probeToken);
     check(
       'the console can read what each gateway will do',
-      channels.status === 200 && 'email' in (channels.body?.data ?? {}) && 'sms' in (channels.body?.data ?? {}),
-      JSON.stringify(channels.body?.data),
+      channels.status === 200 &&
+        'email' in (data<Record<string, unknown>>(channels) ?? {}) &&
+        'sms' in (data<Record<string, unknown>>(channels) ?? {}),
+      JSON.stringify(data<Record<string, unknown>>(channels)),
     );
   } finally {
     await removeProbeChurch(probeId, houseId);

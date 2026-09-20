@@ -36,12 +36,15 @@ must allow the console's origin (`CORS_ORIGIN`). Everything else is secrets.
    cp .env.example .env            # paste the two Neon URLs and a real JWT_SECRET
    npm install
    npm run migrate:deploy          # applies prisma/migrations/ to Neon
-   npm run seed                    # Destiny Sanctuary's register, ledgers and sittings
+   NODE_ENV=production ALLOW_DEMO_SEED=true SEED_ADMIN_PASSWORD='<a real one>' npm run seed
    ```
 
    `npm run seed` creates the two sign-in accounts, `bishop@destinysanctuary.co.ke` and
-   `alice@destinysanctuary.co.ke`, both with the password `praxis-demo-2025`. **Change both before
-   anyone outside the church gets the URL.**
+   `alice@destinysanctuary.co.ke`. With `NODE_ENV=production` it **refuses to run at all** unless
+   `ALLOW_DEMO_SEED=true` is set on that command, because the password it writes by default is printed
+   in the README; `SEED_ADMIN_PASSWORD` is how a real installation is given a real one from the start.
+   Either way, press your name → **Security** in the console once you are in and set your own password:
+   that ends every other session, including the one the seed would have opened.
 
 > Why two URLs: Neon's pooled endpoint is a PgBouncer in transaction mode, which cannot run the DDL
 > a migration emits. The app reads through the pool; migrations go direct. `prisma/schema.prisma`
@@ -64,14 +67,16 @@ must allow the console's origin (`CORS_ORIGIN`). Everything else is secrets.
    | `JWT_SECRET` | a long random string (see below) |
    | `NODE_ENV` | `production` |
    | `CORS_ORIGIN` | the console's URL from step 3 below |
+   | `EMAIL_DRIVER` | `resend`, with `RESEND_API_KEY` and a verified `EMAIL_FROM` |
 
    Generate a secret with:
    ```bash
    node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
    ```
 
-   `PORT` is provided by Railway — do not set it. The service refuses to start in production while
-   `JWT_SECRET` is still the placeholder, which is the point.
+   `PORT` is provided by Railway — do not set it. Two production misconfigurations stop the service
+   before it serves anything: a `JWT_SECRET` still set to the placeholder, and `EMAIL_DRIVER=console`,
+   which would make a forgotten-password link undeliverable on a Sunday evening. That is the point.
 4. Add a **public domain** (Settings → Networking) and note it, e.g.
    `https://praxis-api-production.up.railway.app`. Confirm it:
    ```bash
@@ -104,7 +109,33 @@ that have not been applied, and does nothing once the database is current.
 1. `curl https://<your-api-domain>/health` returns `200`.
 2. Open the console, sign in as `bishop@destinysanctuary.co.ke`.
 3. Home shows live counts, Members → **Find Christian** lists the seeded register, and **Add New
-   Christian** writes a row you can see after a reload. That is the whole Phase 1 loop.
+   Christian** writes a row you can see after a reload.
+4. Sign out, then use *Forgot your password?* on the gate and confirm the mail arrives. If it does not,
+   `EMAIL_DRIVER` is still `console` — but the service would have refused to boot in that state, so a
+   missing mail means the provider rejected it rather than that nothing was attempted.
+
+---
+
+## Releasing, in order
+
+The routine for every deploy that touches a live church:
+
+1. **Back up.** `npm run backup` (or `node tools/backup-db.mjs --out /somewhere/safe`) from the
+   repository root, against the production `DIRECT_URL`. Do not skip this — it is the rollback.
+2. **Deploy.** Push the release (Railway redeploys on the branch; `fly deploy` elsewhere).
+3. **Migrate.** The release command and the Docker entrypoint both run `prisma migrate deploy`
+   before the server starts. If a migration fails, the container does not boot and the old version
+   keeps serving — that is the safe direction for it to fail in.
+4. **Health check.** `curl https://<your-api-domain>/health` until it answers `200`.
+5. **Smoke test.** Sign in on the console; Home totals render; record a tithe on a test member and
+   confirm it appears in the giving ledger, then void it with a reason.
+6. **Monitor.** Watch the first hour of logs (`railway logs` / the host's equivalent) for 5xx lines.
+
+**Rolling back** means redeploying the previous release — Railway keeps every deployment, and one
+click reinstates it. The database is *not* rolled back: migrations that have already applied stay
+applied, which is why step 1 exists. If a migration itself caused the damage, restore the dump from
+step 1 into a new database per [`backups.md`](backups.md), point the API at it, and accept the loss
+of everything after the dump.
 
 ---
 
@@ -124,6 +155,8 @@ Three variables the container needs that a local run does not: `NODE_ENV=product
 database URLs, and `TRUST_PROXY_HOPS` set to the number of proxies in front of it (`1` for a single
 load balancer). That last one is not optional behind a proxy: the client address decides every
 rate-limit bucket, and an unset hop count means every request looks like it came from the balancer.
+For a Kenyan church also set `DISPLAY_TIMEZONE=Africa/Nairobi` — it is the zone every CSV ledger and
+printed register names its dates in, so exported days match the office wall calendar.
 
 The image carries the Prisma CLI, because the boot command is a migration. That is deliberate — see
 the note at the top of the Dockerfile — and it is why `--omit=dev` is *not* used. The container

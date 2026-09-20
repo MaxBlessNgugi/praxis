@@ -4,8 +4,10 @@ import { live, findLive } from '../lib/live';
 import { getObjectBytes, putObject } from '../lib/storage';
 import { declaredTypeMatches } from '../lib/fileType';
 import { page } from '../lib/respond';
+import { retireRecord } from '../lib/archive';
 import { AppError } from '../middleware/errorHandler';
 import { allowedTypesFor, type ListFilesQuery, type UploadFileInput } from '../schemas/file.schema';
+import type { RetireReason } from '../schemas/common';
 
 /**
  * Files: the church's logo, a member's photograph, a scanned minute.
@@ -138,9 +140,16 @@ export async function listFiles(query: ListFilesQuery) {
  * Retire a file.
  *
  * Soft, like every other record here, and the row keeps its bytes: a profile that still points at a
- * retired file is a broken image rather than a lost one, and restoring is the reverse of one column.
+ * retired file is a broken image rather than a lost one. The retirement goes through the same archive
+ * as every other entity — a `SoftDeletedRecord` with the reason, the actor and a restore deadline, and
+ * an audit line — so a deleted logo sits in the Trash beside a deleted member and comes back the same
+ * way, rather than vanishing into a column flip nothing could undo.
  */
-export async function retireFile(fileId: string) {
-  await findLive(prisma.storedFile, fileId, 'That file does not exist', { select: { id: true } });
-  return prisma.storedFile.update({ where: { id: fileId }, data: { deletedAt: new Date() }, select: metaSelect });
+export function retireFile(fileId: string, input: RetireReason, actorId: string) {
+  return retireRecord('StoredFile', fileId, {
+    ...input,
+    actorId,
+    missing: 'That file does not exist',
+    label: (row) => String(row.fileName),
+  });
 }

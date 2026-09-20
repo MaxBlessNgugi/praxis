@@ -57,6 +57,11 @@ export async function assignPlan(req: Request, res: Response): Promise<void> {
   ok(res, await billingService.assignPlan(organizationId(req), assignPlanSchema.parse(req.body), actor(req).id));
 }
 
+/** The money this church has paid, newest first. */
+export async function listPayments(req: Request, res: Response): Promise<void> {
+  ok(res, await billingService.paymentsForOrganization(organizationId(req)));
+}
+
 export async function recordPayment(req: Request, res: Response): Promise<void> {
   created(res, await billingService.recordPayment(organizationId(req), recordPaymentSchema.parse(req.body), actor(req).id));
 }

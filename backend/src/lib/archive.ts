@@ -36,6 +36,11 @@ export const ARCHIVE_TABLES = {
   ProjectContribution: 'projectContribution',
   WelfareDisbursement: 'welfareDisbursement',
   CharityActivity: 'charityActivity',
+  Certificate: 'certificate',
+  Supplier: 'supplier',
+  InventoryItem: 'inventoryItem',
+  Group: 'group',
+  StoredFile: 'storedFile',
 } as const;
 
 export type ArchivedEntityName = keyof typeof ARCHIVE_TABLES;
@@ -49,6 +54,9 @@ export const FINANCE_ENTITY_NAMES: ArchivedEntityName[] = [
   'WelfareDisbursement',
   'CharityActivity',
 ];
+
+/** Why a record was retired: `reason` is the category the Trash counts and filters on. */
+export type ArchiveReason = (typeof ARCHIVE_REASONS)[number];
 
 /**
  * Why a record was retired: `reason` is the category the Trash counts and filters on, `reasonLabel`
@@ -73,8 +81,6 @@ export const ARCHIVE_REASONS = [
   'other',
 ] as const;
 
-type ArchiveReason = (typeof ARCHIVE_REASONS)[number];
-
 /** Prisma types each delegate separately and this module treats them alike. */
 interface ArchiveDelegate {
   findFirst(args: { where: { id: string } & typeof live }): Promise<Record<string, unknown> | null>;
@@ -92,6 +98,9 @@ const delegateFor = (client: Db, table: string): ArchiveDelegate =>
 const ALSO_ON_RESTORE: Partial<Record<ArchivedEntityName, Record<string, unknown>>> = {
   User: { isActive: true },
   Member: { status: 'active' },
+  // Retirement marked the line disposed; bringing the line back without clearing that would put a
+  // record on a live register that every screen reads as gone.
+  InventoryItem: { status: 'active' },
 };
 
 export interface RetireOptions {

@@ -66,6 +66,21 @@ async function nextEnvelopeNumber(): Promise<string> {
   return (await nextEnvelopeNumbers(1))[0] as string;
 }
 
+/**
+ * The congregations this church's own live register actually names — the pickers on the member and
+ * household forms read these rather than any baked-in list, so a church that signs up never sees
+ * another church's campus names in its forms.
+ */
+export async function listLocations(): Promise<string[]> {
+  const rows = await prisma.member.findMany({
+    where: live,
+    distinct: ['location'],
+    select: { location: true },
+    orderBy: { location: 'asc' },
+  });
+  return rows.map((row) => row.location);
+}
+
 export async function listMembers(query: ListMembersQuery) {
   // Words, not a phrase. See the search note below for why this is split here rather than inline.
   const tokens = query.q ? query.q.split(/\s+/).filter(Boolean) : [];

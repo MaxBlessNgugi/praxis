@@ -16,7 +16,7 @@ export type ParishNavTab =
 
 export type MembersSubTab = 'add-new-christian' | 'find-christian' | 'delete-christian' | 'family-unit';
 
-export type MinistriesSubTab = 'ministries-departmental' | 'ministries-leadership' | 'ministries-volunteers';
+export type MinistriesSubTab = 'ministries-departmental' | 'ministries-leadership' | 'ministries-volunteers' | 'ministries-groups';
 
 export type FinancesSubTab = 'tithes' | 'offerings' | 'project-funding' | 'welfare' | 'charity';
 
@@ -31,89 +31,6 @@ export type ServicesSubTab = 'service-planner' | 'attendance' | 'volunteer-roste
 export type CommunicationsSubTab = 'announcements' | 'broadcasts' | 'events-calendar' | 'prayer-requests' | 'birthdays-anniversaries';
 
 export type SettingsSubTab = 'org-profile' | 'subscription' | 'notifications' | 'integrations' | 'data-backup' | 'customization';
-
-// ==================== COMMUNICATIONS TYPES ====================
-
-export type AnnouncementAudience = 'everyone' | 'members-only' | 'ministry-leaders' | 'youth-roll' | 'church-council';
-
-export interface AnnouncementItem {
-  id: string;
-  title: string;
-  content: string;
-  audience: AnnouncementAudience;
-  audienceLabel: string;
-  isPinned: boolean;
-  priority: 'normal' | 'high' | 'urgent';
-  publishDate: string;
-  expiryDate: string;
-  author: string;
-  category: 'worship' | 'ministry' | 'stewardship' | 'community' | 'pastoral' | 'governance';
-  status: 'active' | 'scheduled' | 'expired' | 'draft';
-}
-
-export interface ChurchEventItem {
-  id: string;
-  title: string;
-  category: 'worship' | 'fellowship' | 'youth' | 'outreach' | 'governance' | 'training';
-  /** `YYYY-MM-DD`, in the same local calendar the event was scheduled in. */
-  date: string;
-  /** Last day of a multi-day conference; the card renders the published range from the two. */
-  endDate?: string;
-  startTime: string;
-  endTime: string;
-  location: string;
-  description: string;
-  colorTag: string;
-}
-
-export type PrayerPrivacyLevel = 'public' | 'leaders-only' | 'pastoral-private';
-
-export interface PrayerRequestItem {
-  id: string;
-  title?: string;
-  requestedBy?: string;
-  requesterName?: string;
-  isAnonymous: boolean;
-  category: 'healing' | 'family' | 'guidance' | 'provision' | 'bereavement' | 'praise' | 'salvation';
-  details: string;
-  privacyLevel: PrayerPrivacyLevel;
-  submittedDate?: string;
-  dateSubmitted?: string;
-  status: 'active' | 'answered' | 'active-chain';
-  prayerCount?: number;
-  intercessorCount?: number;
-  isAnswered?: boolean;
-  praiseReport?: string;
-  answerNote?: string;
-  answerDate?: string;
-}
-
-export interface CelebrationItem {
-  id: string;
-  memberId: string;
-  memberName: string;
-  type: 'birthday' | 'anniversary';
-  date: string; // e.g. "Oct 14"
-  fullDate: string;
-  milestoneYears?: number; // e.g. 50 (50th Birthday), 25 (25th Anniversary)
-  householdName: string;
-  phone: string;
-  email: string;
-  avatarInitials: string;
-  status: 'upcoming-this-week' | 'this-month' | 'upcoming-quarter';
-}
-
-export interface BirthdayAnniversaryItem {
-  id: string;
-  type: 'birthday' | 'anniversary';
-  memberName: string;
-  householdName: string;
-  date: string;
-  yearsCount?: number;
-  phone: string;
-  email: string;
-  greetingSent: boolean;
-}
 
 // ==================== SETTINGS TYPES ====================
 
@@ -219,35 +136,68 @@ export interface MembershipTierConfig {
 
 export type MembershipTier = 'member' | 'active-member' | 'first-timer' | 'youth' | 'visitor';
 
-export type BaptismType = 'baptized' | 'dedicated' | 'awaiting' | 'transfer';
+/** How a member stands on the register, in the register's own words. */
+export type MemberStatus = 'active' | 'transferred' | 'deceased' | 'inactive';
 
+/** What has been recorded for a member: believer's baptism, a child dedication, or neither yet. */
+export type BaptismType = 'baptized' | 'dedicated' | 'none';
+
+/**
+ * A member as a screen renders one.
+ *
+ * This is the view model, and it is deliberately the API's vocabulary rather than the mockup's: the
+ * fields are exactly what the register stores, translated once in `lib/adapters.ts`. The earlier
+ * shape carried four fields nothing in the database held — a membership tier, a pastoral status, a
+ * role description, a church name — and a screen reading one of them rendered the blank the API had
+ * actually sent. A field with no column behind it is a field the UI promises and cannot keep.
+ */
 export interface ParishMember {
   id: string;
+  /** First and last name joined, which is how every screen shows it. */
   name: string;
-  memberId: string; // e.g. #MBR-1092
+  /** The register number the church issues, e.g. `MBR-1092`. */
+  memberId: string;
   initials: string;
+  /** The congregation this member belongs to, which is what the register groups by. */
   church: string;
-  roleDescription?: string;
-  membershipTier: MembershipTier;
+  status: MemberStatus;
+  /** The label for `status`, so no screen writes its own. */
+  statusLabel: string;
   baptismType: BaptismType;
+  /** The label for `baptismType`. */
+  baptismLabel: string;
   baptismDate?: string;
   baptismOfficiant?: string;
-  householdName: string;
-  householdId: string;
-  householdRole: string; // Head, Co-Head, Son, Daughter, etc.
+  /** The household the member belongs to, when they belong to one. */
+  householdId?: string;
+  householdName?: string;
+  /** The household's own number, e.g. `#108`: what the register prints beside the name. */
+  householdUnitNumber?: string;
+  householdRole?: string; // Head, Co-Head, Son, Daughter, etc.
+  isHouseholdHead: boolean;
   email: string;
   phone: string;
-  residentialAddress?: string;
-  pastoralStatus: 'active-regular' | 'active-officer' | 'active-mercy' | 'homebound' | 'active-honored' | 'youth-discipleship' | 'pastoral-staff';
-  statusLabel: string;
   dateOfBirth?: string;
   pastoralNotes?: string;
-  tags?: string[];
+  tags: string[];
   envelopeNumber?: string;
+  /** When they were enrolled, as the register records it. */
+  joinedAt: string;
   /// The member's photograph, held as a file id: uploaded once, served by the API behind the same
   /// sign-in as the rest of the register. Optional, because a register that demands a picture of
   /// somebody before it will save them is a register nobody fills in.
   photoFileId?: string | null;
+  /** Present on a single-record read: the ministries this member serves on. */
+  ministries: MemberMinistry[];
+}
+
+/** One ministry a member serves on, with the title they hold on it. */
+export interface MemberMinistry {
+  /** The membership row's own id, which is what a removal addresses. */
+  id: string;
+  ministryId: string;
+  ministryName: string;
+  roleTitle: string;
 }
 
 export interface HouseholdDependent {
@@ -261,15 +211,19 @@ export interface HouseholdDependent {
 export interface HouseholdUnit {
   id: string;
   name: string; // e.g. The Mwangi Household
-  unitNumber: string; // #108
+  unitNumber: string; // H-01
+  /** The congregation the unit belongs to. */
   campus: string;
   statusBadge: string;
   statusType: 'secondary' | 'tertiary' | 'neutral' | 'error';
+  /** The head of the household, or the fact that none has been recorded. */
   headName: string;
   headInitials: string;
-  headDob: string;
-  headTitle: string;
+  /** The head's role and register number, under their name on the card. */
+  headDetail: string;
   dependents: HouseholdDependent[];
+  /** How many people the unit holds, including its head. */
+  memberCount: number;
   address: string;
   phone: string;
 }
@@ -349,6 +303,8 @@ export interface User {
   memberId: string | null;
   panels: Record<string, boolean>;
   actions: Record<string, boolean>;
+  /** Every church this account serves, with the role it holds in each. One entry is the norm. */
+  organizations: Array<ActiveOrganization & { roleKey: string | null; isDefault: boolean }>;
 }
 
 /**

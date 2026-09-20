@@ -18,7 +18,7 @@ import {
 } from '../schemas/communications.schema';
 import * as communications from '../services/communications.service';
 import { created, ok } from '../lib/respond';
-import { actor, id } from '../lib/request';
+import { actor, id, roleKey } from '../lib/request';
 import { retireReasonSchema } from '../schemas/common';
 
 export async function listAnnouncements(req: Request, res: Response): Promise<void> {
@@ -94,12 +94,12 @@ export async function retireEvent(req: Request, res: Response): Promise<void> {
 }
 
 export async function listPrayerRequests(req: Request, res: Response): Promise<void> {
-  const result = await communications.listPrayerRequests(listPrayerRequestsQuerySchema.parse(req.query));
+  const result = await communications.listPrayerRequests(listPrayerRequestsQuerySchema.parse(req.query), roleKey(req));
   res.json(result);
 }
 
 export async function getPrayerRequest(req: Request, res: Response): Promise<void> {
-  ok(res, await communications.getPrayerRequest(id(req)));
+  ok(res, await communications.getPrayerRequest(id(req), roleKey(req)));
 }
 
 export async function createPrayerRequest(req: Request, res: Response): Promise<void> {
@@ -107,11 +107,11 @@ export async function createPrayerRequest(req: Request, res: Response): Promise<
 }
 
 export async function updatePrayerRequest(req: Request, res: Response): Promise<void> {
-  ok(res, await communications.updatePrayerRequest(id(req), updatePrayerRequestSchema.parse(req.body), actor(req)));
+  ok(res, await communications.updatePrayerRequest(id(req), updatePrayerRequestSchema.parse(req.body), actor(req), roleKey(req)));
 }
 
 export async function answerPrayerRequest(req: Request, res: Response): Promise<void> {
-  ok(res, await communications.answerPrayerRequest(id(req), answerPrayerRequestSchema.parse(req.body ?? {}), actor(req)));
+  ok(res, await communications.answerPrayerRequest(id(req), answerPrayerRequestSchema.parse(req.body ?? {}), actor(req), roleKey(req)));
 }
 
 export async function retirePrayerRequest(req: Request, res: Response): Promise<void> {

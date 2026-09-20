@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import * as settingsController from '../controllers/settings.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { moduleGate } from '../middleware/authorize';
 import { requireAuth, requireRole } from '../middleware/authenticate';
+import { requireWritableSubscription } from '../middleware/subscription';
 
 /**
  * `/api/settings` — the organization profile and the three preference documents.
@@ -18,15 +20,19 @@ export const settingsRouter = Router();
 
 const ADMINS = requireRole('admin');
 
-settingsRouter.use(requireAuth);
+settingsRouter.use(requireAuth, moduleGate('settings'));
+
+// The welcome wizard, which a church that signed itself up runs once. It is the one settings write
+// declared **before** the subscription gate below — for the same reason `/api/billing` sits outside
+// the gate entirely: a church that lapsed mid-wizard must still be able to finish saying where it
+// meets. Express applies middleware in declaration order, so a route listed after the gate is behind
+// it and this one is not.
+settingsRouter.post('/onboarding', ADMINS, asyncHandler(settingsController.completeOnboarding));
+
+settingsRouter.use(requireWritableSubscription);
 
 settingsRouter.get('/profile', asyncHandler(settingsController.getProfile));
 settingsRouter.patch('/profile', ADMINS, asyncHandler(settingsController.updateProfile));
-
-// The welcome wizard, which a church that signed itself up runs once. Not behind the subscription
-// gate: a brand-new trial church has nothing to write yet, and a church that lapsed mid-wizard must be
-// able to finish saying where it meets.
-settingsRouter.post('/onboarding', ADMINS, asyncHandler(settingsController.completeOnboarding));
 
 /**
  * The church's own data, as a file.

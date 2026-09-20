@@ -10,6 +10,14 @@ export const documentKindSchema = z.enum(['bylaw', 'policy', 'constitution', 'mi
 // Meetings
 // -------------------------------------------------------------------------------------------
 
+/**
+ * A sitting, as the clerk records it.
+ *
+ * There is no `quorumMet` here, and that is the point: whether a sitting was quorate is a count of the
+ * people in the room against the number the Session needs, and a boolean a client sends is a claim
+ * dressed as a fact. The server counts the council roll, stores what that sitting needed, and derives
+ * the answer from the attendance — the rule is in `lib/quorum`, which the seed states as well.
+ */
 const meetingFields = z.object({
   title: z.string().trim().min(3, 'Name the meeting').max(160),
   kind: meetingKindSchema.default('stated'),
@@ -19,7 +27,6 @@ const meetingFields = z.object({
   chairId: z.string().uuid().optional(),
   secretaryId: z.string().uuid().optional(),
   attendees: z.number().int().min(0).max(10_000).optional(),
-  quorumMet: z.boolean().optional(),
   agenda: z.array(z.string().trim().min(2).max(300)).max(50).optional(),
   minutes: z.string().trim().max(20_000).optional(),
 });
@@ -57,28 +64,43 @@ const resolutionFields = z.object({
   leadNote: z.string().trim().max(500).optional(),
 });
 
-/** The code is issued by the server in the year's series, so it is not accepted from a client. */
+/**
+ * The code is issued by the server in the year's series, so it is not accepted from a client — and
+ * neither is the stage. A resolution moves when the Session votes, when the work starts and when it is
+ * closed, and each of those is an act with its own endpoint rather than a field somebody edits.
+ */
 export const createResolutionSchema = resolutionFields.omit({ stage: true });
 export const updateResolutionSchema = resolutionFields
+  .omit({ stage: true })
   .partial()
   .extend({ meetingId: z.string().uuid().nullable().optional() })
   .refine((value) => Object.keys(value).length > 0, { message: 'Send at least one field to change' });
 
 /**
- * A vote is its own act, with its own endpoint.
+ * Each step of a resolution is its own act, with its own endpoint.
  *
- * Recording that a council voted changes the stage and stamps the date, and the three counts are the
- * minute's record of it — so this is not a field edit that a general PATCH should be able to perform
- * by accident.
+ * A vote records how the council went and its counts, because that is what the minute quotes. Starting
+ * the work and closing it each carry the lead's note — what the work is, and what it came to — and the
+ * audit line keeps the earlier one, so a closure does not quietly erase the plan it closes.
  */
-export const decideResolutionSchema = z.object({
-  decision: z.enum(['voted_approved', 'closed']),
-  voteSummary: z.string().trim().min(2, 'Record how the vote went').max(200),
-  votesFor: z.number().int().min(0).max(10_000).optional(),
-  votesAgainst: z.number().int().min(0).max(10_000).optional(),
-  votesAbstain: z.number().int().min(0).max(10_000).optional(),
-  decidedAt: z.coerce.date().optional(),
-});
+export const decideResolutionSchema = z.discriminatedUnion('decision', [
+  z.object({
+    decision: z.literal('voted_approved'),
+    voteSummary: z.string().trim().min(2, 'Record how the vote went').max(200),
+    votesFor: z.number().int().min(0).max(10_000).optional(),
+    votesAgainst: z.number().int().min(0).max(10_000).optional(),
+    votesAbstain: z.number().int().min(0).max(10_000).optional(),
+    decidedAt: z.coerce.date().optional(),
+  }),
+  z.object({
+    decision: z.literal('implementing'),
+    note: z.string().trim().min(3, 'Say what the work is').max(500),
+  }),
+  z.object({
+    decision: z.literal('closed'),
+    note: z.string().trim().min(3, 'Say what it came to').max(500),
+  }),
+]);
 
 export const listResolutionsQuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
@@ -94,6 +116,13 @@ export const listResolutionsQuerySchema = z.object({
 // Documents
 // -------------------------------------------------------------------------------------------
 
+/**
+ * A document is its metadata, its text, and — where the church holds a copy — the file itself.
+ *
+ * `fileId` points at a `StoredFile` uploaded through `/api/files`, which is what makes a scanned signed
+ * minute the church can actually open rather than a line of metadata about one. `fileUrl` stays for a
+ * by-law that lives on the church's own website.
+ */
 const documentFields = z.object({
   title: z.string().trim().min(3, 'Name the document').max(200),
   kind: documentKindSchema.default('bylaw'),
@@ -102,12 +131,14 @@ const documentFields = z.object({
   adoptedAt: z.coerce.date().optional(),
   body: z.string().trim().max(50_000).optional(),
   fileUrl: z.string().trim().url('Enter a link to the file').max(500).optional(),
+  fileId: z.string().uuid().optional(),
   isActive: z.boolean().default(true),
 });
 
 export const createDocumentSchema = documentFields;
 export const updateDocumentSchema = documentFields
   .partial()
+  .extend({ fileId: z.string().uuid().nullable().optional() })
   .refine((value) => Object.keys(value).length > 0, { message: 'Send at least one field to change' });
 
 export const listDocumentsQuerySchema = z.object({

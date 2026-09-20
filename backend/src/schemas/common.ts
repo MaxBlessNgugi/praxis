@@ -38,10 +38,23 @@ export type RetireReason = z.infer<typeof retireReasonSchema>;
  */
 export const booleanQuery = z.enum(['true', 'false']).transform((value) => value === 'true');
 
+/**
+ * The end of a date window.
+ *
+ * A bare `?to=2026-09-16` means the whole of the 16th, so it becomes the last instant of that day
+ * rather than the instant it begins. Otherwise "this month" silently drops everything received after
+ * midnight on the last day — including every gift banked that very morning, which is precisely the
+ * day a treasurer is looking at the figure.
+ */
+const windowEnd = z.preprocess(
+  (value) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T23:59:59.999Z`) : value),
+  z.coerce.date().optional(),
+);
+
 /** The date window a report, ledger or calendar is asked for. */
 export const window = {
   from: z.coerce.date().optional(),
-  to: z.coerce.date().optional(),
+  to: windowEnd,
 };
 
 /** …and the where-fragment it becomes. Paired with the schema above, or a window would validate and

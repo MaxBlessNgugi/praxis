@@ -8,20 +8,18 @@ This repository holds **both halves of the system**: a React console and the Exp
 API it talks to. They are separate deployments (the console is static, the API is a service) and one
 repository, because a change to the way a figure is computed usually touches both.
 
-> **Status — read this before evaluating the console.** The API is complete. The console is *partly*
-> connected: **authentication, the Home dashboard, Members, Announcements, the Finances panels
-> (Welfare, Charity, Project Funding and the Finance Audit Ledger) and the church profile all read and
-> write real data.** The remaining screens render the original sample data and save nothing — and
-> because the standalone **Tithes and Offerings ledgers are among them**, read
-> [What is connected to the API](#what-is-connected-to-the-api) before entering a real record
-> anywhere.
+> **Status — read this before evaluating the console.** Both halves are complete, and every screen in
+> the console reads and writes the API: no sample data is left anywhere. What is *not* live yet needs
+> credentials rather than code — **outbound email and SMS**, which stay on their `console` drivers
+> (they log the message and refuse to record it as sent) until a provider is configured, and a
+> production host. See [What is connected to the API](#what-is-connected-to-the-api).
 
 ## Stack
 
 | Half | Stack |
 | --- | --- |
 | Console (`/`) | React 19 · TypeScript · Vite 6 · Tailwind 4 · Material Symbols (self-hosted) |
-| API (`/backend`) | Express 5 · TypeScript · Prisma 5 · PostgreSQL · zod · JWT · helmet |
+| API (`/backend`) | Express 4 · TypeScript · Prisma 5 · PostgreSQL · zod · JWT · helmet |
 
 No router and no state library on the console: it is one shell with a section switcher.
 
@@ -93,12 +91,17 @@ Seed logins. The sign-in screen does not fill them in for you — it opens empty
 | `bishop@destinysanctuary.co.ke` | `praxis-demo-2025` | `super_admin` |
 | `alice@destinysanctuary.co.ke` | `praxis-demo-2025` | `admin` |
 
-Both passwords are written down here, so they are public, and they are enough to create the accounts
-that replace them. **A password is set once, at `POST /api/admin/users`, and nothing changes one
-afterwards** — `PATCH /api/admin/users/:id` takes a name, an email and `isActive`, and there is no
-change-password route or screen. Giving each person their own account keeps the audit log honest
-today; an in-place password change is the account-management gap to close before staff use logins of
-their own. `docs/staff-quick-start.md` says the same thing in the office's own words.
+Both passwords are written down here, so they are public. **Change the seeded administrator's before
+the installation is used for anything real** — Account menu → *Security* asks for the current password
+and ends every other session on the account when it saves, or a fresh installation can be seeded with
+`SEED_ADMIN_PASSWORD='<a real one>' npm run seed` in the first place.
+
+Anyone who forgets theirs uses *Forgot your password?* on the gate: the API mails a single-use link
+that expires in `RESET_TOKEN_TTL_MINUTES` (an hour by default) and stores only its SHA-256 hash. In
+production `EMAIL_DRIVER` must be a real provider — the service refuses to start on `console`, because
+a reset link that cannot be delivered is a locked-out church with nobody to ask. An administrator can
+also set somebody else's password at `POST /api/admin/users/:id/password`. `docs/staff-quick-start.md`
+says the same thing in the office's own words.
 
 ## Environment variables
 
@@ -126,6 +129,8 @@ change behaviour rather than just credentials:
 | `SMS_DRIVER` | `console` | `console`, `africastalking`, or `twilio` |
 | `AFRICASTALKING_SENDER_ID` | — | The sender ID the church sends under. Omitted, the account's own short code is used |
 | `PUBLIC_APP_URL` | `http://localhost:3000` | The console's address, used in the welcome email a new church receives |
+| `RESET_TOKEN_TTL_MINUTES` | `60` | How long a password-reset link stays good |
+| `NODE_ENV` | `development` | `development`, `test` or `production`; a staging deployment is a production build against a staging database |
 
 ## Deploying it
 
@@ -144,7 +149,9 @@ Step by step, including the exact strings to copy out of Neon, is in
 2. Deploy `backend/` to Railway with `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET` (generated) and
    `CORS_ORIGIN` set to the console's eventual URL.
 3. Run `npm run seed` once against the new database — from Railway's shell, or locally with the
-   production `DATABASE_URL`.
+   production `DATABASE_URL` and `NODE_ENV=production`. The seed deliberately refuses to write the
+   published demo password into a production database unless you say so on that one command:
+   `ALLOW_DEMO_SEED=true SEED_ADMIN_PASSWORD='<a real one>' npm run seed`.
 4. Deploy the console with `VITE_API_URL` pointing at Railway.
 5. Go back and set `CORS_ORIGIN` to the deployed console URL if it was not known in step 2.
 6. Point an uptime monitor at `https://<api>/health` and — if you want failures reported rather than
@@ -172,13 +179,17 @@ verified sending domains for email and SMS, a `pg_dump` on a schedule (see
 | Finances — Welfare, Charity, Project Funding, Finance Audit Ledger | **Real** |
 | Church profile and logo — `Settings → Church Identity` | **Real** |
 | Settings → Data & backup | **Real** — the live record counts, and a downloadable copy of the church's own records (registers, ledgers, minutes, notices, staff list; no credentials, and uploaded file contents listed rather than embedded) |
-| Tithes and Offerings ledgers — `Giving → Tithes / Offerings` | **Sample data.** Recording a tithe from the **Home** quick action is real; these two ledger screens are not wired yet, so a tithe recorded on Home does not appear in them |
-| Services & Worship · Church Council · Reports & Certs · Communications → Broadcasts (SMS/Email) · Admin → Users & Rights, Trash, Audit Log · Groups & Fellowships · Inventory & Assets · the remaining Settings panels | **Sample data** — the screens render, and nothing persists. The Trash screen's restore acts on its own sample rows, so its success message is not something the database knows about |
+| Tithes, Offerings, Project Funding, Welfare, Charity and the Finance Audit Ledger | **Real** — recording, voiding and the hash-chained ledger the *Verify Ledger* button recomputes |
+| Services & Worship — the planner, the liturgy order, attendance, the volunteer roster and the service reports | **Real** |
+| Church Council — meetings, resolutions and the document library | **Real** |
+| Groups & Fellowships — departments, leadership roles and volunteer roles | **Real** |
+| Admin — Users & Rights, Trash (restore included), Audit Log | **Real** |
+| The remaining Settings panels — preferences, delivery & storage, subscription & billing | **Real** |
 
-The API behind every one of those screens is already built, typechecked and smoke-tested; wiring the
-screen is the remaining work — one panel at a time, against `src/hooks/useApi.ts` and the mappers in
-`src/lib/adapters.ts`. Broadcasts waits on an SMS/email provider, so it is last.
-`src/lib/api.ts` is the honest inventory of what the server can do.
+Two things a screen still says about the server, rather than pretending otherwise: a delivery that no
+provider can make is refused with the variable to set, and a figure the API does not store (a room, an
+RSVP headcount) is left out instead of invented. `src/lib/api.ts` is the honest inventory of what the
+server can do.
 
 ## Multi-tenancy
 
@@ -307,6 +318,9 @@ screen that calls it:
 | --- | --- |
 | Passwords | bcrypt at cost 12; at least 8 characters; the handful of passwords tried first against any new account are refused, and so are the obvious church ones |
 | Sessions | HS256 tokens signed with `JWT_SECRET` (a 7-day lifetime, and the service refuses to start with the placeholder outside development); role and rights are re-read from the database on every request rather than trusted from the token |
+| Password changes | Changing or resetting a password bumps a per-account session counter carried in the token, so every *other* session ends at that moment; the change itself answers with a fresh token for the session that asked |
+| Reset links | 32 random bytes, stored only as a SHA-256 hash, single-use, expiring, and rate-limited per address; the request endpoint answers identically whether or not the address is registered |
+| Rights | `panels` and `actions` are enforced by the API on every route — a role without a section, or with `view` but not `edit`, is refused there, not merely hidden by the console |
 | Sign-in | A per-address ceiling of `AUTH_RATE_LIMIT_MAX` (10/minute) plus per-account lockout |
 | Everything else | A general ceiling of `RATE_LIMIT_MAX` (300/minute), and a tighter one (`COSTLY_RATE_LIMIT_MAX`) on the two endpoints with a bill attached — sending a broadcast, and uploading a file |
 | Browser exposure | `helmet`'s security headers, and CORS restricted to the listed origins; `X-Forwarded-For` is only believed as far as `TRUST_PROXY_HOPS` says |
@@ -314,7 +328,7 @@ screen that calls it:
 | Deletion | Soft delete with a reason, restorable from the Trash; the finance ledger is a hash chain that **Verify Ledger** recomputes |
 | Accountability | Every write writes an audit row naming the account that made it, with a before and after |
 | Tenancy | Every query is scoped to the church in the token; `npm run check:isolation` proves one church cannot reach another's rows |
-| Failures | One JSON log line per request and per failure, `X-Request-Id` on every response, `/health` for a monitor, and optional Sentry-compatible reporting for 5xx |
+| Failures | One envelope for every error — `error`, a machine-readable `code`, and `fields` for a validation refusal — with `X-Request-Id` on every response, one JSON log line per failure, `/health` for a monitor, and optional Sentry-compatible reporting for 5xx. A production server answers an unexpected 500 with "Something went wrong" and nothing else: no stack, no path, no host. `npm run check:errors` proves that in both environments |
 
 ## Commands
 
@@ -324,6 +338,7 @@ Console:
 | --- | --- |
 | `npm run dev` | Dev server on **port 3000** (the audits assume it) |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint over the console, the audits and the build config |
 | `npm run build` | Production build to `dist/` |
 | `npm run build:share` | One self-contained `dist-share/index.html` for handing the demo to someone |
 | `npm run audit:a11y` | Assistive-tech audit of every screen (a real browser) |
@@ -336,13 +351,27 @@ API (from `backend/`):
 | --- | --- |
 | `npm run dev` | `tsx watch` on port 4000 |
 | `npm run typecheck` | `tsc --noEmit` (strict) |
+| `npm run lint` | ESLint over the service, the seed and the check scripts |
 | `npm run build` | Compile to `dist/` |
 | `npm run migrate` | Create and apply a migration in development |
 | `npm run migrate:deploy` | Apply committed migrations (what the release step runs) |
 | `npm run seed` | Load the demo data — one church (Destiny Sanctuary, its leadership and its records), the three subscription plans, and that church's own subscription and first payment |
-| `npm run check:isolation` | Proves one church cannot reach another's records (needs the API running) |
+| `npm run check:isolation` | Proves one church cannot reach another's records — every list, every by-id read, files, and a member of staff serving two churches (needs the API running) |
+| `npm run check:people` | Households and ministries end to end: a household staffed, headed, emptied before it may retire and put back from the trash; a ministry that refuses retirement while anybody still serves; the viewer/staff/admin role boundaries (needs the API running) |
+| `npm run check:launch` | A church nobody has heard of signs itself up, finishes the welcome wizard, enrols somebody, records money, plans a service and publishes a notice — the whole first Sunday (needs the API running) |
+| `npm run check:security` | The posture itself: refusals without a token, security headers, CORS, upload checks, password policy, lockout and rate limits (needs the API running, and leaves the calling address throttled for up to a minute) |
+| `npm run check:auth` | Drives the account lifecycle on a throwaway account: a password change that ends the other sessions and keeps this one, a reset link that is single-use, expiring and stored only as a hash (needs the API running) |
+| `npm run check:finance` | The giving ledger: recording, voiding and restoring with the totals moving exactly, the hash chain catching a hand-edited row, and another church reaching none of it (needs the API running) |
+| `npm run check:worship` | Services end to end: planning, the order of worship, rosters and swap requests, attendance and the census, reports (needs the API running) |
+| `npm run check:governance` | Council: meetings, the roll and quorum, minutes, resolutions through decision and implementation, documents (needs the API running) |
+| `npm run check:communications` | Broadcasts, events, prayer requests, celebrations — including what a lapsed subscription may still send (needs the API running) |
+| `npm run check:reports` | Overview and filtered reports, and the certificate lifecycle (needs the API running) |
+| `npm run check:inventory` | Stock: quantity integrity under concurrency, overdraft refusal, transfers, stock takes, ledger-sums-to-shelf, tenant isolation (needs the API running) |
 | `npm run check:vendor` | Proves the vendor console and the outbound gateways behave — suspend, support session, and a send that is refused rather than faked (needs the API running) |
+| `npm run check:billing` | The whole subscription lifecycle on a throwaway church: trial → paid → early renewal → past due → expired → read-only → one payment restores it (needs the API running) |
 | `npm run check:import` | Proves a register can be imported from a spreadsheet: the report before anything is written, the duplicate keys, and the file shapes that break a naive parser (needs the API running) |
+| `npm run check:settings` | The church's own profile, preferences and the file library, including the audit trail around them (needs the API running) |
+| `npm run check:errors` | Runs every failure the API knows about through the handler in both environments, and proves a production response names no file, host or stack (needs nothing running) |
 | `npm run studio` | Prisma Studio |
 
 The two browser audits need the dev server running and Chrome installed — `CHROME=/path/to/chrome`
@@ -352,6 +381,8 @@ overrides the lookup. Both exit non-zero when their report holds a failure.
 
 - [`docs/staff-quick-start.md`](docs/staff-quick-start.md) — the guide for the church office: what each
   panel is for, who can see what, and what to do when something goes wrong. **Give this one to staff.**
+- [`docs/billing.md`](docs/billing.md) — plans, the subscription lifecycle and its grace period, what a
+  lapsed church keeps and loses, payments, and the vendor console.
 - [`docs/backups.md`](docs/backups.md) — what to back up, how to restore it, and what the in-app Trash
   and Audit Log do *not* cover.
 - [`docs/cloud-deploy.md`](docs/cloud-deploy.md) — the deploy runbook.

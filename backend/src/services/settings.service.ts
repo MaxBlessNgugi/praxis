@@ -330,6 +330,20 @@ export async function exportOrganization(actorId: string) {
     files: files.length,
   };
 
+  // A Trash snapshot of a retired file carries the row as it stood — including the bytes, for the
+  // database driver that keeps them on the row. This bundle lists files by name and size on purpose
+  // (see `excluded.uploads`), so the same strip is applied to the snapshots rather than making the
+  // "no file contents" promise true everywhere except the one section nobody reads until a crisis.
+  const stripFileBytes = (rows: Record<string, unknown>[]) =>
+    rows.map((row) => {
+      const snapshot = row.snapshot as Record<string, unknown> | null;
+      if (!snapshot || typeof snapshot !== 'object' || !('storageKey' in snapshot)) return row;
+      const { data: bytes, storageKey, ...rest } = snapshot;
+      void bytes;
+      void storageKey;
+      return { ...row, snapshot: rest };
+    });
+
   const bundle = {
     // A version, so a file found in three years can still be read by whatever then reads these.
     format: 'praxis.church-export/1',
@@ -371,7 +385,7 @@ export async function exportOrganization(actorId: string) {
     staff: plain(staff as unknown as Record<string, unknown>[]),
     auditLog: plain(audit),
     financeLedger: plain(financeLedger),
-    trash: plain(archived),
+    trash: stripFileBytes(plain(archived)),
   };
 
   // The copy is the one thing here that a church would want a record of, so it is recorded.

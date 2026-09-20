@@ -86,8 +86,26 @@ export async function attendanceSummary(req: Request, res: Response): Promise<vo
   ok(res, await serviceService.attendanceSummary(id(req)));
 }
 
+/**
+ * An administrator may revise a report that has already been signed off; everybody else is refused
+ * with an explanation. The service layer holds that rule, because the stored row has to be read to
+ * know whether it applies — this only tells it who is asking.
+ */
 export async function putReport(req: Request, res: Response): Promise<void> {
-  ok(res, await serviceService.upsertReport(id(req), upsertServiceReportSchema.parse(req.body), actor(req)));
+  const mayReviseSignedOff = req.user?.roleKey === 'admin' || req.user?.roleKey === 'super_admin';
+  ok(
+    res,
+    await serviceService.upsertReport(
+      id(req),
+      upsertServiceReportSchema.parse(req.body),
+      actor(req),
+      mayReviseSignedOff,
+    ),
+  );
+}
+
+export async function finalizeReport(req: Request, res: Response): Promise<void> {
+  ok(res, await serviceService.finalizeReport(id(req), actor(req)));
 }
 
 export async function getReport(req: Request, res: Response): Promise<void> {

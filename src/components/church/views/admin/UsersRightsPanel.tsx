@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usersApi, type AdminUserDto } from '../../../../lib/api';
-import { errorMessage, useRoles, useUsers } from '../../../../hooks/useApi';
+import { errorMessage, useMemberOptions, useRoles, useUsers } from '../../../../hooks/useApi';
 import { useAuth } from '../../../../lib/auth';
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 import { useDialog } from '../../dialog';
@@ -61,12 +61,28 @@ const formatWhen = (iso: string | null): string => {
 };
 
 export const UsersRightsPanel: React.FC = () => {
-  const { user: signedIn } = useAuth();
-  const accounts = useUsers();
+  const { user: signedIn, organization } = useAuth();
+
+  // The filters the list endpoint actually takes. Search is debounced because it is a network
+  // request per keystroke otherwise, and nobody types their final query in one keypress.
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+  const accounts = useUsers({ q: search || undefined, roleKey: roleFilter || undefined });
   const roles = useRoles();
+  // The register's own people, for linking an account to the member it belongs to. A volunteer who
+  // signs in as themselves can ask for cover on their own duty; an account with no member behind it
+  // can only ever act as the office.
+  const memberOptions = useMemberOptions();
 
   const [isCreating, setIsCreating] = useState(false);
   const createDialog = useDialog(() => setIsCreating(false), 'Add an account');
+  const [isInviting, setIsInviting] = useState(false);
+  const inviteDialog = useDialog(() => setIsInviting(false), 'Invite by email');
   const [passwordFor, setPasswordFor] = useState<AdminUserDto | null>(null);
   const passwordDialog = useDialog(() => setPasswordFor(null), 'Set a new password');
 
@@ -75,6 +91,8 @@ export const UsersRightsPanel: React.FC = () => {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [draft, setDraft] = useState({ name: '', email: '', password: '', roleKey: 'staff' });
+  const [inviteDraft, setInviteDraft] = useState({ name: '', email: '', roleKey: 'staff', memberId: '' });
+  const [inviteResult, setInviteResult] = useState<{ name: string; canSendEmail: boolean; devLink?: string } | null>(null);
   const [newPassword, setNewPassword] = useState('');
 
   const act = async (id: string, run: () => Promise<unknown>, done: string) => {
@@ -105,6 +123,27 @@ export const UsersRightsPanel: React.FC = () => {
       setNotice(`${draft.name.trim()} can now sign in. Tell them the password — it is not emailed.`);
       setDraft({ name: '', email: '', password: '', roleKey: 'staff' });
       setIsCreating(false);
+      await accounts.refetch();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const submitInvite = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusyId('invite');
+    setError(null);
+    try {
+      const { data } = await usersApi.invite({
+        name: inviteDraft.name.trim(),
+        email: inviteDraft.email.trim(),
+        roleKey: inviteDraft.roleKey,
+        ...(inviteDraft.memberId ? { memberId: inviteDraft.memberId } : {}),
+      });
+      setInviteResult({ name: data.user.name, canSendEmail: data.canSendEmail, devLink: data.devLink });
+      setInviteDraft({ name: '', email: '', roleKey: 'staff', memberId: '' });
       await accounts.refetch();
     } catch (err) {
       setError(errorMessage(err));
@@ -186,7 +225,29 @@ export const UsersRightsPanel: React.FC = () => {
               One account per person. The audit log can only name somebody if everybody signs in as themselves.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="sr-only" htmlFor="users-q">Search accounts</label>
+            <input
+              id="users-q"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search a name or an email"
+              className="w-full rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] px-3 py-2 text-xs text-[#1C1917] placeholder-[#A8A29E] focus:border-[#C2410C] focus:outline-none focus:ring-4 focus:ring-[#C2410C]/15 sm:w-52"
+            />
+            <label className="sr-only" htmlFor="users-role">Filter by role</label>
+            <select
+              id="users-role"
+              value={roleFilter}
+              onChange={(event) => setRoleFilter(event.target.value)}
+              className="rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] px-2.5 py-2 text-xs font-semibold text-[#1C1917] cursor-pointer"
+            >
+              <option value="">Every role</option>
+              {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={() => void accounts.refetch()}
@@ -194,6 +255,17 @@ export const UsersRightsPanel: React.FC = () => {
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">refresh</span>
               Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setInviteResult(null);
+                setIsInviting(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-[9px] border border-[#C2410C] bg-[#FFFFFF] px-3.5 py-2 text-xs font-bold text-[#C2410C] transition-colors hover:bg-[#FDF8F3] cursor-pointer"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">mail</span>
+              Invite by email
             </button>
             <button
               type="button"
@@ -235,6 +307,24 @@ export const UsersRightsPanel: React.FC = () => {
                       <p className="mt-0.5 truncate text-xs text-[#57534E]">
                         {row.email} · last signed in {formatWhen(row.lastLoginAt)}
                       </p>
+                      {row.churches.length > 1 && (
+                        <p className="mt-1 flex flex-wrap items-center gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-[#A8A29E]">Serves</span>
+                          {row.churches.map((church) => (
+                            <span
+                              key={church.id}
+                              className={`rounded-[6px] px-1.5 py-0.5 text-[10px] font-semibold ${
+                                church.id === organization?.id
+                                  ? 'bg-[#FDE8D7] text-[#9A3412]'
+                                  : 'bg-[#F8F1E9] text-[#57534E]'
+                              }`}
+                              title={`${church.name} — ${ROLE_LABELS[church.roleKey ?? ''] ?? 'no role'}`}
+                            >
+                              {church.name}
+                            </span>
+                          ))}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
@@ -267,6 +357,23 @@ export const UsersRightsPanel: React.FC = () => {
                       >
                         Set password
                       </button>
+
+                      {row.isInvited && (
+                        <button
+                          type="button"
+                          disabled={busyId === row.id}
+                          onClick={() =>
+                            void act(
+                              row.id,
+                              () => usersApi.reinvite(row.id),
+                              `A new activation link was issued for ${row.name}.`,
+                            )
+                          }
+                          className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-2.5 py-1.5 text-xs font-bold text-[#1C1917] transition-colors hover:bg-[#F5EDE4] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                        >
+                          Re-issue invitation
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -360,6 +467,102 @@ export const UsersRightsPanel: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {isInviting && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...inviteDialog}>
+          <form onSubmit={submitInvite} className="w-full max-w-[440px] rounded-[14px] border border-[#E7E5E4] bg-[#FFFFFF] p-6 shadow-warm-card-hover">
+            <h3 className="font-headline text-base font-bold text-[#1C1917]">Invite by email</h3>
+            {inviteResult ? (
+              <>
+                <div className="mt-4 space-y-3">
+                  <p role="status" className="rounded-[9px] border border-[#A7F3D0] bg-[#ECFDF5] px-3 py-2.5 text-xs font-semibold text-[#047857]">
+                    {inviteResult.name}&apos;s account exists. {inviteResult.canSendEmail ? 'An activation link has been emailed — it works once and expires in two days.' : 'No email provider is configured, so the link could not be sent.'}
+                  </p>
+                  {!inviteResult.canSendEmail && (
+                    <p className="rounded-[9px] border border-[#FDE68A] bg-[#FFFBEB] px-3 py-2.5 text-[11px] text-[#78350F]">
+                      In production the link is emailed. On this installation, hand the address over in person:
+                      they choose their own password through it, and until then the account cannot sign in.
+                    </p>
+                  )}
+                  {inviteResult.devLink && (
+                    <div>
+                      <label className={LABEL} htmlFor="invite-dev-link">Development handover link</label>
+                      <input id="invite-dev-link" readOnly value={inviteResult.devLink} onFocus={(e) => e.target.select()} className={`${FIELD} font-mono text-[11px]`} />
+                    </div>
+                  )}
+                  <p className="text-[11px] text-[#57534E]">
+                    The account appears in the list above now, and the audit log records the invitation. Set a
+                    password yourself only if the link is lost — that ends whatever the holder was mid-way through.
+                  </p>
+                </div>
+                <div className="mt-5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsInviting(false)}
+                    className="rounded-[9px] bg-[#C2410C] px-4 py-2 text-xs font-bold text-white hover:bg-[#EA580C] cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-0.5 text-xs text-[#57534E]">
+                  The account is created now, but it cannot sign in until its owner chooses a password through the
+                  emailed link — nobody invents a password for somebody else.
+                </p>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className={LABEL} htmlFor="invite-name">Name</label>
+                    <input id="invite-name" required value={inviteDraft.name} onChange={(e) => setInviteDraft((previous) => ({ ...previous, name: e.target.value }))} className={FIELD} />
+                  </div>
+                  <div>
+                    <label className={LABEL} htmlFor="invite-email">Email</label>
+                    <input id="invite-email" type="email" required autoComplete="off" value={inviteDraft.email} onChange={(e) => setInviteDraft((previous) => ({ ...previous, email: e.target.value }))} className={FIELD} />
+                    <p className="mt-1 text-[11px] text-[#57534E]">The link and every future sign-in use this address.</p>
+                  </div>
+                  <div>
+                    <label className={LABEL} htmlFor="invite-role">Role</label>
+                    <select id="invite-role" value={inviteDraft.roleKey} onChange={(e) => setInviteDraft((previous) => ({ ...previous, roleKey: e.target.value }))} className={FIELD}>
+                      <option value="staff">Church staff — the office, no deleting</option>
+                      <option value="viewer">Viewer — reads only</option>
+                      <option value="admin">Administrator — everything but rights</option>
+                      <option value="super_admin">Super administrator — everything</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={LABEL} htmlFor="invite-member">On the register as (optional)</label>
+                    <select
+                      id="invite-member"
+                      value={inviteDraft.memberId}
+                      onChange={(e) => setInviteDraft((previous) => ({ ...previous, memberId: e.target.value }))}
+                      className={FIELD}
+                    >
+                      <option value="">Not on the register</option>
+                      {memberOptions.members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.firstName} {member.lastName}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[11px] text-[#57534E]">
+                      Link the account to the person on the register, so a volunteer can act as themselves.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-5 flex justify-end gap-2">
+                  <button type="button" onClick={() => setIsInviting(false)} className="rounded-[9px] border border-[#E7E5E4] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={busyId === 'invite'} className="rounded-[9px] bg-[#C2410C] px-4 py-2 text-xs font-bold text-white hover:bg-[#EA580C] disabled:opacity-60 cursor-pointer">
+                    {busyId === 'invite' ? 'Inviting…' : 'Send the invitation'}
+                  </button>
+                </div>
+              </>
+            )}
+          </form>
+        </div>
+      )}
 
       {isCreating && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1C1917]/45 p-4" {...createDialog}>

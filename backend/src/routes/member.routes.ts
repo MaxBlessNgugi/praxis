@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as memberController from '../controllers/member.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { moduleGate } from '../middleware/authorize';
 import { requireAuth, requireRole } from '../middleware/authenticate';
 import { requireWritableSubscription } from '../middleware/subscription';
 
@@ -13,7 +14,7 @@ import { requireWritableSubscription } from '../middleware/subscription';
  */
 export const memberRouter = Router();
 
-memberRouter.use(requireAuth, requireWritableSubscription);
+memberRouter.use(requireAuth, moduleGate('members'), requireWritableSubscription);
 
 // Declared before `/:id`, or "trash" would be read as a member id. The *list* of archived members is
 // the admin Trash screen's (`GET /api/admin/trash?entityName=Member`) rather than a copy of it here;
@@ -29,6 +30,10 @@ memberRouter.post(
 );
 
 memberRouter.get('/', asyncHandler(memberController.listMembers));
+
+// The congregations the register itself names, for the member and household forms. Declared before
+// `/:id` for the usual reason: "locations" is not a member id.
+memberRouter.get('/locations', asyncHandler(memberController.listLocations));
 memberRouter.get('/:id', asyncHandler(memberController.getMember));
 
 memberRouter.post('/', requireRole('super_admin', 'admin', 'staff'), asyncHandler(memberController.createMember));

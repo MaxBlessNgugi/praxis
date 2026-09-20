@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { HouseholdUnit } from '../../../types';
 import { useDialog } from '../dialog';
 import { EmptyState } from '../../ui';
-import { DEFAULT_LOCATION, LOCATIONS } from '../../../data/churchDomain';
+import { ErrorBlock } from '../DataState';
+import { useLocations } from '../../../lib/hooks/useMembers';
 import { useMembers } from '../../../lib/hooks/useMembers';
-import { ApiError } from '../../../lib/api';
-
-/** The statuses the mock households actually carry, so the filter cannot go dead. */
-const HOUSEHOLD_STATUSES = ['Family Head', 'Relocation Pending', 'Elder Emeritus', 'Single Adult Household', 'Appointed Staff', 'Visionary Leader'];
+import { ApiError, reportsApi } from '../../../lib/api';
+import { downloadBlob } from '../../../lib/export';
 
 interface FamilyUnitViewProps {
   onNavigateToAddChristian?: () => void;
@@ -16,35 +15,67 @@ interface FamilyUnitViewProps {
 export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
   onNavigateToAddChristian,
 }) => {
-  const { listHouseholds, createHousehold: apiCreateHousehold } = useMembers();
+  const { listAllHouseholds, createHousehold: apiCreateHousehold } = useMembers();
   const [households, setHouseholds] = useState<HouseholdUnit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [campusFilter, setCampusFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortMode, setSortMode] = useState<'name' | 'largest'>('name');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const createModalOpenDialog = useDialog(() => setIsCreateModalOpen(false), "Create New Household");
   const [newSurname, setNewSurname] = useState('');
-  const [newHead, setNewHead] = useState('');
   const [newAddress, setNewAddress] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newCampus, setNewCampus] = useState<string>(DEFAULT_LOCATION);
-  const [isLoading, setIsLoading] = useState(true);
+  const [newUnitNumber, setNewUnitNumber] = useState('');
+  const [newCampus, setNewCampus] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const { locations } = useLocations();
 
   useEffect(() => {
     const loadHouseholds = async () => {
       try {
-        const response = await listHouseholds({ pageSize: 1000 });
-        setHouseholds(response.data);
+        setHouseholds(await listAllHouseholds());
         setError(null);
       } catch (err) {
         setError(err instanceof ApiError ? err.body.error : 'Failed to load households');
-      } finally {
-        setIsLoading(false);
       }
     };
     loadHouseholds();
-  }, [listHouseholds]);
+  }, [listAllHouseholds]);
+
+  /**
+   * The whole directory, as the server has it — not the filtered page on screen.
+   *
+   * The export used to be an `alert()` with a hardcoded "412 households" beside it, so the one
+   * button on the screen that promised a file delivered nothing. The server composes the same
+   * register the list reads, under the same gates, and the browser just names the download.
+   */
+  const handleExport = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      downloadBlob('praxis-households.csv', await reportsApi.householdsCsv());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.body.error : 'The export could not be built');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  /**
+   * The next number in the church's own series (`HH-101`, `HH-102` …).
+   *
+   * Suggested rather than invented: the clerk may have a roll of numbers in front of them, and a unit
+   * number the system made up is one nobody can find the household under later.
+   */
+  const nextUnitNumber = (() => {
+    const highest = households.reduce((max, row) => Math.max(max, Number(row.unitNumber.replace(/\D/g, '')) || 0), 100);
+    return `HH-${highest + 1}`;
+  })();
+
+  const householdMembers = households.reduce((total, row) => total + row.memberCount, 0);
+  const averageSize = households.length === 0 ? '0' : (householdMembers / households.length).toFixed(1);
+  const headless = households.filter((row) => row.headName === 'No head recorded').length;
+  const congregations = new Set(households.map((row) => row.campus)).size;
 
   const filteredHouseholds = households.filter((h) => {
     const matchSearch =
@@ -55,28 +86,34 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
       h.address.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchCampus = campusFilter === 'all' || h.campus === campusFilter;
-    const matchStatus = statusFilter === 'all' || h.statusBadge === statusFilter;
 
-    return matchSearch && matchCampus && matchStatus;
+    return matchSearch && matchCampus;
   });
+
+  /** The two orders the toolbar offers, applied to what the filters left. */
+  const householdsShown = [...filteredHouseholds].sort((a, b) =>
+    sortMode === 'largest' ? b.memberCount - a.memberCount : a.name.localeCompare(b.name),
+  );
 
   const handleCreateHousehold = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSurname || !newHead) return;
+    // The field shows the suggested number until the clerk types over it, so the suggestion is what
+    // an untouched form submits.
+    const unitNumber = (newUnitNumber || nextUnitNumber).trim();
+    if (!newSurname.trim() || !unitNumber) return;
 
     try {
       const newUnit = await apiCreateHousehold({
-        name: `The ${newSurname} Household`,
-        unitNumber: `#${Math.floor(100 + Math.random() * 899)}`,
-        campus: newCampus,
-        address: newAddress || 'Plot 100, Milimani Estate, Nyahururu',
+        name: `The ${newSurname.trim()} Household`,
+        unitNumber,
+        location: newCampus,
+        ...(newAddress.trim() ? { address: newAddress.trim() } : {}),
       });
-      setHouseholds([newUnit, ...households]);
+      setHouseholds((current) => [newUnit, ...current]);
       setIsCreateModalOpen(false);
       setNewSurname('');
-      setNewHead('');
       setNewAddress('');
-      setNewPhone('');
+      setNewUnitNumber('');
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.body.error : 'Failed to create household');
@@ -85,86 +122,29 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
 
   return (
     <div className="flex flex-col w-full gap-6 pb-12">
-      {/* 4 Top Stat Cards */}
+      {/* What the register itself holds — no invented quarterly deltas. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* Stat 1: Active Households */}
-        <div className="bg-white p-5 rounded-xl shadow-sm relative overflow-hidden group hover:shadow-md transition-all border border-[#EAE1D7]/60">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-headline text-xs uppercase tracking-wider text-[#59413a] font-bold">
-              Active Households
-            </span>
-            <div className="w-10 h-10 rounded-lg bg-[#f4ece8] flex items-center justify-center text-[#9b2f00]">
-              <span aria-hidden="true" className="material-symbols-outlined text-[22px]">roofing</span>
+        {[
+          { label: 'Households on the roll', value: String(households.length), icon: 'roofing', tone: 'bg-[#f4ece8] text-[#9b2f00]', caption: `${congregations} congregation${congregations === 1 ? '' : 's'}` },
+          { label: 'Members in households', value: String(householdMembers), icon: 'family_restroom', tone: 'bg-[#ffdcc3] text-[#904d00]', caption: 'Filed under a household' },
+          { label: 'Average members / unit', value: averageSize, icon: 'calculate', tone: 'bg-[#eee7e3] text-[#59413a]', caption: 'Across every household' },
+          { label: 'Households without a head', value: String(headless), icon: 'person_off', tone: 'bg-[#ffdad6] text-[#93000a]', caption: headless === 0 ? 'Every household has one' : 'Open a member record to appoint one' },
+        ].map((card) => (
+          <div key={card.label} className="bg-white p-5 rounded-xl shadow-sm relative overflow-hidden border border-[#EAE1D7]/60">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-headline text-xs uppercase tracking-wider text-[#59413a] font-bold">{card.label}</span>
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${card.tone}`}>
+                <span aria-hidden="true" className="material-symbols-outlined text-[22px]">{card.icon}</span>
+              </div>
             </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-headline text-3xl text-[#1e1b19] font-bold">412</span>
-            <span className="font-headline text-xs text-[#006243] flex items-center font-bold">
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">arrow_upward</span>+14 this qtr
-            </span>
-          </div>
-          <p className="font-body text-xs text-[#59413a] mt-1">Total verified residential covenants</p>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#9b2f00]/5 rounded-full pointer-events-none group-hover:scale-125 transition-transform"></div>
-        </div>
-
-        {/* Stat 2: Avg Members / Unit */}
-        <div className="bg-white p-5 rounded-xl shadow-sm relative overflow-hidden group hover:shadow-md transition-all border border-[#EAE1D7]/60">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-headline text-xs uppercase tracking-wider text-[#59413a] font-bold">
-              Avg Members / Unit
-            </span>
-            <div className="w-10 h-10 rounded-lg bg-[#ffdcc3] flex items-center justify-center text-[#904d00]">
-              <span aria-hidden="true" className="material-symbols-outlined text-[22px]">family_restroom</span>
+            <div className="flex items-baseline gap-2">
+              <span className="font-headline text-3xl text-[#1e1b19] font-bold">{card.value}</span>
             </div>
+            <p className="font-body text-xs text-[#59413a] mt-1">{card.caption}</p>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-headline text-3xl text-[#1e1b19] font-bold">3.2</span>
-            <span className="font-headline text-xs text-[#904d00] flex items-center font-bold">
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">horizontal_rule</span>steady
-            </span>
-          </div>
-          <p className="font-body text-xs text-[#59413a] mt-1">1,318 total linked souls on roll</p>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#904d00]/5 rounded-full pointer-events-none group-hover:scale-125 transition-transform"></div>
-        </div>
-
-        {/* Stat 3: Single Member Homes */}
-        <div className="bg-white p-5 rounded-xl shadow-sm relative overflow-hidden group hover:shadow-md transition-all border border-[#EAE1D7]/60">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-headline text-xs uppercase tracking-wider text-[#59413a] font-bold">
-              Single Member Homes
-            </span>
-            <div className="w-10 h-10 rounded-lg bg-[#f4ece8] flex items-center justify-center text-[#59413a]">
-              <span aria-hidden="true" className="material-symbols-outlined text-[22px]">person_outline</span>
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-headline text-3xl text-[#1e1b19] font-bold">88</span>
-            <span className="font-headline text-xs text-[#59413a]/80 font-medium">21.3% of church</span>
-          </div>
-          <p className="font-body text-xs text-[#59413a] mt-1">Young adults, seniors & solo stewards</p>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#e1bfb5]/10 rounded-full pointer-events-none group-hover:scale-125 transition-transform"></div>
-        </div>
-
-        {/* Stat 4: Multi-Generational */}
-        <div className="bg-white p-5 rounded-xl shadow-sm relative overflow-hidden group hover:shadow-md transition-all border border-[#EAE1D7]/60">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-headline text-xs uppercase tracking-wider text-[#59413a] font-bold">
-              Multi-Generational
-            </span>
-            <div className="w-10 h-10 rounded-lg bg-[#85f8c4] flex items-center justify-center text-[#006243]">
-              <span aria-hidden="true" className="material-symbols-outlined text-[22px]">diversity_3</span>
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-headline text-3xl text-[#1e1b19] font-bold">54</span>
-            <span className="font-headline text-xs text-[#006243] flex items-center font-bold">
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">verified</span>13% active
-            </span>
-          </div>
-          <p className="font-body text-xs text-[#59413a] mt-1">Homes with elders & children linked</p>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#006243]/5 rounded-full pointer-events-none group-hover:scale-125 transition-transform"></div>
-        </div>
+        ))}
       </div>
+
 
       {/* Filter & Toolbar */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-[#EAE1D7]/60 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
@@ -190,7 +170,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                 className="appearance-none h-10 pl-3 pr-8 rounded-lg bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer focus:outline-none border border-[#e1bfb5]/40"
               >
                 <option value="all">All Campuses</option>
-                {LOCATIONS.map((location) => (
+                {locations.map((location) => (
                   <option key={location} value={location}>
                     {location}
                   </option>
@@ -202,17 +182,13 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
             </div>
 
             <div className="relative">
-              <select aria-label="Household status filter"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+              <select aria-label="Order of the register"
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as 'name' | 'largest')}
                 className="appearance-none h-10 pl-3 pr-8 rounded-lg bg-[#f4ece8] font-headline text-xs font-semibold text-[#1e1b19] cursor-pointer focus:outline-none border border-[#e1bfb5]/40"
               >
-                <option value="all">All Statuses</option>
-                {HOUSEHOLD_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
+                <option value="name">Name (A–Z)</option>
+                <option value="largest">Largest household first</option>
               </select>
               <span aria-hidden="true" className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[16px] text-[#59413a] pointer-events-none">
                 expand_more
@@ -244,7 +220,12 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
 
       {/* Household Grid: 6 Units */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredHouseholds.length === 0 && (
+        {error && (
+          <div className="col-span-full">
+            <ErrorBlock message={error} />
+          </div>
+        )}
+        {!error && householdsShown.length === 0 && (
           <div className="col-span-full">
             <EmptyState
               icon="holiday_village"
@@ -253,7 +234,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
             />
           </div>
         )}
-        {filteredHouseholds.map((unit) => (
+        {householdsShown.map((unit) => (
           <div
             key={unit.id}
             className="bg-white rounded-xl shadow-sm border border-[#EAE1D7]/60 p-6 flex flex-col justify-between hover:shadow-md transition-shadow"
@@ -415,16 +396,18 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
       <div className="bg-white px-6 py-4 rounded-xl shadow-sm border border-[#EAE1D7]/60 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <span className="font-body text-xs text-[#59413a]">
-            Showing <span className="font-bold text-[#1e1b19]">1 - {filteredHouseholds.length}</span> of{' '}
-            <span className="font-bold text-[#1e1b19]">412</span> households
+            Showing <span className="font-bold text-[#1e1b19]">1 - {householdsShown.length}</span> of{' '}
+            <span className="font-bold text-[#1e1b19]">{households.length}</span> households
           </span>
           <div className="hidden sm:flex items-center gap-2">
             <button
               type="button"
-              onClick={() => alert('Exporting Household Directory as CSV...')}
-              className="px-3 py-1.5 rounded-lg bg-[#f4ece8] hover:bg-[#eee7e3] font-headline text-xs font-semibold text-[#1e1b19] transition-colors flex items-center gap-1.5 cursor-pointer"
+              onClick={() => void handleExport()}
+              disabled={exporting}
+              className="px-3 py-1.5 rounded-lg bg-[#f4ece8] hover:bg-[#eee7e3] disabled:opacity-60 font-headline text-xs font-semibold text-[#1e1b19] transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">file_download</span> Export Roll (CSV)
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">file_download</span>{' '}
+              {exporting ? 'Preparing…' : 'Export Roll (CSV)'}
             </button>
             <button
               type="button"
@@ -519,17 +502,20 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
               </div>
 
               <div>
-                <label htmlFor="household-head" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
-                  Primary Family Head *
+                <label htmlFor="household-unit" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
+                  Unit Number *
                 </label>
-                <input id="household-head" aria-label="Primary Family Head"
+                <input id="household-unit" aria-label="Unit Number"
                   type="text"
                   required
-                  value={newHead}
-                  onChange={(e) => setNewHead(e.target.value)}
-                  placeholder="e.g. Timothy Mwangi"
+                  value={newUnitNumber || nextUnitNumber}
+                  onChange={(e) => setNewUnitNumber(e.target.value)}
+                  placeholder="e.g. HH-108"
                   className="w-full h-9 px-3 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 />
+                <p className="font-body text-[11px] text-[#59413a] mt-1">
+                  The head of the household is filed from their own member record — open it in Members and set them as head.
+                </p>
               </div>
 
               <div>
@@ -541,7 +527,7 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                   onChange={(e) => setNewCampus(e.target.value)}
                   className="w-full h-9 px-2.5 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 >
-                  {LOCATIONS.map((location) => (
+                  {locations.map((location) => (
                     <option key={location} value={location}>
                       {location}
                     </option>
@@ -558,19 +544,6 @@ export const FamilyUnitView: React.FC<FamilyUnitViewProps> = ({
                   value={newAddress}
                   onChange={(e) => setNewAddress(e.target.value)}
                   placeholder="Street Address, Estate, Town"
-                  className="w-full h-9 px-3 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="household-phone" className="block font-headline text-xs font-bold text-[#1e1b19] mb-1">
-                  Primary Contact Phone
-                </label>
-                <input id="household-phone" aria-label="Primary Contact Phone"
-                  type="tel"
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  placeholder="+254 700 000 000"
                   className="w-full h-9 px-3 rounded-lg border border-[#e1bfb5] text-[#1e1b19] focus:outline-none focus:border-[#9b2f00]"
                 />
               </div>

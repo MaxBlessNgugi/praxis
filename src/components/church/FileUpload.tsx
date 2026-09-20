@@ -38,6 +38,11 @@ export interface FileUploadProps {
   preview?: boolean;
   disabled?: boolean;
   onUploaded: (file: StoredFileDto) => void | Promise<void>;
+  /**
+   * Offered beside Replace once a file is attached. Omit it where a file is replaced but never
+   * dropped — a logo is retired from Settings, not from the sidebar that shows it.
+   */
+  onRemoved?: () => void | Promise<void>;
   className?: string;
 }
 
@@ -51,12 +56,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   preview = true,
   disabled = false,
   onUploaded,
+  onRemoved,
   className = '',
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justUploaded, setJustUploaded] = useState<StoredFileDto | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const displayedId = justUploaded?.id ?? currentFileId ?? null;
   const { url, loading: previewLoading } = useFileUrl(preview ? displayedId : null);
@@ -90,6 +97,29 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       setError(errorMessage(cause));
     } finally {
       setPending(false);
+    }
+  };
+
+  /**
+   * The file goes to the Trash, not away: the server keeps the row and the bytes, and the deletion
+   * is recorded with a reason the office writes here. What the caller does about the record that
+   * pointed at the file is the caller's own act — clearing `photoFileId` is a member update, not a
+   * file operation.
+   */
+  const handleRemove = async () => {
+    if (!displayedId) return;
+    const reasonLabel = window.prompt('Say why this file is being removed (kept in the audit log):');
+    if (!reasonLabel || reasonLabel.trim().length < 3) return;
+    setRemoving(true);
+    setError(null);
+    try {
+      await filesApi.remove(displayedId, { reason: 'request', reasonLabel: reasonLabel.trim() });
+      setJustUploaded(null);
+      await onRemoved?.();
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -133,6 +163,17 @@ export const FileUpload: React.FC<FileUploadProps> = ({
             >
               {pending ? 'Uploading…' : currentFileId || justUploaded ? 'Replace' : 'Choose file'}
             </button>
+            {onRemoved && displayedId && (
+              <button
+                type="button"
+                onClick={() => void handleRemove()}
+                disabled={disabled || removing || pending}
+                title="Removes the file; it stays in the Trash for thirty days"
+                className="px-3 py-1.5 rounded-[9px] border border-[#FECACA] bg-[#FFFFFF] hover:bg-[#FEF2F2] text-xs font-bold text-[#B91C1C] transition-colors disabled:opacity-70 cursor-pointer"
+              >
+                {removing ? 'Removing…' : 'Remove'}
+              </button>
+            )}
             <span className="text-[11px] text-[#A8A29E]">Max {limitMb} MB</span>
           </div>
 

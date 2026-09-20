@@ -46,6 +46,9 @@ jobs:
       - name: typecheck
         run: npm run typecheck
 
+      - name: lint
+        run: npm run lint
+
       - name: build
         run: npm run build
 
@@ -99,12 +102,43 @@ jobs:
         working-directory: backend
         run: npx tsx tools/tenant-isolation.ts
 
+      # The people domain, which the suites above only touch in passing: a household staffed, headed,
+      # emptied before it may retire and put back from the trash; a ministry whose roll re-rolls a
+      # returning member and refuses retirement while anybody still serves; and the two boundaries
+      # the console's buttons claim — a viewer who may read but not write, a staff member who may
+      # write but not retire. It runs in a probe church of its own and removes it either way.
+      - name: households, ministries and the role matrix
+        working-directory: backend
+        run: npm run check:people
+
+      # The circles that meet midweek: a group convened with its leader, its roll staffed, a meeting
+      # recorded and corrected, retirement refused while anybody still belongs, the trash that takes
+      # it back, the role matrix again on the new surface, and a second church that cannot reach
+      # another's circle at all. It runs in probe churches of its own and removes them either way.
+      - name: groups, fellowships and their meetings
+        working-directory: backend
+        run: npm run check:groups
+
       # The operator's side, which crosses tenants by design and so needs its own proof: suspension
       # refusing a sign-in and saying why, a support session that is scoped, audited and one-way, and
       # an outbound send that is refused rather than recorded as delivered when no provider is set.
       - name: the vendor console and the outbound gateways
         working-directory: backend
         run: npm run check:vendor
+
+      # The account's own lifecycle: a password change that ends the other sessions and keeps this
+      # one, a reset link that is single-use, expiring, and stored only as a hash. It works on a
+      # throwaway account rather than the seeded administrator's.
+      - name: the authentication lifecycle
+        working-directory: backend
+        run: npm run check:auth
+
+      # Failed responses, in both environments: that each one keeps the shape the console reads, and
+      # that a production server names no file, host or stack while a development one still says what
+      # broke. It needs no database and no running service.
+      - name: failures keep their shape
+        working-directory: backend
+        run: npm run check:errors
 
       # The register arriving as a spreadsheet, which is how every parish's data actually gets in.
       # It checks the report a clerk reads before anything is written, the duplicate keys that make a
@@ -121,6 +155,71 @@ jobs:
       - name: a church can sign itself up and use the whole system
         working-directory: backend
         run: npm run check:launch
+
+      # The money, which is the part of the system a parish cannot afford to be wrong about: a gift
+      # recorded and read back, filters and totals answered by the server rather than by the page, a
+      # mistake voided with its reason kept and restored again, an entry edited straight in the
+      # database caught by the hash chain, and a second church unable to see any of it. It runs in a
+      # probe church of its own and removes it either way.
+      - name: giving adds up, and tampering is caught
+        working-directory: backend
+        run: npm run check:finance
+
+      # The services and worship domain, which is where a volunteer is given something to do rather
+      # than a name on a list: a service scheduled with its room and hour kept honest, the order of
+      # service stored in the order it was sent, a duplicate duty refused, a swap asked for by the
+      # holder and decided by an administrator with the duty actually moving, a census revised rather
+      # than counted twice, a report signed off and read-only afterwards, and a second church unable
+      # to reach any of it. It runs in a probe church of its own and removes it either way.
+      - name: services, rosters and a signed-off service report
+        working-directory: backend
+        run: npm run check:worship
+
+      # The stock room: quantities that survive concurrent receipts from opposite sides without
+      # deadlocking, an issue refused when the shelf cannot cover it, a transfer that sums to zero on
+      # the ledger, a stock take whose approval is the only thing that moves stock, a retired item
+      # whose movements still sum to zero, and a second church unable to reach any of it. It runs in
+      # a probe church of its own and removes it either way.
+      - name: the stock ledger adds up under concurrency
+        working-directory: backend
+        run: npm run check:inventory
+
+      # The council: a quorum counted from the roll of offices rather than claimed by whoever files
+      # the notice, a minute sealed once the sitting has been held and the words written, the register
+      # fixed afterwards, a resolution moving proposed → voted → implemented → closed with every
+      # shortcut refused, the by-law library keeping the version in force and the copy the church
+      # holds, and a second church unable to reach any of it. It runs in a probe church of its own and
+      # removes it either way.
+      - name: the council's sittings, resolutions and by-laws
+        working-directory: backend
+        run: npm run check:governance
+
+      # What the church says and what it prays for: a notice's importance stored rather than styled,
+      # a board made of two dates, a campaign written and scheduled before it is sent, a send on a
+      # channel with no provider refused rather than recorded as delivered, an organiser named from
+      # this church's own register — and a private prayer request that never reaches an account the
+      # server has not authorised, in the list, in the counts, or by its id. It runs in a probe church
+      # of its own and removes it either way.
+      - name: notices, broadcasts, the calendar and the prayer wall
+        working-directory: backend
+        run: npm run check:communications
+
+      # Serials, reissue, the CSV exports and their filters, in a probe church of its own.
+      - name: reports, certificates and exports
+        working-directory: backend
+        run: npm run check:reports
+
+      # Files: delete-to-Trash-to-restore, preference persistence and audit, the export's honesty.
+      - name: settings, files and data tools
+        working-directory: backend
+        run: npm run check:settings
+
+      # The SaaS lifecycle, end to end: signup onto a trial, conversion by payment, an early renewal
+      # that *adds* a month, past due and expired arriving by the clock, a lapsed church that can still
+      # read everything it owns but write nothing, and one payment restoring all of it.
+      - name: the billing lifecycle
+        working-directory: backend
+        run: npm run check:billing
 
       # Deliberately last of the API checks: it exercises the sign-in rate limiter to prove the
       # ceiling exists, which leaves this address throttled for up to a minute afterwards.
@@ -157,6 +256,9 @@ jobs:
           DATABASE_URL: postgresql://praxis:praxis@localhost:5432/praxis?schema=public
           DIRECT_URL: postgresql://praxis:praxis@localhost:5432/praxis?schema=public
         run: npx prisma validate
+
+      - name: lint
+        run: npm run lint
 
       - name: typecheck
         run: npm run typecheck

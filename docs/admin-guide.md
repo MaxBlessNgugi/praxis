@@ -25,7 +25,7 @@ Two things are worth knowing before anything else:
 | **Church Council** | Meetings, resolutions with their decision workflow, the constitution and by-laws | The secretary and the council |
 | **Giving & Stewardship** | Tithes, offerings, project funding, welfare, charity, the giving ledger | The treasurer (and the pastor, to read) |
 | **Inventory & Assets** | Church property and its state | The administrator |
-| **Groups & Fellowships** | Departments, leadership roles, volunteers | The ministry coordinators |
+| **Groups & Fellowships** | Departments, leadership roles, volunteers, and the midweek circles (cell groups and fellowships) with their rolls and meeting records | The ministry coordinators |
 | **Reports & Certs** | Overview and filtered reports, certificates, the AGM dossier | The secretary and the pastor |
 | **Communications** | Announcements, broadcasts (email/SMS), events, prayer requests, birthdays | The office |
 | **Settings & Profile** | The church's own details, service times, subscription, integrations, data & backup | Owners and administrators |
@@ -141,7 +141,9 @@ order:
 
 1. Give the incoming person an account with the right role — **Super administrator** if they are taking
    charge.
-2. Ask them to change the password from a machine they control, on their first sign-in.
+2. Ask them to change the password from a machine they control, on their first sign-in: the account
+   menu at the bottom of the sidebar → **Security**. That ends any other session left open on the old
+   password, so nothing is still signed in as them on a machine they no longer use.
 3. **Disable** the outgoing account, don't delete it. Their work stays attributable.
 4. Walk the incoming person round these four screens: Home, Members, Giving, and Admin &rarr; Audit
    log. Those four are enough to run the office and to see that the system is honest.
@@ -156,8 +158,8 @@ order:
   when; Admin &rarr; Finance audit recomputes the giving ledger and names the first entry that no
   longer adds up.
 - **Somebody cannot sign in** — an account locks for fifteen minutes after five wrong passwords, and
-  the message says so. A forgotten password is reset by an administrator from Admin &rarr; Users &amp;
-  roles.
+  the message says so. A forgotten password is theirs to reset from *Forgot your password?* on the
+  sign-in screen; if no mail arrives, an administrator sets one from Admin &rarr; Users &amp; roles.
 - **The console will not load** — Settings &rarr; Data &amp; backup reports whether the server is
   reachable, and the request id on any error screen is what support needs to find the request again.
 - **Anything else** — contact the operator through the address on your invoice.

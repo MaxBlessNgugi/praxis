@@ -263,6 +263,79 @@ export interface ItemEnvelope<T> {
   data: T;
 }
 
+/** How a member stands on the register. */
+export type MemberStatusDto = 'active' | 'transferred' | 'deceased' | 'inactive';
+
+export type BaptismTypeDto = 'baptized' | 'dedicated' | 'none';
+
+/**
+ * A register row, exactly as the API sends it.
+ *
+ * This is the boundary the console was missing: without it the register's JSON was cast straight to
+ * a screen's view model, and every field the two spell differently — `firstName`/`lastName` against
+ * `name`, a household id against a household name — rendered blank. `lib/adapters.ts` translates
+ * between the two, and nothing else may assume they are the same shape.
+ */
+export interface MemberDto {
+  id: string;
+  memberId: string;
+  firstName: string;
+  lastName: string;
+  initials: string | null;
+  email: string | null;
+  phone: string | null;
+  nationalId: string | null;
+  dateOfBirth: string | null;
+  /** The congregation the member belongs to. */
+  location: string;
+  householdId: string | null;
+  householdRole: string | null;
+  isHouseholdHead: boolean;
+  status: MemberStatusDto;
+  baptismType: BaptismTypeDto;
+  baptismDate: string | null;
+  baptismOfficiant: string | null;
+  envelopeNumber: string | null;
+  pastoralNotes: string | null;
+  tags: string[];
+  joinedAt: string;
+  weddingAnniversary: string | null;
+  photoFileId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  /** Present on a list read: the household the member belongs to. */
+  household?: { id: string; name: string; unitNumber: string; location: string } | null;
+  /** Present on a single-record read: the ministries this member serves on. */
+  ministries?: MinistryMemberDto[];
+}
+
+/** One person on a household's roll. */
+export interface HouseholdMemberRef {
+  id: string;
+  memberId: string;
+  firstName: string;
+  lastName: string;
+  initials: string | null;
+  householdRole: string | null;
+  isHouseholdHead: boolean;
+  phone: string | null;
+}
+
+export interface HouseholdDto {
+  id: string;
+  name: string;
+  unitNumber: string;
+  location: string;
+  address: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  /** The roll. Absent only on a read that asked for the count instead. */
+  members?: HouseholdMemberRef[];
+  _count?: { members: number };
+}
+
 /** A member as other records refer to them (never the whole register row). */
 export interface MemberRef {
   id: string;
@@ -273,6 +346,8 @@ export interface MemberRef {
 
 export interface MemberRefWithPhone extends MemberRef {
   phone: string | null;
+  /** What a member hands over on a Sunday, so the giving ledger can file their gift by envelope. */
+  envelopeNumber: string | null;
 }
 
 /**
@@ -309,9 +384,12 @@ export interface LiturgyItemDto {
   notes: string | null;
 }
 
+export type ServiceKind = 'worship' | 'midweek' | 'prayer' | 'special' | 'other';
+
 export interface ServiceDto {
   id: string;
   title: string;
+  kind: ServiceKind;
   heldAt: string;
   startTime: string | null;
   venue: string;
@@ -329,6 +407,7 @@ export interface ServiceDto {
 
 export interface CreateServiceBody {
   title: string;
+  kind?: ServiceKind;
   heldAt: string;
   startTime?: string;
   venue: string;
@@ -421,6 +500,8 @@ export interface ServiceReportDto {
   highlights: string | null;
   preparedById: string | null;
   preparedBy?: { id: string; name: string } | null;
+  /** Set when an administrator signed the report off, which is what makes it read-only. */
+  finalizedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -440,7 +521,7 @@ export interface RetireBody {
 }
 
 export const servicesApi = {
-  list: (params?: { venue?: string; isTemplate?: boolean; from?: string; to?: string; page?: number; pageSize?: number; sort?: 'upcoming' | 'recent' }) =>
+  list: (params?: { kind?: ServiceKind; venue?: string; isTemplate?: boolean; from?: string; to?: string; page?: number; pageSize?: number; sort?: 'upcoming' | 'recent' }) =>
     api.get<ListEnvelope<ServiceDto>>(`/api/services${qs(params)}`),
   get: (id: string) => api.get<ItemEnvelope<ServiceDto>>(`/api/services/${id}`),
   create: (body: CreateServiceBody) => api.post<ItemEnvelope<ServiceDto>>('/api/services', body),
@@ -459,6 +540,9 @@ export const servicesApi = {
   getReport: (id: string) => api.get<ItemEnvelope<ServiceReportDto>>(`/api/services/${id}/report`),
   putReport: (id: string, body: UpsertServiceReportBody) =>
     api.put<ItemEnvelope<ServiceReportDto>>(`/api/services/${id}/report`, body),
+  /** Signing off closes the service: afterwards the report is read-only to everybody but an admin. */
+  finalizeReport: (id: string) =>
+    api.post<ItemEnvelope<ServiceReportDto>>(`/api/services/${id}/report/finalize`, {}),
 };
 
 export const attendanceApi = {
@@ -502,6 +586,10 @@ export interface TitheDto {
   recordedById: string | null;
   createdAt: string;
   updatedAt: string;
+  /** The member on the register this gift was filed against, when the clerk picked one. */
+  member?: MemberRef | null;
+  /** Who keyed it in, which is the name an auditor asks for. */
+  recordedBy?: { id: string; name: string } | null;
 }
 
 export interface RecordTitheBody {
@@ -528,6 +616,9 @@ export interface OfferingDto {
   recordedById: string | null;
   createdAt: string;
   updatedAt: string;
+  /** The gathering a plate was counted at, when the clerk filed it against a service. */
+  service?: { id: string; title: string; heldAt: string } | null;
+  recordedBy?: { id: string; name: string } | null;
 }
 
 export interface RecordOfferingBody {
@@ -591,15 +682,36 @@ export interface ContributionDto {
   updatedAt: string;
 }
 
+/**
+ * The window, the search and the facets both ledgers are filtered by, sent to the API as they are.
+ *
+ * A type alias rather than an interface: `qs` takes a record of scalars, and only a type alias carries
+ * the implicit index signature that lets an object of known fields be passed as one.
+ */
+export type GivingFilter = {
+  q?: string;
+  method?: PaymentMethod;
+  category?: string;
+  memberId?: string;
+  serviceId?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+  sort?: 'amount' | 'recent' | 'oldest';
+};
+
 export const tithesApi = {
-  list: (params?: { q?: string; method?: PaymentMethod; category?: string; memberId?: string; minAmount?: number; from?: string; to?: string; page?: number; pageSize?: number; sort?: 'amount' | 'recent' | 'oldest' }) =>
+  list: (params?: GivingFilter) =>
     api.get<ListEnvelope<TitheDto> & { totals: { amount: number } }>(`/api/finance/tithes${qs(params)}`),
   create: (body: RecordTitheBody) => api.post<ItemEnvelope<TitheDto>>('/api/finance/tithes', body),
   get: (id: string) => api.get<ItemEnvelope<TitheDto>>(`/api/finance/tithes/${id}`),
 };
 
 export const offeringsApi = {
-  list: (params?: { q?: string; method?: PaymentMethod; category?: string; from?: string; to?: string; page?: number; pageSize?: number; sort?: 'amount' | 'recent' | 'oldest' }) =>
+  list: (params?: GivingFilter) =>
     api.get<ListEnvelope<OfferingDto> & { totals: { amount: number } }>(`/api/finance/offerings${qs(params)}`),
   create: (body: RecordOfferingBody) => api.post<ItemEnvelope<OfferingDto>>('/api/finance/offerings', body),
 };
@@ -621,11 +733,14 @@ export const projectsApi = {
 };
 
 // ==================== COMMUNICATIONS ====================
+export type AnnouncementPriority = 'normal' | 'urgent';
+
 export interface AnnouncementDto {
   id: string;
   title: string;
   body: string;
   audience: string;
+  priority: AnnouncementPriority;
   isPinned: boolean;
   publishedAt: string;
   expiresAt: string | null;
@@ -640,16 +755,30 @@ export interface AnnouncementBody {
   title: string;
   body: string;
   audience?: string;
+  priority?: AnnouncementPriority;
   isPinned?: boolean;
   publishedAt?: string;
   expiresAt?: string | null;
+}
+
+export type EventKind = 'service' | 'conference' | 'meeting' | 'outreach';
+export type EventStatus = 'scheduled' | 'cancelled';
+
+/** The person running an event, named from the register so a card can show who to ask. */
+export interface OrganizerRef {
+  id: string;
+  firstName: string;
+  lastName: string;
 }
 
 export interface EventDto {
   id: string;
   title: string;
   description: string | null;
-  kind: 'service' | 'conference' | 'meeting' | 'outreach';
+  kind: EventKind;
+  organizerId: string | null;
+  organizer?: OrganizerRef | null;
+  status: EventStatus;
   venue: string;
   startsAt: string;
   endsAt: string;
@@ -662,7 +791,9 @@ export interface EventDto {
 export interface EventBody {
   title: string;
   description?: string;
-  kind?: EventDto['kind'];
+  kind?: EventKind;
+  organizerId?: string | null;
+  status?: EventStatus;
   venue: string;
   startsAt: string;
   endsAt: string;
@@ -709,7 +840,7 @@ export interface CelebrationsMeta {
 }
 
 export const announcementsApi = {
-  list: (params?: { q?: string; audience?: string; isPinned?: boolean; live?: boolean; from?: string; to?: string; page?: number; pageSize?: number }) =>
+  list: (params?: { q?: string; audience?: string; priority?: AnnouncementPriority; isPinned?: boolean; live?: boolean; from?: string; to?: string; page?: number; pageSize?: number }) =>
     api.get<ListEnvelope<AnnouncementDto>>(`/api/communications/announcements${qs(params)}`),
   create: (body: AnnouncementBody) => api.post<ItemEnvelope<AnnouncementDto>>('/api/communications/announcements', body),
   update: (id: string, body: Partial<AnnouncementBody>) =>
@@ -721,7 +852,7 @@ export const announcementsApi = {
 };
 
 export const eventsApi = {
-  list: (params?: { q?: string; kind?: EventDto['kind']; upcoming?: boolean; from?: string; to?: string; page?: number; pageSize?: number }) =>
+  list: (params?: { q?: string; kind?: EventKind; upcoming?: boolean; from?: string; to?: string; page?: number; pageSize?: number }) =>
     api.get<ListEnvelope<EventDto>>(`/api/communications/events${qs(params)}`),
   create: (body: EventBody) => api.post<ItemEnvelope<EventDto>>('/api/communications/events', body),
   update: (id: string, body: Partial<EventBody>) => api.patch<ItemEnvelope<EventDto>>(`/api/communications/events/${id}`, body),
@@ -864,6 +995,32 @@ export type FinanceAuditAction = 'recorded' | 'voided' | 'restored' | 'approved'
 export type FinanceEntity = 'tithe' | 'offering' | 'project' | 'contribution' | 'welfare' | 'charity';
 
 /**
+ * Why money came off the books — the API's own vocabulary for a void.
+ *
+ * The console offers exactly these and no others: a free-text reason cannot be reported on, and
+ * "wrong amount" arriving as "error" is how a treasurer's month-end review stops being able to say
+ * what kind of mistakes the office is making.
+ */
+export type VoidReason =
+  | 'duplicate'
+  | 'wrong_amount'
+  | 'wrong_member'
+  | 'wrong_date'
+  | 'bounced'
+  | 'fraud_suspected'
+  | 'other';
+
+export const VOID_REASONS: Array<{ value: VoidReason; label: string }> = [
+  { value: 'duplicate', label: 'Recorded twice' },
+  { value: 'wrong_amount', label: 'Wrong amount' },
+  { value: 'wrong_member', label: 'Wrong giver' },
+  { value: 'wrong_date', label: 'Wrong date' },
+  { value: 'bounced', label: 'Payment bounced' },
+  { value: 'fraud_suspected', label: 'Suspected fraud' },
+  { value: 'other', label: 'Something else' },
+];
+
+/**
  * A line in the chained ledger. Each entry carries a SHA-256 hash over its own fields plus the
  * previous entry's, so altering or removing a row after the fact breaks every hash after it.
  */
@@ -907,11 +1064,17 @@ export interface FinanceSummaryDto {
   projects: { cash: number; pledges: number; contributions: number; pledgeCount: number; received: number };
   welfare: { disbursed: number; awaitingPayment: number; declined: number; openCases: number };
   charity: { total: number; count: number };
-  givingByMethod: Array<{ method: PaymentMethod; amount: number; count: number }>;
-  givingByCategory: Array<{ category: string; amount: number; count: number }>;
+  /** Tithes split by how they arrived, largest first. Offerings are counted apart; see below. */
+  tithesByMethod: Array<{ method: PaymentMethod; amount: number; count: number }>;
+  tithesByCategory: Array<{ category: string; amount: number; count: number }>;
+  offeringsByMethod: Array<{ method: PaymentMethod; amount: number; count: number }>;
 }
 
-/** What the Trash reads. The finance trash adds `restorable`: whether the admin door can bring it back. */
+/**
+ * What the Trash reads. `restorable` is set by the **admin** trash, where a record type this system
+ * cannot put back is a real possibility; the finance door only ever lists money, and money is always
+ * restorable, so it leaves the flag off.
+ */
 export interface SoftDeletedRecordDto {
   id: string;
   entityName: string;
@@ -947,7 +1110,7 @@ export const financeApi = {
    * Void, never delete: the row stays, the reason is kept, and the ledger gets a line. Both the
    * reason and its label travel as query parameters, as every retirement in this system does.
    */
-  void: (entity: FinanceEntity, id: string, body: { reason: string; reasonLabel: string }) =>
+  void: (entity: FinanceEntity, id: string, body: RetireBody) =>
     api.delete<ItemEnvelope<unknown>>(
       `/api/finance/${entity}/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`,
     ),
@@ -1012,6 +1175,70 @@ export const ministriesApi = {
     api.get<ListEnvelope<MinistryMemberDto> & { totals: { serving: number } }>(`/api/ministries/roster${qs(params)}`),
 };
 
+// ==================== GROUPS & FELLOWSHIPS ====================
+export interface GroupDto {
+  id: string;
+  name: string;
+  description: string | null;
+  leaderId: string | null;
+  meetingDay: string | null;
+  location: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  leader: MemberRefWithPhone | null;
+  members?: GroupMemberDto[];
+  meetings?: GroupMeetingDto[];
+  _count?: { members: number };
+}
+
+export interface GroupMemberDto {
+  id: string;
+  groupId: string;
+  memberId: string;
+  roleTitle: string;
+  joinedAt: string;
+  member: MemberRefWithPhone;
+}
+
+export interface GroupMeetingDto {
+  id: string;
+  groupId: string;
+  metAt: string;
+  hostName: string | null;
+  notes: string | null;
+  attendedCount: number;
+  group?: { id: string; name: string };
+}
+
+interface GroupBody {
+  name: string;
+  description?: string;
+  leaderId?: string;
+  meetingDay?: string;
+  location?: string;
+  isActive?: boolean;
+}
+
+export const groupsApi = {
+  list: (params?: { q?: string; isActive?: boolean; leaderId?: string; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<GroupDto>>(`/api/groups${qs(params)}`),
+  get: (id: string) => api.get<ItemEnvelope<GroupDto>>(`/api/groups/${id}`),
+  create: (body: GroupBody) => api.post<ItemEnvelope<GroupDto>>('/api/groups', body),
+  update: (id: string, body: Partial<GroupBody> & { leaderId?: string | null }) =>
+    api.patch<ItemEnvelope<GroupDto>>(`/api/groups/${id}`, body),
+  retire: (id: string, body: RetireBody) =>
+    api.delete<ItemEnvelope<unknown>>(`/api/groups/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`),
+  addMember: (id: string, body: { memberId: string; roleTitle?: string }) =>
+    api.post<ItemEnvelope<GroupMemberDto>>(`/api/groups/${id}/members`, body),
+  removeMember: (memberRowId: string) => api.delete<void>(`/api/groups/members/${memberRowId}`),
+  recordMeeting: (id: string, body: { metAt: string; hostName?: string; notes?: string; attendedCount?: number }) =>
+    api.post<ItemEnvelope<GroupMeetingDto>>(`/api/groups/${id}/meetings`, body),
+  updateMeeting: (meetingId: string, body: Partial<{ metAt: string; hostName?: string; notes?: string; attendedCount: number }>) =>
+    api.patch<ItemEnvelope<GroupMeetingDto>>(`/api/groups/meetings/${meetingId}`, body),
+};
+
 // ==================== GOVERNANCE ====================
 export type MeetingKind = 'stated' | 'executive' | 'emergency';
 export type MeetingStatus = 'scheduled' | 'held' | 'cancelled';
@@ -1028,18 +1255,25 @@ export interface MeetingDto {
   chairId: string | null;
   secretaryId: string | null;
   attendees: number | null;
+  /** What the sitting needed that day, counted from the council roll and stamped on it by the server. */
+  quorumRequired: number | null;
+  /** Derived from the attendance against `quorumRequired`; `null` when either side is unknown. */
   quorumMet: boolean | null;
   agenda: string[] | null;
   minutes: string | null;
+  minutesFinalizedAt: string | null;
+  minutesFinalizedById: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
   chair: MemberRef | null;
   secretary: MemberRef | null;
+  minutesFinalizedBy: { id: string; name: string } | null;
   resolutions?: ResolutionDto[];
   _count?: { resolutions: number };
 }
 
+/** There is no `quorumMet` here: whether a sitting was quorate is counted by the server, not claimed. */
 export interface MeetingBody {
   title: string;
   kind?: MeetingKind;
@@ -1049,7 +1283,6 @@ export interface MeetingBody {
   chairId?: string;
   secretaryId?: string;
   attendees?: number;
-  quorumMet?: boolean;
   agenda?: string[];
   minutes?: string;
 }
@@ -1078,6 +1311,10 @@ export interface ResolutionDto {
 }
 
 /** The code is issued by the server in the year's series, so it is never sent from a client. */
+export type DecisionBody =
+  | { decision: 'voted_approved'; voteSummary: string; votesFor?: number; votesAgainst?: number; votesAbstain?: number; decidedAt?: string }
+  | { decision: 'implementing' | 'closed'; note: string };
+
 export interface ResolutionBody {
   title: string;
   summary: string;
@@ -1099,6 +1336,9 @@ export interface GovernanceDocumentDto {
   adoptedAt: string | null;
   body: string | null;
   fileUrl: string | null;
+  fileId: string | null;
+  /** The copy the church holds, uploaded through `/api/files`. */
+  file: { id: string; fileName: string; mimeType: string; byteSize: number } | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -1113,11 +1353,12 @@ export interface DocumentBody {
   adoptedAt?: string;
   body?: string;
   fileUrl?: string;
+  fileId?: string;
   isActive?: boolean;
 }
 
-/** Lists of meetings, resolutions and documents carry a per-key census beside their page meta. */
-type CountedEnvelope<T> = ListEnvelope<T> & { counts: Record<string, number> };
+/** Lists of resolutions and documents carry a per-key census beside their page meta. */
+export type CountedEnvelope<T> = ListEnvelope<T> & { counts: Record<string, number> };
 
 export const governanceApi = {
   listMeetings: (params?: { q?: string; kind?: MeetingKind; status?: MeetingStatus; from?: string; to?: string; page?: number; pageSize?: number }) =>
@@ -1126,6 +1367,8 @@ export const governanceApi = {
   createMeeting: (body: MeetingBody) => api.post<ItemEnvelope<MeetingDto>>('/api/governance/meetings', body),
   updateMeeting: (id: string, body: Partial<MeetingBody> & { chairId?: string | null; secretaryId?: string | null }) =>
     api.patch<ItemEnvelope<MeetingDto>>(`/api/governance/meetings/${id}`, body),
+  /** Sealing the minute is what closes a sitting, and only an administrator may do it. */
+  sealMinutes: (id: string) => api.post<ItemEnvelope<MeetingDto>>(`/api/governance/meetings/${id}/minutes/seal`, {}),
   retireMeeting: (id: string, body: RetireBody) =>
     api.delete<ItemEnvelope<unknown>>(`/api/governance/meetings/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`),
 
@@ -1135,8 +1378,8 @@ export const governanceApi = {
   createResolution: (body: ResolutionBody) => api.post<ItemEnvelope<ResolutionDto>>('/api/governance/resolutions', body),
   updateResolution: (id: string, body: Partial<ResolutionBody> & { meetingId?: string | null }) =>
     api.patch<ItemEnvelope<ResolutionDto>>(`/api/governance/resolutions/${id}`, body),
-  /** A vote is its own act, with its own endpoint — never a field a general PATCH could change. */
-  decideResolution: (id: string, body: { decision: 'voted_approved' | 'closed'; voteSummary: string; votesFor?: number; votesAgainst?: number; votesAbstain?: number; decidedAt?: string }) =>
+  /** Each step is its own act, with its own endpoint — never a stage a general PATCH could set. */
+  decideResolution: (id: string, body: DecisionBody) =>
     api.post<ItemEnvelope<ResolutionDto>>(`/api/governance/resolutions/${id}/decision`, body),
   retireResolution: (id: string, body: RetireBody) =>
     api.delete<ItemEnvelope<unknown>>(`/api/governance/resolutions/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`),
@@ -1261,6 +1504,293 @@ export const reportsApi = {
   attendance: (params?: ReportRange) => api.get<ItemEnvelope<AttendanceReportDto>>(`/api/reports/attendance${qs(params)}`),
   ministries: () => api.get<ItemEnvelope<MinistryReportDto>>('/api/reports/ministries'),
   governance: (params?: ReportRange) => api.get<ItemEnvelope<GovernanceReportDto>>(`/api/reports/governance${qs(params)}`),
+  inventory: () => api.get<ItemEnvelope<InventoryReportDto>>('/api/reports/inventory'),
+  //
+  // The ledgers, as files. A GET returning CSV is handed back as a Blob by the client's own rule
+  // (non-JSON is bytes), so an export runs under the same bearer token and gates as every read.
+  //
+  tithesCsv: (params?: ReportRange & Record<string, string | undefined>) => api.get<Blob>(`/api/reports/exports/tithes.csv${qs(params)}`),
+  offeringsCsv: (params?: ReportRange & Record<string, string | undefined>) => api.get<Blob>(`/api/reports/exports/offerings.csv${qs(params)}`),
+  attendanceCsv: (params?: ReportRange & Record<string, string | undefined>) => api.get<Blob>(`/api/reports/exports/attendance.csv${qs(params)}`),
+  householdsCsv: (params?: ReportRange & Record<string, string | undefined>) => api.get<Blob>(`/api/reports/exports/households.csv${qs(params)}`),
+};
+
+// ==================== CERTIFICATES ====================
+/** The two ordinances the church issues certificates for. */
+export type CertificateKind = 'baptism' | 'dedication';
+
+export interface CertificateDto {
+  id: string;
+  serial: string;
+  kind: CertificateKind;
+  fullName: string;
+  memberNumber: string | null;
+  member: { id: string; memberId: string; firstName: string; lastName: string } | null;
+  parents: string | null;
+  ceremonyDate: string | null;
+  officiant: string | null;
+  scripture: string | null;
+  issuedBy: { id: string; name: string } | null;
+  issuedAt: string;
+  reissues: { id: string; serial: string } | null;
+}
+
+export interface IssueCertificateBody {
+  kind: CertificateKind;
+  fullName: string;
+  memberId?: string;
+  memberNumber?: string;
+  parents?: string;
+  ceremonyDate: string;
+  officiant?: string;
+  scripture?: string;
+}
+
+export const certificatesApi = {
+  list: (params?: { kind?: CertificateKind; q?: string; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<CertificateDto>>(`/api/certificates${qs(params)}`),
+  get: (id: string) => api.get<ItemEnvelope<CertificateDto>>(`/api/certificates/${id}`),
+  issue: (body: IssueCertificateBody) => api.post<ItemEnvelope<CertificateDto>>('/api/certificates', body),
+  reissue: (id: string, body: { officiant?: string }) =>
+    api.post<ItemEnvelope<CertificateDto>>(`/api/certificates/${id}/reissue`, body),
+  retire: (id: string, body: { reason: string; reasonLabel: string }) =>
+    api.delete<ItemEnvelope<CertificateDto>>(`/api/certificates/${id}${qs(body)}`),
+};
+
+// ==================== INVENTORY ====================
+export type InventoryKind = 'consumable' | 'asset';
+export type InventoryStatus = 'active' | 'in_service' | 'maintenance' | 'lost' | 'damaged' | 'disposed';
+export type AssetCondition = 'good' | 'fair' | 'poor';
+export type StockMovementKind = 'purchase' | 'issue' | 'return' | 'transfer' | 'adjustment' | 'loss' | 'damage';
+export type StockTakeStatus = 'counting' | 'review' | 'approved' | 'cancelled';
+
+export interface SupplierDto {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  isActive: boolean;
+}
+
+export interface InventoryItemDto {
+  id: string;
+  sku: string;
+  name: string;
+  kind: InventoryKind;
+  category: string;
+  unit: string;
+  location: string;
+  quantity: number;
+  reorderAt: number | null;
+  cost: number | null;
+  status: InventoryStatus;
+  condition: AssetCondition | null;
+  supplier: { id: string; name: string } | null;
+  purchasedAt: string | null;
+  custodian: { id: string; firstName: string; lastName: string; initials: string } | null;
+  serialNumber: string | null;
+  warrantyUntil: string | null;
+  fileId: string | null;
+  notes: string | null;
+  lastCountedAt: string | null;
+}
+
+/** One visit to the repair bench, with the item it serviced and who logged it. */
+export interface MaintenanceRecordDto {
+  id: string;
+  itemId: string;
+  servicedAt: string;
+  provider: string | null;
+  cost: number | null;
+  description: string | null;
+  nextDueAt: string | null;
+  file: { id: string; fileName: string } | null;
+  recordedBy: { id: string; name: string } | null;
+  createdAt: string;
+  item: { id: string; name: string; sku: string; unit: string };
+}
+
+export interface StockMovementDto {
+  id: string;
+  itemId: string;
+  kind: StockMovementKind;
+  delta: number;
+  balanceAfter: number;
+  reference: string | null;
+  note: string | null;
+  actor: { id: string; name: string } | null;
+  occurredAt: string;
+  item?: { id: string; name: string; sku: string; unit: string };
+}
+
+export interface StockTakeDto {
+  id: string;
+  itemId: string;
+  status: StockTakeStatus;
+  bookQuantity: number;
+  countedQuantity: number | null;
+  variance: number | null;
+  note: string | null;
+  countedBy: { id: string; name: string } | null;
+  approvedBy: { id: string; name: string } | null;
+  approvedAt: string | null;
+  createdAt: string;
+  item?: { id: string; name: string; sku: string; unit: string };
+}
+
+export interface PurchaseDto {
+  id: string;
+  reference: string | null;
+  supplier: { id: string; name: string } | null;
+  total: number;
+  purchasedAt: string;
+  note: string | null;
+  recordedBy: { id: string; name: string } | null;
+  lines: Array<{ id: string; quantity: number; unitCost: number | null; item: { id: string; name: string; sku: string; unit: string } }>;
+}
+
+export interface IssueDto {
+  id: string;
+  quantity: number;
+  issuedToName: string;
+  reason: string | null;
+  issuedAt: string;
+  item: { id: string; name: string; sku: string; unit: string };
+  ministry: { id: string; name: string } | null;
+  issuedBy: { id: string; name: string } | null;
+  authorizedBy: { id: string; name: string } | null;
+}
+
+export interface TransferDto {
+  id: string;
+  quantity: number;
+  fromLocation: string;
+  toLocation: string;
+  note: string | null;
+  transferredAt: string;
+  item: { id: string; name: string; sku: string; unit: string };
+  transferredBy: { id: string; name: string } | null;
+}
+
+export interface InventoryReportDto {
+  totals: {
+    consumableLines: number;
+    consumableQuantity: number;
+    assetLines: number;
+    assetQuantity: number;
+    stockValue: number;
+    assetValue: number;
+    totalValue: number;
+  };
+  byCategory: Array<{ category: string; lines: number; value: number }>;
+  byLocation: Array<{ location: string; lines: number; quantity: number }>;
+  byCondition: Array<{ condition: string; lines: number }>;
+  byCustodian: Array<{ custodian: string; lines: number }>;
+  lowStock: Array<{ id: string; sku: string; name: string; quantity: number; reorderAt: number | null; unit: string; location: string }>;
+  maintenanceDue: Array<{
+    id: string;
+    servicedAt: string;
+    nextDueAt: string | null;
+    provider: string | null;
+    item: { id: string; name: string; sku: string; location: string };
+  }>;
+  recentVariances: Array<{
+    id: string;
+    approvedAt: string | null;
+    variance: number | null;
+    countedQuantity: number | null;
+    bookQuantity: number;
+    item: { id: string; name: string; sku: string };
+  }>;
+  movementsByKind: Record<string, number>;
+}
+
+export const inventoryApi = {
+  suppliers: (params?: { q?: string; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<SupplierDto>>(`/api/inventory/suppliers${qs(params)}`),
+  addSupplier: (body: { name: string; phone?: string; email?: string; notes?: string }) =>
+    api.post<ItemEnvelope<SupplierDto>>('/api/inventory/suppliers', body),
+  items: (params?: { q?: string; category?: string; kind?: InventoryKind; status?: InventoryStatus; lowStock?: 'true'; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<InventoryItemDto>>(`/api/inventory/items${qs(params)}`),
+  item: (id: string) => api.get<ItemEnvelope<InventoryItemDto & { movements: StockMovementDto[] }>>(`/api/inventory/items/${id}`),
+  addItem: (body: {
+    sku: string;
+    name: string;
+    kind: InventoryKind;
+    category: string;
+    unit?: string;
+    location: string;
+    reorderAt?: number | null;
+    cost?: number | null;
+    condition?: AssetCondition | null;
+    supplierId?: string | null;
+    purchasedAt?: string | null;
+    custodianId?: string | null;
+    serialNumber?: string | null;
+    warrantyUntil?: string | null;
+    fileId?: string | null;
+    openingQuantity?: number;
+    notes?: string;
+  }) => api.post<ItemEnvelope<InventoryItemDto>>('/api/inventory/items', body),
+  updateItem: (
+    id: string,
+    body: {
+      status?: Exclude<InventoryStatus, 'disposed'>;
+      condition?: AssetCondition | null;
+      location?: string;
+      notes?: string;
+      reorderAt?: number | null;
+      serialNumber?: string | null;
+      warrantyUntil?: string | null;
+      fileId?: string | null;
+    },
+  ) => api.patch<ItemEnvelope<InventoryItemDto>>(`/api/inventory/items/${id}`, body),
+  maintenance: (params?: { itemId?: string; due?: 'true'; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<MaintenanceRecordDto>>(`/api/inventory/maintenance${qs(params)}`),
+  addMaintenance: (body: {
+    itemId: string;
+    servicedAt: string;
+    provider?: string;
+    cost?: number | null;
+    description?: string;
+    nextDueAt?: string | null;
+    fileId?: string | null;
+  }) => api.post<ItemEnvelope<MaintenanceRecordDto>>('/api/inventory/maintenance', body),
+  retireItem: (id: string, body: { reason: string; reasonLabel: string }) =>
+    api.delete<ItemEnvelope<unknown>>(`/api/inventory/items/${id}${qs(body)}`),
+  movements: (params?: { itemId?: string; kind?: StockMovementKind; from?: string; to?: string; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<StockMovementDto>>(`/api/inventory/movements${qs(params)}`),
+  stockTakes: (params?: { itemId?: string; status?: StockTakeStatus; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<StockTakeDto>>(`/api/inventory/stock-takes${qs(params)}`),
+  startStockTake: (body: { itemId: string; note?: string }) =>
+    api.post<ItemEnvelope<StockTakeDto>>('/api/inventory/stock-takes', body),
+  recordCount: (id: string, body: { countedQuantity: number; note?: string }) =>
+    api.post<ItemEnvelope<StockTakeDto>>(`/api/inventory/stock-takes/${id}/count`, body),
+  approveStockTake: (id: string) => api.post<ItemEnvelope<StockTakeDto>>(`/api/inventory/stock-takes/${id}/approve`, {}),
+  cancelStockTake: (id: string) => api.post<ItemEnvelope<StockTakeDto>>(`/api/inventory/stock-takes/${id}/cancel`, {}),
+  purchases: (params?: { q?: string; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<PurchaseDto>>(`/api/inventory/purchases${qs(params)}`),
+  recordPurchase: (body: {
+    supplierId?: string;
+    reference?: string;
+    note?: string;
+    lines: Array<{ itemId: string; quantity: number; unitCost?: number | null }>;
+  }) => api.post<ItemEnvelope<PurchaseDto>>('/api/inventory/purchases', body),
+  issues: (params?: { itemId?: string; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<IssueDto>>(`/api/inventory/issues${qs(params)}`),
+  recordIssue: (body: {
+    itemId: string;
+    quantity: number;
+    issuedToName: string;
+    ministryId?: string;
+    reason?: string;
+    authorizedById?: string;
+  }) => api.post<ItemEnvelope<IssueDto>>('/api/inventory/issues', body),
+  transfers: (params?: { itemId?: string; page?: number; pageSize?: number }) =>
+    api.get<ListEnvelope<TransferDto>>(`/api/inventory/transfers${qs(params)}`),
+  recordTransfer: (body: { itemId: string; quantity: number; toLocation: string; note?: string }) =>
+    api.post<ItemEnvelope<TransferDto>>('/api/inventory/transfers', body),
 };
 
 // ==================== SETTINGS ====================
@@ -1389,7 +1919,7 @@ export interface TrashListEnvelope {
 export interface AuditListEnvelope {
   data: AuditLogDto[];
   meta: PageMeta;
-  totals: { byAction: Record<string, number>; byEntity: Record<string, number> };
+  totals: { byAction: Record<string, number>; byEntity: Record<string, number>; byActor: Record<string, string> };
 }
 
 /** One record's whole history, read back from both logs, oldest first. */
@@ -1434,7 +1964,11 @@ export interface AdminUserDto {
   memberId: string | null;
   isActive: boolean;
   lastLoginAt: string | null;
+  /** Still waiting on its activation link: the only forward path is a re-issued invitation. */
+  isInvited: boolean;
   createdAt: string;
+  /** Every church this account serves, with its role in each — the multi-org picture of one person. */
+  churches: Array<{ id: string; name: string; roleKey: string | null }>;
 }
 
 export const usersApi = {
@@ -1442,6 +1976,20 @@ export const usersApi = {
     api.get<ListEnvelope<AdminUserDto>>(`/api/admin/users${qs(params)}`),
   create: (body: { name: string; email: string; password: string; roleKey?: string; memberId?: string }) =>
     api.post<ItemEnvelope<AdminUserDto>>('/api/admin/users', body),
+  /**
+   * Invite an account: created immediately, but only its owner's emailed activation link can make it
+   * sign-in-able. `devLink` is present only on a development server with no email provider.
+   */
+  invite: (body: { name: string; email: string; roleKey?: string; memberId?: string }) =>
+    api.post<
+      ItemEnvelope<{ user: AdminUserDto; canSendEmail: boolean; devLink?: string }>
+    >('/api/admin/users/invite', body),
+  /**
+   * Re-issue the activation link for an invited account that never finished signing up — the
+   * office's "their link lapsed" case. Same shape as the invite's answer.
+   */
+  reinvite: (id: string) =>
+    api.post<ItemEnvelope<{ canSendEmail: boolean; devLink?: string }>>(`/api/admin/users/${id}/reinvite`, {}),
   update: (id: string, body: { name?: string; email?: string; isActive?: boolean }) =>
     api.patch<ItemEnvelope<AdminUserDto>>(`/api/admin/users/${id}`, body),
   assignRole: (id: string, roleKey: string) =>
@@ -1491,7 +2039,8 @@ export const filesApi = {
     api.get<ListEnvelope<StoredFileDto>>(`/api/files${qs(params)}`),
   meta: (id: string) => api.get<ItemEnvelope<StoredFileDto>>(`/api/files/${id}/meta`),
   upload: (body: UploadFileBody) => api.post<ItemEnvelope<StoredFileDto>>('/api/files', body),
-  remove: (id: string) => api.delete<ItemEnvelope<StoredFileDto>>(`/api/files/${id}`),
+  remove: (id: string, body: { reason: string; reasonLabel: string }) =>
+    api.delete<ItemEnvelope<StoredFileDto>>(`/api/files/${id}${qs(body)}`),
   download: (id: string) => api.get<Blob>(`/api/files/${id}`),
 };
 
@@ -1665,6 +2214,7 @@ export const vendorApi = {
   ) => api.post<ItemEnvelope<SubscriptionPaymentDto>>(`/api/vendor/organizations/${id}/payments`, body),
   /** How big this church is and when anything last happened in it. */
   stats: (id: string) => api.get<ItemEnvelope<VendorOrganizationStatsDto>>(`/api/vendor/organizations/${id}/stats`),
+  payments: (id: string) => api.get<ItemEnvelope<SubscriptionPaymentDto[]>>(`/api/vendor/organizations/${id}/payments`),
   setSuspension: (id: string, body: { suspended: boolean; reason: string }) =>
     api.post<ItemEnvelope<{ id: string; name: string; isActive: boolean }>>(`/api/vendor/organizations/${id}/suspension`, body),
   startSupportSession: (id: string, body: { reason: string }) =>
@@ -1710,7 +2260,34 @@ export const authApi = {
    * Changing your own password. The current one is required even though the console already holds a
    * token — a token can be copied off a shared office machine, and this is what stops the copy from
    * locking its owner out.
+   *
+   * The answer is a **new token**: the change ends every other session on the account, including the
+   * one that asked, so the console has to replace the token it is holding or it signs itself out.
    */
   changePassword: (body: { currentPassword: string; newPassword: string }) =>
-    api.post<void>('/api/auth/password', body),
+    api.post<ItemEnvelope<{ token: string; expiresIn: string }>>('/api/auth/password', body),
+  /**
+   * Ask for a reset link. The answer is the same whether or not the address is registered — the
+   * endpoint cannot be used to find out who has an account. `devLink` is present only on a development
+   * server with no email provider configured, where there is no other way to finish the flow.
+   */
+  requestPasswordReset: (body: { email: string }) =>
+    api.post<
+      ItemEnvelope<{ message: string; canSendEmail: boolean; expiresInMinutes: number; devLink?: string }>
+    >('/api/auth/password-reset/request', body),
+  /** Spend the link: the token from the email, and the password to replace the old one with. */
+  confirmPasswordReset: (body: { token: string; password: string }) =>
+    api.post<void>('/api/auth/password-reset/confirm', body),
+  /**
+   * Move the session to another church the account serves. Answers the sign-in shape — a fresh token
+   * whose organization claim is the new church, rights and all — so the session swap is one call.
+   */
+  switchOrganization: (body: { organizationId: string }) =>
+    api.post<LoginResponse>('/api/auth/switch-organization', body),
+  /**
+   * The signed-in account renaming itself. The email is the office's to change, not the caller's —
+   * it is the identity across every church the account serves and how its mail is addressed.
+   */
+  updateOwnProfile: (body: { name: string }) =>
+    api.patch<ItemEnvelope<{ name: string }>>('/api/auth/me', body),
 };

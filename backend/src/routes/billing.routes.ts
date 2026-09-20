@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as billingController from '../controllers/billing.controller';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { moduleGate } from '../middleware/authorize';
 import { requireAuth } from '../middleware/authenticate';
 
 /**
@@ -16,7 +17,7 @@ import { requireAuth } from '../middleware/authenticate';
  */
 export const billingRouter = Router();
 
-billingRouter.use(requireAuth);
+billingRouter.use(requireAuth, moduleGate('settings'));
 
 billingRouter.get('/plans', asyncHandler(billingController.listPlans));
 billingRouter.get('/subscription', asyncHandler(billingController.getSubscription));

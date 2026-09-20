@@ -1,376 +1,448 @@
 import React, { useState } from 'react';
-import { AnnouncementItem, AnnouncementAudience } from '../../../../types';
 import { useDialog } from '../../dialog';
-import { announcementsApi } from '../../../../lib/api';
-import { toAnnouncementItem } from '../../../../lib/adapters';
+import {
+  announcementsApi,
+  type AnnouncementBody,
+  type AnnouncementDto,
+  type AnnouncementPriority,
+} from '../../../../lib/api';
+import { formatDate } from '../../../../lib/adapters';
 import { useAnnouncements, useMutation } from '../../../../hooks/useApi';
 import { usePermissions } from '../../../../lib/permissions';
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '../../DataState';
 
+/**
+ * The notice sheet, as the church actually keeps it.
+ *
+ * The table stores a title, a body, who it is for, how loudly it asks to be read, and the two dates
+ * that decide when it is on the board. Every control here writes one of those and nothing else — the
+ * old panel offered a category and a priority the record had no column for, so a notice's importance
+ * was a display default rather than something the office had decided.
+ *
+ * The three states a notice can be in are read off those dates rather than stored: not yet up,
+ * on the board, taken down. That is why "Publish now" and "Take down" are the same two dates moved.
+ */
+
+/** The audiences the office posts to. Stored as written, so the label *is* the record. */
+const AUDIENCES = ['Everyone', 'Members', 'Ministry Leaders', 'Youth', 'Church Council'] as const;
+
+const FIELD =
+  'w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]';
+const LABEL = 'block text-xs font-bold text-[#1C1917] mb-1';
+
+type NoticeState = 'scheduled' | 'live' | 'lapsed';
+
+function stateOf(notice: AnnouncementDto): NoticeState {
+  const now = Date.now();
+  if (new Date(notice.publishedAt).getTime() > now) return 'scheduled';
+  if (notice.expiresAt && new Date(notice.expiresAt).getTime() <= now) return 'lapsed';
+  return 'live';
+}
+
+const STATE_LABELS: Record<NoticeState, string> = {
+  scheduled: 'Goes up later',
+  live: 'On the board',
+  lapsed: 'Taken down',
+};
+
+/** `YYYY-MM-DD` for a date input, in the reader's own zone. */
+const dayInput = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-CA') : '');
+
+/** A day input means the start of that day local time; an empty one means no date at all. */
+const instantOf = (day: string) => (day ? new Date(`${day}T00:00:00`).toISOString() : undefined);
+
+interface Draft {
+  id: string | null;
+  title: string;
+  body: string;
+  audience: string;
+  priority: AnnouncementPriority;
+  isPinned: boolean;
+  publishedOn: string;
+  expiresOn: string;
+}
+
+const emptyDraft = (): Draft => ({
+  id: null,
+  title: '',
+  body: '',
+  audience: AUDIENCES[0],
+  priority: 'normal',
+  isPinned: false,
+  publishedOn: new Date().toLocaleDateString('en-CA'),
+  expiresOn: '',
+});
+
+const draftOf = (notice: AnnouncementDto): Draft => ({
+  id: notice.id,
+  title: notice.title,
+  body: notice.body,
+  audience: notice.audience,
+  priority: notice.priority,
+  isPinned: notice.isPinned,
+  publishedOn: dayInput(notice.publishedAt),
+  expiresOn: dayInput(notice.expiresAt),
+});
+
 export const AnnouncementsPanel: React.FC = () => {
-  const { items, loading, error, refetch } = useAnnouncements();
+  const { items, loading, error, refetch } = useAnnouncements({ pageSize: 100 });
   const createAnnouncement = useMutation(announcementsApi.create);
   const updateAnnouncement = useMutation(announcementsApi.update);
   const retireAnnouncement = useMutation(announcementsApi.retire);
   const { canEdit, canDelete } = usePermissions();
 
-  const announcements = items.map(toAnnouncementItem);
-
   const [selectedAudience, setSelectedAudience] = useState<string>('all');
-  const [isCreating, setIsCreating] = useState<boolean>(false);
-  const creatingDialog = useDialog(() => setIsCreating(false), "Publish Announcement");
+  const [draft, setDraft] = useState<Draft>(emptyDraft());
+  const [isEditing, setIsEditing] = useState(false);
+  const editingDialog = useDialog(() => setIsEditing(false), 'Church Notice');
 
-  // Form state. `priority` and `category` keep the existing controls, but the announcements table
-  // stores neither yet, so they are not submitted (see the Phase 2 notes).
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [audience, setAudience] = useState<AnnouncementAudience>('everyone');
-  const [priority, setPriority] = useState<AnnouncementItem['priority']>('normal');
-  const [isPinned, setIsPinned] = useState<boolean>(false);
-  const [category, setCategory] = useState<AnnouncementItem['category']>('worship');
-  const [expiryDate, setExpiryDate] = useState('Mar 09, 2025');
-  const [author, setAuthor] = useState('Church Office Staff');
+  // The audience filter is the loaded rows, not a second request: the panel holds the whole sheet.
+  const shown = selectedAudience === 'all' ? items : items.filter((notice) => notice.audience === selectedAudience);
+  const boards = items.filter((notice) => stateOf(notice) === 'live');
 
-  const filteredAnnouncements = announcements.filter((ann) => {
-    if (selectedAudience !== 'all' && ann.audience !== selectedAudience) return false;
-    return true;
-  });
+  const openComposer = (notice?: AnnouncementDto) => {
+    setDraft(notice ? draftOf(notice) : emptyDraft());
+    setIsEditing(true);
+  };
 
-  const handleCreateAnnouncement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !content.trim()) return;
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!draft.title.trim() || !draft.body.trim()) return;
+
+    const body = {
+      title: draft.title.trim(),
+      body: draft.body.trim(),
+      audience: draft.audience,
+      priority: draft.priority,
+      isPinned: draft.isPinned,
+      publishedAt: instantOf(draft.publishedOn),
+      expiresAt: instantOf(draft.expiresOn) ?? null,
+    };
 
     try {
-      await createAnnouncement.run({
-        title: title.trim(),
-        body: content.trim(),
-        audience,
-        isPinned,
-      });
+      if (draft.id) await updateAnnouncement.run(draft.id, body);
+      else await createAnnouncement.run(body);
       await refetch();
-      setIsCreating(false);
-      setTitle('');
-      setContent('');
+      setIsEditing(false);
     } catch {
-      // createAnnouncement.error is rendered inside the modal.
+      // The write's own error is rendered inside the dialog.
     }
   };
 
-  const handleTogglePin = async (id: string) => {
-    const current = announcements.find((a) => a.id === id);
-    if (!current) return;
-    try {
-      await updateAnnouncement.run(id, { isPinned: !current.isPinned });
-      await refetch();
-    } catch {
-      // updateAnnouncement.error is rendered below the list.
-    }
+  /**
+   * Pinning, publishing now and taking a notice down are all the same act — one row changed — so the
+   * two date buttons and the pin share this.
+   */
+  const change = async (notice: AnnouncementDto, fields: Partial<AnnouncementBody>) => {
+    await updateAnnouncement.run(notice.id, fields);
+    await refetch();
   };
 
-  const handleDeleteAnnouncement = async (id: string) => {
-    try {
-      // Every retirement in this system carries a reason into the Trash and the audit trail.
-      await retireAnnouncement.run(id, {
-        reason: 'other',
-        reasonLabel: 'Taken off the noticeboard by the church office',
-      });
-      await refetch();
-    } catch {
-      // retireAnnouncement.error is rendered below the list.
-    }
+  const retire = async (notice: AnnouncementDto) => {
+    await retireAnnouncement.run(notice.id, {
+      reason: 'other',
+      reasonLabel: 'Taken off the noticeboard by the church office',
+    });
+    await refetch();
   };
 
-  const writeError = updateAnnouncement.error ?? retireAnnouncement.error;
+  const writeError = updateAnnouncement.error ?? retireAnnouncement.error ?? createAnnouncement.error;
 
   return (
     <div className="flex flex-col space-y-6">
-      {/* Metrics Row */}
+      {/* What the sheet holds right now. Each figure is the rows on screen, nothing else. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Active Bulletins</span>
-            <div className="text-2xl font-black text-[#1C1917] mt-0.5">{announcements.length} Published</div>
-            <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">check_circle</span>
-              All channels synchronized
-            </span>
+        {[
+          { label: 'On the board', value: `${boards.length} Live`, hint: 'Published and not yet taken down' },
+          { label: 'Urgent', value: `${items.filter((n) => n.priority === 'urgent').length} Alerts`, hint: 'Placed first on every list' },
+          { label: 'Pinned', value: `${items.filter((n) => n.isPinned).length} Featured`, hint: 'Held at the top of the sheet' },
+          {
+            label: 'Written ahead',
+            value: `${items.filter((n) => stateOf(n) === 'scheduled').length} Scheduled`,
+            hint: 'Waiting for the day they go up',
+          },
+        ].map((card) => (
+          <div
+            key={card.label}
+            className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card"
+          >
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">{card.label}</span>
+            <div className="text-2xl font-black text-[#1C1917] mt-0.5">{card.value}</div>
+            <span className="text-xs text-[#57534E]">{card.hint}</span>
           </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">campaign</span>
-          </div>
-        </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Pinned Notices</span>
-            <div className="text-2xl font-black text-[#C2410C] mt-0.5">
-              {announcements.filter((a) => a.isPinned).length} Featured
-            </div>
-            <span className="text-xs text-[#57534E] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">push_pin</span>
-              Promoted on Church Notice Board
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#C2410C]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">push_pin</span>
-          </div>
-        </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Urgent Priority</span>
-            <div className="text-2xl font-black text-[#DC2626] mt-0.5">
-              {announcements.filter((a) => a.priority === 'urgent').length} Alerts
-            </div>
-            <span className="text-xs text-[#DC2626] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">priority_high</span>
-              Top-of-bulletin placement
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#DC2626]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">notification_important</span>
-          </div>
-        </div>
-
-        <div className="bg-[#FFFFFF] p-5 rounded-[14px] border border-[#E7E5E4] shadow-warm-card flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A8A29E]">Audience Segments</span>
-            <div className="text-2xl font-black text-[#1C1917] mt-0.5">5 Cohorts</div>
-            <span className="text-xs text-[#059669] font-medium flex items-center gap-1 mt-1">
-              <span aria-hidden="true" className="material-symbols-outlined text-[14px]">shield</span>
-              RBAC Role Filtered
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-[11px] bg-[#FDF8F3] border border-[#E7E5E4] flex items-center justify-center text-[#059669]">
-            <span aria-hidden="true" className="material-symbols-outlined text-[24px]">supervised_user_circle</span>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Announcements Directory */}
       <div className="bg-[#FFFFFF] rounded-[14px] p-5 border border-[#E7E5E4] shadow-warm-card">
-        {/* Header & Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E7E5E4] mb-4">
           <div>
             <h3 className="font-headline text-base font-bold text-[#1C1917] flex items-center gap-2">
               <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-[#C2410C]">newspaper</span>
-              Church Bulletin & Announcement Hub
+              Church Notice Sheet
             </h3>
             <p className="text-xs text-[#57534E] mt-0.5">
-              Draft, schedule, and broadcast official news notices to targeted rolls.
+              Write a notice, say who it is for and the day it goes up. The office can hold it back or take it
+              down again without losing the wording.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select aria-label="Target audience"
+            <select
+              aria-label="Filter by audience"
               value={selectedAudience}
-              onChange={(e) => setSelectedAudience(e.target.value)}
+              onChange={(event) => setSelectedAudience(event.target.value)}
               className="px-3 py-1.5 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
             >
-              <option value="all">All Audiences</option>
-              <option value="everyone">Public / Everyone</option>
-              <option value="members-only">Members Only</option>
-              <option value="ministry-leaders">Ministry Leaders</option>
-              <option value="youth-roll">Youth & Discipleship Class</option>
-              <option value="church-council">Church Council</option>
+              <option value="all">Every audience</option>
+              {AUDIENCES.map((audience) => (
+                <option key={audience} value={audience}>
+                  {audience}
+                </option>
+              ))}
             </select>
 
             {canEdit && (
-            <button
-              type="button"
-              onClick={() => setIsCreating(true)}
-              className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
-              New Announcement
-            </button>
+              <button
+                type="button"
+                onClick={() => openComposer()}
+                className="px-3 py-1.5 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add_circle</span>
+                New notice
+              </button>
             )}
           </div>
         </div>
 
         {writeError && <ErrorBlock message={writeError} onRetry={() => void refetch()} className="mb-4" />}
 
-        {/* Announcements Cards Grid */}
         {loading && items.length === 0 ? (
-          <LoadingBlock label="Loading announcements…" />
+          <LoadingBlock label="Reading the notice sheet…" />
         ) : error ? (
           <ErrorBlock message={error} onRetry={() => void refetch()} />
-        ) : filteredAnnouncements.length === 0 ? (
+        ) : shown.length === 0 ? (
           <EmptyBlock
             icon="campaign"
-            title="No announcements yet"
-            hint="Publish the first notice and it appears here for the whole church."
+            title={items.length === 0 ? 'Nothing on the notice sheet yet' : 'No notices for that audience'}
+            hint={
+              items.length === 0
+                ? 'Write the first notice and it appears here for the whole church.'
+                : 'Choose another audience, or write one for this group.'
+            }
           />
         ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredAnnouncements.map((ann) => (
-            <div
-              key={ann.id}
-              className={`p-4 rounded-[12px] border transition-all flex flex-col justify-between ${
-                ann.isPinned
-                  ? 'bg-[#FDF8F3] border-[#C2410C]/40 ring-1 ring-[#C2410C]/20 shadow-sm'
-                  : 'bg-[#FFFFFF] border-[#E7E5E4] hover:bg-[#FDF8F3]/50'
-              }`}
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span
-                      className={`px-2 py-0.2 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        ann.priority === 'urgent'
-                          ? 'bg-[#DC2626]/10 text-[#DC2626]'
-                          : ann.priority === 'high'
-                          ? 'bg-[#D97706]/10 text-[#D97706]'
-                          : 'bg-[#57534E]/10 text-[#57534E]'
-                      }`}
-                    >
-                      {ann.priority}
-                    </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {shown.map((notice) => {
+              const state = stateOf(notice);
+              return (
+                <div
+                  key={notice.id}
+                  className={`p-4 rounded-[12px] border transition-all flex flex-col justify-between ${
+                    notice.isPinned
+                      ? 'bg-[#FDF8F3] border-[#C2410C]/40 ring-1 ring-[#C2410C]/20 shadow-sm'
+                      : 'bg-[#FFFFFF] border-[#E7E5E4] hover:bg-[#FDF8F3]/50'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {notice.priority === 'urgent' && (
+                          <span className="px-2 py-0.5 rounded-full bg-[#DC2626]/10 text-[#DC2626] text-[10px] font-bold uppercase tracking-wider">
+                            Urgent
+                          </span>
+                        )}
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            state === 'live'
+                              ? 'bg-[#059669]/10 text-[#059669]'
+                              : state === 'scheduled'
+                                ? 'bg-[#D97706]/10 text-[#D97706]'
+                                : 'bg-[#57534E]/10 text-[#57534E]'
+                          }`}
+                        >
+                          {STATE_LABELS[state]}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-[#C2410C]/10 text-[#C2410C] text-[10px] font-bold">
+                          {notice.audience}
+                        </span>
+                      </div>
 
-                    <span className="px-2 py-0.2 rounded-full bg-[#E7E5E4]/80 text-[#1C1917] text-[10px] font-bold uppercase tracking-wider">
-                      {ann.category}
-                    </span>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => void change(notice, { isPinned: !notice.isPinned })}
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            notice.isPinned ? 'text-[#C2410C] bg-[#C2410C]/10' : 'text-[#A8A29E] hover:text-[#1C1917]'
+                          }`}
+                          title={notice.isPinned ? 'Unpin' : 'Pin to the top of the sheet'}
+                        >
+                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">push_pin</span>
+                        </button>
+                      )}
+                    </div>
 
-                    <span className="px-2 py-0.2 rounded-md bg-[#C2410C]/10 text-[#C2410C] text-[10px] font-bold">
-                      {ann.audienceLabel}
-                    </span>
+                    <h4 className="font-headline text-sm font-bold text-[#1C1917] mb-1.5 leading-snug">{notice.title}</h4>
+                    <p className="text-xs text-[#57534E] leading-relaxed line-clamp-3 mb-3">{notice.body}</p>
                   </div>
 
-                  {canEdit && (
-                  <button
-                    type="button"
-                    onClick={() => void handleTogglePin(ann.id)}
-                    className={`p-1 rounded-md transition-colors cursor-pointer ${
-                      ann.isPinned ? 'text-[#C2410C] bg-[#C2410C]/10' : 'text-[#A8A29E] hover:text-[#1C1917]'
-                    }`}
-                    title={ann.isPinned ? 'Unpin' : 'Pin to top'}
-                  >
-                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">push_pin</span>
-                  </button>
-                  )}
+                  <div className="pt-3 border-t border-[#E7E5E4]/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#A8A29E]">
+                    <div>
+                      By <strong className="text-[#1C1917]">{notice.author?.name ?? 'Church office'}</strong> ·{' '}
+                      <span className="font-mono">{formatDate(notice.publishedAt)}</span>
+                      {notice.expiresAt && <> → {formatDate(notice.expiresAt)}</>}
+                    </div>
+
+                    {canEdit && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openComposer(notice)}
+                          className="px-2 py-1 rounded-[6px] font-bold text-[#1C1917] hover:bg-[#F5EDE4] cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        {state === 'live' ? (
+                          <button
+                            type="button"
+                            onClick={() => void change(notice, { expiresAt: new Date().toISOString() })}
+                            className="px-2 py-1 rounded-[6px] font-bold text-[#57534E] hover:bg-[#F5EDE4] cursor-pointer"
+                          >
+                            Take down
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void change(notice, { publishedAt: new Date().toISOString(), expiresAt: null })}
+                            className="px-2 py-1 rounded-[6px] font-bold text-[#059669] hover:bg-[#059669]/10 cursor-pointer"
+                          >
+                            Publish now
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => void retire(notice)}
+                            title="Move to the Trash"
+                            className="p-1 rounded text-[#DC2626] hover:text-[#B91C1C] cursor-pointer"
+                          >
+                            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-
-                <h4 className="font-headline text-sm font-bold text-[#1C1917] mb-1.5 leading-snug">
-                  {ann.title}
-                </h4>
-
-                <p className="text-xs text-[#57534E] leading-relaxed line-clamp-3 mb-3">
-                  {ann.content}
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-[#E7E5E4]/80 flex items-center justify-between text-[11px] text-[#A8A29E]">
-                <div>
-                  By <strong className="text-[#1C1917]">{ann.author}</strong> · <span className="font-mono">{ann.publishDate}</span>
-                </div>
-                {canDelete && (
-                <button
-                  type="button"
-                  onClick={() => void handleDeleteAnnouncement(ann.id)}
-                  className="text-[#DC2626] hover:text-[#B91C1C] p-1 rounded transition-colors cursor-pointer"
-                  title="Remove Bulletin"
-                >
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">delete</span>
-                </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* MODAL: Publish Announcement */}
-      {isCreating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...creatingDialog}>
-          <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] animate-in fade-in zoom-in duration-150">
+      {isEditing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C1917]/50 backdrop-blur-xs" {...editingDialog}>
+          <div className="bg-[#FFFFFF] rounded-[14px] max-w-lg w-full p-6 shadow-2xl border border-[#E7E5E4] max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E5E4]">
-              <h3 className="font-headline text-base font-bold text-[#1C1917]">Publish Announcement</h3>
+              <h3 className="font-headline text-base font-bold text-[#1C1917]">
+                {draft.id ? 'Edit notice' : 'Write a notice'}
+              </h3>
               <button
                 type="button"
-                onClick={() => setIsCreating(false)}
-                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md"
-              aria-label="Close">
+                onClick={() => setIsEditing(false)}
+                aria-label="Close"
+                className="text-[#57534E] hover:text-[#1C1917] p-1 rounded-md cursor-pointer"
+              >
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
-            <form onSubmit={handleCreateAnnouncement} className="mt-4 space-y-4">
+            <form onSubmit={save} className="mt-4 space-y-4">
               <div>
-                <label htmlFor="announcement-title" className="block text-xs font-bold text-[#1C1917] mb-1">Headline / Title *</label>
-                <input id="announcement-title" aria-label="Headline / Title"
+                <label htmlFor="notice-title" className={LABEL}>
+                  Headline *
+                </label>
+                <input
+                  id="notice-title"
                   type="text"
                   required
-                  placeholder="e.g. Reformation Heritage Dinner & Hymn Sing"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                  value={draft.title}
+                  onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                  placeholder="Harvest thanksgiving — service times move forward"
+                  className={FIELD}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="announcement-audience" className="block text-xs font-bold text-[#1C1917] mb-1">Target Audience</label>
-                  <select id="announcement-audience" aria-label="Target Audience"
-                    value={audience}
-                    onChange={(e) => setAudience(e.target.value as AnnouncementAudience)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                  <label htmlFor="notice-audience" className={LABEL}>
+                    Who it is for
+                  </label>
+                  <select
+                    id="notice-audience"
+                    value={draft.audience}
+                    onChange={(event) => setDraft({ ...draft, audience: event.target.value })}
+                    className={`${FIELD} cursor-pointer`}
                   >
-                    <option value="everyone">Everyone (Public)</option>
-                    <option value="members-only">Members Only</option>
-                    <option value="ministry-leaders">Ministry Leaders</option>
-                    <option value="youth-roll">Youth Roll</option>
-                    <option value="church-council">Church Council</option>
+                    {AUDIENCES.map((audience) => (
+                      <option key={audience} value={audience}>
+                        {audience}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="announcement-priority" className="block text-xs font-bold text-[#1C1917] mb-1">Priority</label>
-                  <select id="announcement-priority" aria-label="Priority"
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value as any)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                  <label htmlFor="notice-priority" className={LABEL}>
+                    How loudly it asks
+                  </label>
+                  <select
+                    id="notice-priority"
+                    value={draft.priority}
+                    onChange={(event) => setDraft({ ...draft, priority: event.target.value as AnnouncementPriority })}
+                    className={`${FIELD} cursor-pointer`}
                   >
                     <option value="normal">Normal</option>
-                    <option value="high">High Priority</option>
-                    <option value="urgent">Urgent / Alert</option>
+                    <option value="urgent">Urgent</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label htmlFor="announcement-content" className="block text-xs font-bold text-[#1C1917] mb-1">Notice Content *</label>
-                <textarea id="announcement-content" aria-label="Notice Content"
-                  rows={4}
+                <label htmlFor="notice-body" className={LABEL}>
+                  The notice *
+                </label>
+                <textarea
+                  id="notice-body"
+                  rows={5}
                   required
-                  placeholder="Full bulletin notice body..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                  value={draft.body}
+                  onChange={(event) => setDraft({ ...draft, body: event.target.value })}
+                  placeholder="What the church needs to know, in the words the office would use."
+                  className={FIELD}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="announcement-category" className="block text-xs font-bold text-[#1C1917] mb-1">Category</label>
-                  <select id="announcement-category" aria-label="Category"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as any)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
-                  >
-                    <option value="worship">Worship & Service</option>
-                    <option value="ministry">Ministries & Classes</option>
-                    <option value="stewardship">Stewardship & Mercy</option>
-                    <option value="governance">Church Council</option>
-                    <option value="community">Community Fellowship</option>
-                  </select>
+                  <label htmlFor="notice-publishes" className={LABEL}>
+                    Goes up
+                  </label>
+                  <input
+                    id="notice-publishes"
+                    type="date"
+                    value={draft.publishedOn}
+                    onChange={(event) => setDraft({ ...draft, publishedOn: event.target.value })}
+                    className={FIELD}
+                  />
                 </div>
                 <div>
-                  <label htmlFor="announcement-author" className="block text-xs font-bold text-[#1C1917] mb-1">Author / Sign-off</label>
-                  <input id="announcement-author" aria-label="Author / Sign-off"
-                    type="text"
-                    value={author}
-                    onChange={(e) => setAuthor(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-[8px] border border-[#E7E5E4] focus:outline-none focus:border-[#C2410C] bg-[#FDF8F3]"
+                  <label htmlFor="notice-expires" className={LABEL}>
+                    Comes down (optional)
+                  </label>
+                  <input
+                    id="notice-expires"
+                    type="date"
+                    value={draft.expiresOn}
+                    onChange={(event) => setDraft({ ...draft, expiresOn: event.target.value })}
+                    className={FIELD}
                   />
                 </div>
               </div>
@@ -378,36 +450,36 @@ export const AnnouncementsPanel: React.FC = () => {
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  id="pinCheck"
-                  checked={isPinned}
-                  onChange={(e) => setIsPinned(e.target.checked)}
+                  id="notice-pinned"
+                  checked={draft.isPinned}
+                  onChange={(event) => setDraft({ ...draft, isPinned: event.target.checked })}
                   className="rounded text-[#C2410C] focus:ring-[#C2410C]"
                 />
-                <label htmlFor="pinCheck" className="text-xs font-bold text-[#1C1917] cursor-pointer">
-                  Pin announcement to top of church notice board & mobile portal
+                <label htmlFor="notice-pinned" className="text-xs font-bold text-[#1C1917] cursor-pointer">
+                  Hold it at the top of the sheet
                 </label>
               </div>
 
-              {createAnnouncement.error && (
+              {(createAnnouncement.error ?? updateAnnouncement.error) && (
                 <div role="alert" className="rounded-[8px] border border-[#FECACA] bg-[#FEF2F2] px-3 py-2 text-[11px] font-semibold text-[#B91C1C]">
-                  {createAnnouncement.error}
+                  {createAnnouncement.error ?? updateAnnouncement.error}
                 </div>
               )}
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E5E4]">
                 <button
                   type="button"
-                  onClick={() => setIsCreating(false)}
+                  onClick={() => setIsEditing(false)}
                   className="px-4 py-2 text-xs font-bold text-[#57534E] hover:text-[#1C1917] cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={createAnnouncement.pending}
+                  disabled={createAnnouncement.pending || updateAnnouncement.pending}
                   className="px-4 py-2 rounded-[8px] bg-[#C2410C] hover:bg-[#EA580C] disabled:opacity-70 disabled:cursor-wait text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
                 >
-                  {createAnnouncement.pending ? 'Posting…' : 'Post Announcement'}
+                  {createAnnouncement.pending || updateAnnouncement.pending ? 'Saving…' : 'Save notice'}
                 </button>
               </div>
             </form>

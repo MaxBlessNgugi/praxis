@@ -1,804 +1,237 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useMinistryRoster, useMinistries } from '../../../hooks/useApi';
+import { type MinistryMemberDto } from '../../../lib/api';
+import { ErrorBlock, LoadingBlock, EmptyBlock } from '../DataState';
+import { exportCsv } from '../../../lib/export';
 
-/** The roster matrix renders one card per team, in this order. */
-const TEAMS = [
-  'Welcome & Hospitality',
-  'Audio/Visual & Tech Production',
-  'Children’s Church Care',
-  'Worship Band & Vocalists',
-  'Campus Safety & First Aid',
-] as const;
-type Team = (typeof TEAMS)[number];
-const ALL_TEAMS = `All Volunteer Teams (${TEAMS.length} Teams)`;
-
+/**
+ * The volunteer roll: everybody serving on a ministry, read from the roster endpoint.
+ *
+ * The mock hardcoded five teams, an invented 248-person pool, fake swap requests and a fabricated
+ * vetting percentage. What the API actually holds is the ministry roll — a person, the title they
+ * hold, and the ministry they serve on — so the panel shows exactly that, with the same `serving`
+ * total the backend counts. Service-time rosters (who is on duty *this Sunday*) live in
+ * Services & Worship → Volunteer Roster, which is the schedule rather than the roll.
+ */
 export const MinistriesVolunteerPanel: React.FC = () => {
-  const [selectedServiceTime, setSelectedServiceTime] = useState<'9:00' | '11:00' | '6:00'>('9:00');
-  const [teamFilter, setTeamFilter] = useState(ALL_TEAMS);
-  const [searchFilter, setSearchFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMinistry, setSelectedMinistry] = useState('all');
   const [viewMode, setViewMode] = useState<'matrix' | 'list'>('matrix');
 
-  // Swaps state
-  const [swaps, setSwaps] = useState([
-    {
-      id: 'swap-1',
-      name: 'Sarah Kamau',
-      role: 'Welcome Desk • 11:00 AM',
-      reason: 'Family Travel',
-      note: '"Requested swap with Jeremy Adhiambo (Qualified Greeter)."',
-      approved: false,
-    },
-    {
-      id: 'swap-2',
-      name: 'Rachel Adhiambo',
-      role: 'Kindergarten Lead • 11:00 AM',
-      reason: 'Sick Leave',
-      note: '"Sudden fever, need experienced backup for Preschool room."',
-      approved: false,
-    },
-    {
-      id: 'swap-3',
-      name: 'Eric Stone',
-      role: 'Sound Op • 11:00 AM',
-      reason: 'Unconfirmed',
-      note: 'Invite sent 48h ago',
-      approved: false,
-    },
-  ]);
+  const roster = useMinistryRoster({});
+  const ministries = useMinistries({});
 
-  const showsTeam = (team: Team) => teamFilter === ALL_TEAMS || teamFilter === team;
+  const rows = useMemo(() => {
+    const wanted = searchQuery.trim().toLowerCase();
+    return roster.items.filter((row) => {
+      const ministryName = row.ministry?.name ?? '';
+      const person = row.member ? `${row.member.firstName} ${row.member.lastName}` : '';
+      const matchesSearch =
+        !wanted ||
+        [row.roleTitle, ministryName, person].some((value) => value.toLowerCase().includes(wanted));
+      return matchesSearch && (selectedMinistry === 'all' || row.ministry?.id === selectedMinistry);
+    });
+  }, [roster.items, searchQuery, selectedMinistry]);
 
-  const handleApproveSwap = (id: string) => {
-    setSwaps(swaps.map(s => s.id === id ? { ...s, approved: true } : s));
+  /** One column per ministry that has somebody on its roll, in the register's order. */
+  const matrixMinistries = useMemo(() => {
+    const ids: Array<{ id: string; name: string }> = [];
+    for (const row of roster.items) {
+      if (row.ministry && !ids.some((m) => m.id === row.ministry!.id)) {
+        ids.push({ id: row.ministry.id, name: row.ministry.name });
+      }
+    }
+    return ids;
+  }, [roster.items]);
+
+  const exportRoll = () => {
+    exportCsv<MinistryMemberDto>(
+      'volunteer-roles.csv',
+      [
+        { label: 'Member', value: (row) => `${row.member?.firstName ?? ''} ${row.member?.lastName ?? ''}`.trim() },
+        { label: 'Role', value: (row) => row.roleTitle },
+        { label: 'Ministry', value: (row) => row.ministry?.name ?? '' },
+        { label: 'Phone', value: (row) => row.member?.phone ?? '' },
+        { label: 'Joined', value: (row) => row.joinedAt.slice(0, 10) },
+      ],
+      rows,
+    );
   };
 
   return (
     <div className="flex flex-col w-full space-y-6">
-      {/* Top Stat Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Stat 1: Total Active Pool */}
-        <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              Total Active Pool
-            </span>
-            <span className="p-2 rounded-xl bg-[#f4ece8] text-[#9b2f00] flex items-center justify-center">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">groups</span>
-            </span>
-          </div>
-          <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight">248</div>
-            <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">trending_up</span>
-              <span>+14 newly onboarded this term</span>
+      {roster.loading && <LoadingBlock label="Reading the volunteer roll…" />}
+      {roster.error && <ErrorBlock message={roster.error} onRetry={roster.refetch} />}
+
+      {!roster.loading && !roster.error && (
+        <>
+          {/* Stat band — every figure is a count of the roll the table below shows. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80">
+              <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">Serving on rolls</span>
+              <div className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight mt-3">{roster.serving}</div>
+              <div className="text-[#59413a] text-xs mt-1">Total {roster.serving === 1 ? 'entry' : 'entries'} · the count the server keeps</div>
             </div>
-          </div>
-        </div>
-
-        {/* Stat 2: Feb 16 Scheduled */}
-        <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              Feb 16 Scheduled
-            </span>
-            <span className="p-2 rounded-xl bg-[#f4ece8] text-[#904d00] flex items-center justify-center">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">event_available</span>
-            </span>
-          </div>
-          <div>
-            <div className="flex items-baseline gap-2">
-              <span className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight">64</span>
-              <span className="text-xs text-[#59413a]">/ 67 Roles Filled</span>
+            <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80">
+              <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">Distinct volunteers</span>
+              <div className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight mt-3">
+                {new Set(roster.items.map((row) => row.memberId)).size}
+              </div>
+              <div className="text-[#59413a] text-xs mt-1">People, some on more than one roll</div>
             </div>
-            <div className="w-full bg-[#f4ece8] rounded-full h-1.5 mt-2 overflow-hidden">
-              <div className="bg-[#904d00] h-full rounded-full" style={{ width: '95.5%' }}></div>
+            <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80">
+              <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">Ministries with a roll</span>
+              <div className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight mt-3">{matrixMinistries.length}</div>
+              <div className="text-[#59413a] text-xs mt-1">Of {ministries.items.length} on the register</div>
             </div>
-          </div>
-        </div>
-
-        {/* Stat 3: Critical Roster Gaps */}
-        <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[#ba1a1a] uppercase tracking-wider">
-              Critical Roster Gaps
-            </span>
-            <span className="p-2 rounded-xl bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">error</span>
-            </span>
-          </div>
-          <div>
-            <div className="flex items-baseline gap-2">
-              <span className="font-headline text-3xl font-bold text-[#ba1a1a] tracking-tight">3</span>
-              <span className="text-xs font-bold text-[#ba1a1a]">Vacancies Needing Cover</span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1 text-[#59413a] font-mono text-[11px]">
-              <span>Kids Lead • Sound Op • Usher</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Stat 4: Safeguarding CPP */}
-        <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80 flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-              Safeguarding (CPP)
-            </span>
-            <span className="p-2 rounded-xl bg-[#85f8c4]/40 text-[#002114] flex items-center justify-center">
-              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">verified_user</span>
-            </span>
-          </div>
-          <div>
-            <div className="font-headline text-3xl font-bold text-[#1e1b19] tracking-tight">98.4%</div>
-            <div className="flex items-center gap-1 mt-1 text-[#006243] text-xs font-semibold">
-              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span>
-              <span>Background verified active</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Primary Roster Controls & Schedule Toolbar */}
-      <div className="p-3.5 rounded-2xl bg-white border border-[#EAE1D7] shadow-sm flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
-        {/* Left: View Toggle & Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex p-1 bg-[#faf2ee] rounded-xl border border-[#EAE1D7]">
-            <button
-              onClick={() => setViewMode('matrix')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                viewMode === 'matrix' ? 'bg-white text-[#1e1b19] shadow-xs' : 'text-[#59413a] hover:text-[#1e1b19]'
-              }`}
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#c2410c]">calendar_view_week</span>
-              <span>Matrix View</span>
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                viewMode === 'list' ? 'bg-white text-[#1e1b19] shadow-xs' : 'text-[#59413a] hover:text-[#1e1b19]'
-              }`}
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">format_list_bulleted</span>
-              <span>List View</span>
-            </button>
-          </div>
-
-          <div className="relative">
-            <select aria-label="Team filter"
-              value={teamFilter}
-              onChange={(e) => setTeamFilter(e.target.value)}
-              className="h-10 pl-3 pr-8 rounded-xl bg-[#faf2ee] text-[#1e1b19] text-xs font-medium border border-[#EAE1D7] appearance-none outline-none cursor-pointer"
-            >
-              <option>{ALL_TEAMS}</option>
-              {TEAMS.map((team) => (
-                <option key={team}>{team}</option>
-              ))}
-            </select>
-            <span aria-hidden="true" className="material-symbols-outlined absolute right-2.5 top-2.5 text-[#8d7168] pointer-events-none text-[18px]">
-              expand_more
-            </span>
-          </div>
-        </div>
-
-        {/* Center: Date Selector & Quick Jump */}
-        <div className="flex flex-wrap items-center justify-center gap-2 bg-[#faf2ee] px-3 py-1.5 rounded-xl border border-[#EAE1D7]">
-          <button className="p-1 rounded-md text-[#59413a] hover:bg-[#f4ece8] transition-colors" title="Previous">
-            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">chevron_left</span>
-          </button>
-          <div className="flex items-center gap-2 px-1">
-            <span aria-hidden="true" className="material-symbols-outlined text-[#c2410c] text-[18px]">event</span>
-            <span className="font-headline text-xs font-bold text-[#1e1b19]">Sun, Feb 16, 2025</span>
-            <span className="px-2 py-0.5 rounded-full bg-[#ffdcc3] text-[#2f1500] font-mono text-[10px] font-bold">
-              Upcoming
-            </span>
-          </div>
-          <button className="p-1 rounded-md text-[#59413a] hover:bg-[#f4ece8] transition-colors" title="Next">
-            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">chevron_right</span>
-          </button>
-          <div className="h-4 w-px bg-[#EAE1D7] mx-1 hidden sm:block"></div>
-          <div className="hidden sm:flex items-center gap-1">
-            <button
-              onClick={() => setSelectedServiceTime('9:00')}
-              className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-                selectedServiceTime === '9:00' ? 'bg-[#9b2f00] text-white font-bold' : 'bg-white text-[#1e1b19] hover:bg-[#f4ece8]'
-              }`}
-            >
-              9:00 AM
-            </button>
-            <button
-              onClick={() => setSelectedServiceTime('11:00')}
-              className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-                selectedServiceTime === '11:00' ? 'bg-[#9b2f00] text-white font-bold' : 'bg-white text-[#1e1b19] hover:bg-[#f4ece8]'
-              }`}
-            >
-              11:00 AM
-            </button>
-            <button
-              onClick={() => setSelectedServiceTime('6:00')}
-              className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-                selectedServiceTime === '6:00' ? 'bg-[#9b2f00] text-white font-bold' : 'bg-white text-[#1e1b19] hover:bg-[#f4ece8]'
-              }`}
-            >
-              6:00 PM
-            </button>
-          </div>
-        </div>
-
-        {/* Right: Search & Action CTAs */}
-        <div className="flex flex-wrap items-center gap-2 justify-end">
-          <div className="relative">
-            <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2.5 text-[#8d7168] text-[18px]">search</span>
-            <input aria-label="Filter person or role"
-              type="text"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Filter person or role..."
-              className="w-full sm:w-44 h-10 pl-9 pr-3 rounded-xl bg-[#faf2ee] text-[#1e1b19] placeholder:text-[#8d7168] text-xs border border-[#EAE1D7] focus:outline-none focus:bg-white"
-            />
-          </div>
-          <button className="h-10 px-3 rounded-xl bg-[#faf2ee] hover:bg-[#f4ece8] text-[#1e1b19] text-xs font-semibold flex items-center gap-1.5 border border-[#EAE1D7] transition-colors">
-            <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#904d00]">smart_toy</span>
-            <span className="hidden md:inline">Auto-Schedule</span>
-          </button>
-          <button className="h-10 px-4 rounded-xl bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer">
-            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person_add</span>
-            <span>Quick Assign</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Layout: Scheduling Matrix Grid & Side Rail */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        {/* Primary Matrix Container (8 Cols on XL) */}
-        <div className="xl:col-span-8 flex flex-col gap-4">
-          {/* Matrix Header Row */}
-          <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-[#faf2ee] rounded-2xl border border-[#EAE1D7] text-xs font-semibold text-[#59413a] uppercase tracking-wider">
-            <div className="col-span-3">Ministry & Appointed Role</div>
-            <div className="col-span-4 flex items-center gap-1.5 text-[#9b2f00]">
-              <span className="w-2 h-2 rounded-full bg-[#9b2f00] inline-block"></span>
-              <span>Service 1 • 9:00 AM (Main)</span>
-            </div>
-            <div className="col-span-5 flex items-center gap-1.5 text-[#904d00]">
-              <span className="w-2 h-2 rounded-full bg-[#904d00] inline-block"></span>
-              <span>Service 2 • 11:00 AM (Family)</span>
-            </div>
-          </div>
-
-          {/* TEAM 1: Welcome & Hospitality */}
-          <div className={`bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden ${showsTeam('Welcome & Hospitality') ? '' : 'hidden'}`}>
-            <div className="px-5 py-3 bg-[#faf2ee]/70 border-b border-[#EAE1D7] flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[#ffdbd0] text-[#9b2f00] flex items-center justify-center">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">door_front</span>
-                </div>
-                <span className="font-headline text-sm font-bold text-[#1e1b19]">Welcome & Hospitality</span>
-                <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-semibold">
-                  4 Slots Active
-                </span>
-              </div>
-              <span className="text-xs text-[#006243] flex items-center gap-1 font-semibold">
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check</span> 1 Swap Requested
-              </span>
-            </div>
-
-            {/* Role 1: Greeter Lead */}
-            <div className="p-4 grid grid-cols-12 gap-3 items-center hover:bg-[#faf2ee]/40 transition-colors border-b border-[#EAE1D7]/60">
-              <div className="col-span-3">
-                <div className="font-semibold text-xs text-[#1e1b19]">Greeter Lead</div>
-                <div className="font-mono text-[10px] text-[#59413a]">North Foyer</div>
-              </div>
-              <div className="col-span-4 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#ffdbd0] text-[#9b2f00] flex items-center justify-center text-xs font-bold shrink-0">
-                    MV
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Marcus Mwangi</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-                <button className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]" title="Swap">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
-                </button>
-              </div>
-              <div className="col-span-5 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#ffdcc3] text-[#2f1500] flex items-center justify-center text-xs font-bold shrink-0">
-                    AM
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Arthur Wanjala</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]" title="Swap">
-                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
-                  </button>
-                  <button className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]" title="Send SMS">
-                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">sms</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Role 2: Welcome Desk */}
-            <div className="p-4 grid grid-cols-12 gap-3 items-center hover:bg-[#faf2ee]/40 transition-colors">
-              <div className="col-span-3">
-                <div className="font-semibold text-xs text-[#1e1b19]">Welcome Desk</div>
-                <div className="font-mono text-[10px] text-[#59413a]">Central Hub</div>
-              </div>
-              <div className="col-span-4 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#9b2f00] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    CS
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Chloe Otieno</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-                <button aria-label="Swap volunteer" className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
-                </button>
-              </div>
-              {/* 11:00 AM - REPLACEMENT REQUESTED */}
-              <div className="col-span-5 p-2.5 rounded-xl bg-[#ffdad6]/40 flex items-center justify-between border border-[#ba1a1a]/30">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#ba1a1a] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    SJ
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Sarah Kamau</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#ffdad6] text-[#93000a] text-[10px] font-bold w-fit">
-                      Replacement Needed
-                    </span>
-                  </div>
-                </div>
-                <button className="h-7 px-2.5 rounded-lg bg-[#9b2f00] text-white hover:bg-[#c2410c] text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[14px]">swap_calls</span>
-                  <span>Swap</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* TEAM 2: Audio/Visual & Tech Production */}
-          <div className={`bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden ${showsTeam('Audio/Visual & Tech Production') ? '' : 'hidden'}`}>
-            <div className="px-5 py-3 bg-[#faf2ee]/70 border-b border-[#EAE1D7] flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[#ffdcc3] text-[#904d00] flex items-center justify-center">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">mic_external_on</span>
-                </div>
-                <span className="font-headline text-sm font-bold text-[#1e1b19]">Audio/Visual & Tech Production</span>
-                <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-semibold">
-                  5 Slots Active
-                </span>
-              </div>
-              <span className="text-xs text-[#ba1a1a] font-bold flex items-center gap-1">
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">warning</span> 1 Vacancy
-              </span>
-            </div>
-
-            {/* Role 1: FOH Sound Engineer */}
-            <div className="p-4 grid grid-cols-12 gap-3 items-center hover:bg-[#faf2ee]/40 transition-colors border-b border-[#EAE1D7]/60">
-              <div className="col-span-3">
-                <div className="font-semibold text-xs text-[#1e1b19]">FOH Sound Engineer</div>
-                <div className="font-mono text-[10px] text-[#59413a]">Sound Booth Level 2</div>
-              </div>
-              <div className="col-span-4 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#ffb59d] text-[#390c00] flex items-center justify-center text-xs font-bold shrink-0">
-                    CV
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Caleb Mwangi</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-                <button aria-label="Swap volunteer" className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
-                </button>
-              </div>
-              <div className="col-span-5 p-2.5 rounded-xl bg-[#ffdcc3]/40 flex items-center justify-between border border-[#fe932c]/40">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#fe932c] text-[#2f1500] flex items-center justify-center text-xs font-bold shrink-0">
-                    ES
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Eric Stone</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#ffdcc3] text-[#6e3900] text-[10px] font-bold w-fit">
-                      Pending Confirmation
-                    </span>
-                  </div>
-                </div>
-                <button className="p-1.5 rounded-lg bg-white border border-[#EAE1D7] text-[#59413a] hover:text-[#1e1b19]" title="Resend Notification">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">notifications_active</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Role 2: ProPresenter Visuals */}
-            <div className="p-4 grid grid-cols-12 gap-3 items-center hover:bg-[#faf2ee]/40 transition-colors">
-              <div className="col-span-3">
-                <div className="font-semibold text-xs text-[#1e1b19]">ProPresenter Visuals</div>
-                <div className="font-mono text-[10px] text-[#59413a]">Broadcast Deck</div>
-              </div>
-              <div className="col-span-4 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#e9e1dd] text-[#1e1b19] flex items-center justify-center text-xs font-bold shrink-0">
-                    LC
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Leo Chebet</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-                <button aria-label="Swap volunteer" className="p-1 rounded text-[#59413a] hover:bg-[#f4ece8]">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
-                </button>
-              </div>
-              {/* CRITICAL OPEN SLOT */}
-              <div className="col-span-5 p-2.5 rounded-xl bg-[#ffdad6]/40 flex items-center justify-between border border-[#ba1a1a]/40 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-full bg-white text-[#ba1a1a] flex items-center justify-center font-bold">
-                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person_off</span>
-                  </span>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-[#ba1a1a]">OPEN VACANCY</span>
-                    <span className="font-mono text-[10px] text-[#59413a]">Requires Level 2 Training</span>
-                  </div>
-                </div>
-                <button className="h-8 px-3 rounded-xl bg-[#9b2f00] text-white hover:bg-[#c2410c] text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">add</span>
-                  <span>Assign</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* TEAM 3: Children’s Church Check-in & Care */}
-          <div className={`bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden ${showsTeam('Children’s Church Care') ? '' : 'hidden'}`}>
-            <div className="px-5 py-3 bg-[#faf2ee]/70 border-b border-[#EAE1D7] flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[#85f8c4]/40 text-[#006243] flex items-center justify-center">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">child_care</span>
-                </div>
-                <span className="font-headline text-sm font-bold text-[#1e1b19]">Children’s Church Check-in & Care</span>
-                <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-semibold">
-                  6 Slots Active
-                </span>
-              </div>
-              <span className="text-xs font-semibold text-[#006243]">CPP Verified Required</span>
-            </div>
-
-            {/* Role 1: Nursery Assistant */}
-            <div className="p-4 grid grid-cols-12 gap-3 items-center hover:bg-[#faf2ee]/40 transition-colors border-b border-[#EAE1D7]/60">
-              <div className="col-span-3">
-                <div className="font-semibold text-xs text-[#1e1b19]">Nursery Assistant</div>
-                <div className="font-mono text-[10px] text-[#59413a]">Ages 0-2 Room B</div>
-              </div>
-              <div className="col-span-4 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#85f8c4] text-[#002114] flex items-center justify-center text-xs font-bold shrink-0">
-                    EV
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Elena Mwangi</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="col-span-5 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#eee7e3] text-[#1e1b19] flex items-center justify-center text-xs font-bold shrink-0">
-                    MJ
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Maya Kamau</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Role 2: Kindergarten Lead Teacher */}
-            <div className="p-4 grid grid-cols-12 gap-3 items-center hover:bg-[#faf2ee]/40 transition-colors">
-              <div className="col-span-3">
-                <div className="font-semibold text-xs text-[#1e1b19]">Kindergarten Lead</div>
-                <div className="font-mono text-[10px] text-[#59413a]">Classroom 104</div>
-              </div>
-              <div className="col-span-4 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#ffdcc3] text-[#2f1500] flex items-center justify-center text-xs font-bold shrink-0">
-                    HA
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Hannah Kimani</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-              </div>
-              {/* 11:00 AM SWAP REQUESTED */}
-              <div className="col-span-5 p-2.5 rounded-xl bg-[#ffdad6]/40 flex items-center justify-between border border-[#ba1a1a]/30">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#ba1a1a] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    RA
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Rachel Adhiambo</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#ffdad6] text-[#93000a] text-[10px] font-bold w-fit">
-                      Swap Requested
-                    </span>
-                  </div>
-                </div>
-                <button className="h-7 px-2.5 rounded-lg bg-[#9b2f00] text-white hover:bg-[#c2410c] text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[14px]">volunteer_activism</span>
-                  <span>Fill</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* TEAM 4: Worship Band & Vocals */}
-          <div className={`bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden ${showsTeam('Worship Band & Vocalists') ? '' : 'hidden'}`}>
-            <div className="px-5 py-3 bg-[#faf2ee]/70 border-b border-[#EAE1D7] flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[#ffdbd0] text-[#390c00] flex items-center justify-center">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">piano</span>
-                </div>
-                <span className="font-headline text-sm font-bold text-[#1e1b19]">Worship Band & Vocals</span>
-                <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-semibold">
-                  6 Slots Active
-                </span>
-              </div>
-              <span className="text-xs text-[#006243] font-bold flex items-center gap-1">
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span> All Roster Confirmed
-              </span>
-            </div>
-
-            <div className="p-4 grid grid-cols-12 gap-3 items-center hover:bg-[#faf2ee]/40 transition-colors border-b border-[#EAE1D7]/60">
-              <div className="col-span-3">
-                <div className="font-semibold text-xs text-[#1e1b19]">Vocal Lead</div>
-                <div className="font-mono text-[10px] text-[#59413a]">Sanctuary Platform</div>
-              </div>
-              <div className="col-span-4 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#904d00] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    TV
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Timothy Mwangi</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="col-span-5 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#904d00] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    TV
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Timothy Mwangi</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed (Dual Service)
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 grid grid-cols-12 gap-3 items-center hover:bg-[#faf2ee]/40 transition-colors">
-              <div className="col-span-3">
-                <div className="font-semibold text-xs text-[#1e1b19]">Acoustic Guitar</div>
-                <div className="font-mono text-[10px] text-[#59413a]">Sanctuary Stage Left</div>
-              </div>
-              <div className="col-span-4 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#ffdcc3] text-[#2f1500] flex items-center justify-center text-xs font-bold shrink-0">
-                    SA
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Sarah Kimani</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="col-span-5 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#eee7e3] text-[#1e1b19] flex items-center justify-center text-xs font-bold shrink-0">
-                    NR
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Nathan Ross</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* TEAM 5: Campus Safety & First Aid */}
-          <div className={`bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden ${showsTeam('Campus Safety & First Aid') ? '' : 'hidden'}`}>
-            <div className="px-5 py-3 bg-[#faf2ee]/70 border-b border-[#EAE1D7] flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">medical_services</span>
-                </div>
-                <span className="font-headline text-sm font-bold text-[#1e1b19]">Campus Safety & First Aid</span>
-                <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-semibold">
-                  4 Slots Active
-                </span>
-              </div>
-              <span className="text-xs text-[#ba1a1a] font-bold">1 Vacancy</span>
-            </div>
-
-            <div className="p-4 grid grid-cols-12 gap-3 items-center hover:bg-[#faf2ee]/40 transition-colors">
-              <div className="col-span-3">
-                <div className="font-semibold text-xs text-[#1e1b19]">Sanctuary Usher Lead</div>
-                <div className="font-mono text-[10px] text-[#59413a]">Auditorium Main Aisle</div>
-              </div>
-              <div className="col-span-4 p-2.5 rounded-xl bg-[#faf2ee] flex items-center justify-between border border-[#EAE1D7]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#eee7e3] text-[#1e1b19] flex items-center justify-center text-xs font-bold shrink-0">
-                    KW
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-[#1e1b19] truncate">Kevin Njoki</span>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-[#85f8c4]/30 text-[#005137] text-[10px] font-bold w-fit">
-                      Confirmed
-                    </span>
-                  </div>
-                </div>
-              </div>
-              {/* 11:00 AM Critical Open */}
-              <div className="col-span-5 p-2.5 rounded-xl bg-[#ffdad6]/40 flex items-center justify-between border border-[#ba1a1a]/40 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-full bg-white text-[#9b2f00] flex items-center justify-center font-bold">
-                    <span aria-hidden="true" className="material-symbols-outlined text-[18px]">person_pin_circle</span>
-                  </span>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-[#9b2f00]">OPEN USHER</span>
-                    <span className="font-mono text-[10px] text-[#59413a]">Level 1 Sanctuary</span>
-                  </div>
-                </div>
-                <button className="h-8 px-3 rounded-xl bg-[#9b2f00] text-white hover:bg-[#c2410c] text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">flash_on</span>
-                  <span>Quick Fill</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side Rail (4 Cols on XL) */}
-        <div className="xl:col-span-4 flex flex-col gap-6">
-          {/* Urgent Swaps & Pending Approvals Drawer */}
-          <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7] flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-[#ffdcc3] text-[#2f1500] flex items-center justify-center">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">sync_problem</span>
-                </div>
-                <div>
-                  <h2 className="font-headline text-sm font-bold text-[#1e1b19]">Pending Swaps</h2>
-                  <span className="text-[11px] text-[#59413a]">Requires Admin Approval</span>
-                </div>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-[#ffdad6] text-[#ba1a1a] font-mono text-[11px] font-bold">
-                {swaps.filter(s => !s.approved).length} Urgent
-              </span>
-            </div>
-
-            {/* Swap cards */}
-            <div className="space-y-3">
-              {swaps.map((swap) => (
-                <div key={swap.id} className="p-3.5 rounded-xl bg-[#faf2ee] flex flex-col gap-2.5 border border-[#EAE1D7]">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-xs text-[#1e1b19]">{swap.name}</span>
-                      <span className="font-mono text-[11px] text-[#59413a]">{swap.role}</span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded bg-[#ffdad6] text-[#ba1a1a] text-[10px] font-bold">
-                      {swap.reason}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#59413a] italic">{swap.note}</p>
-                  
-                  {swap.approved ? (
-                    <div className="flex items-center gap-1.5 text-xs text-[#006243] font-semibold pt-1">
-                      <span aria-hidden="true" className="material-symbols-outlined text-[16px]">check_circle</span>
-                      <span>Swap Approved & Updated</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        onClick={() => handleApproveSwap(swap.id)}
-                        className="flex-1 h-8 rounded-lg bg-[#c2410c] hover:bg-[#9b2f00] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                      >
-                        Approve Swap
-                      </button>
-                      <button className="px-3 h-8 rounded-lg bg-white border border-[#EAE1D7] text-[#1e1b19] text-xs font-semibold hover:bg-[#f4ece8] transition-colors">
-                        Find Other
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Roster Automation & Safeguarding Card */}
-          <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7] flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[22px]">tune</span>
-                <h3 className="font-headline text-sm font-bold text-[#1e1b19]">Scheduling Policies</h3>
-              </div>
-              <span className="font-mono text-[11px] text-[#006243] font-bold">ACTIVE</span>
-            </div>
-
-            <div className="space-y-2.5 text-xs text-[#1e1b19]">
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
-                <div className="flex flex-col">
-                  <span className="font-semibold text-[#1e1b19]">Max Serving Frequency</span>
-                  <span className="font-mono text-[10px] text-[#59413a]">Max 2 Sundays/Month</span>
-                </div>
-                <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[18px]">check_circle</span>
-              </div>
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
-                <div className="flex flex-col">
-                  <span className="font-semibold text-[#1e1b19]">Dual-Shift Conflict Warning</span>
-                  <span className="font-mono text-[10px] text-[#59413a]">Flag consecutive services</span>
-                </div>
-                <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[18px]">check_circle</span>
-              </div>
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#faf2ee] border border-[#EAE1D7]">
-                <div className="flex flex-col">
-                  <span className="font-semibold text-[#1e1b19]">Child Protection Compliance</span>
-                  <span className="font-mono text-[10px] text-[#59413a]">Auto-lock unverified volunteers</span>
-                </div>
-                <span aria-hidden="true" className="material-symbols-outlined text-[#006243] text-[18px]">verified</span>
-              </div>
-            </div>
-
-            {/* Weekly Blast Call-To-Action */}
-            <div className="p-4 rounded-xl bg-[#faf2ee] border border-[#EAE1D7] flex flex-col gap-2 mt-1">
-              <div className="flex items-center gap-2 text-[#9b2f00] text-xs font-bold">
-                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">forward_to_inbox</span>
-                <span>Sunday Reminder Blast</span>
-              </div>
-              <p className="text-[11px] text-[#59413a] leading-relaxed">
-                Automated WhatsApp & SMS reminders scheduled for Friday 4:00 PM to all 64 confirmed servants.
+            <div className="p-5 rounded-2xl bg-white shadow-sm border border-[#EAE1D7]/80">
+              <span className="text-xs font-semibold text-[#59413a] uppercase tracking-wider">Who is on duty Sunday</span>
+              <p className="text-xs text-[#59413a] leading-relaxed mt-3">
+                The service-time roster is a schedule, not a roll — it lives in{' '}
+                <span className="font-semibold text-[#1e1b19]">Services &amp; Worship → Volunteer Roster</span>.
               </p>
-              <button className="w-full h-8 rounded-lg bg-white border border-[#EAE1D7] hover:bg-[#f4ece8] text-[#1e1b19] text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 mt-1">
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">schedule_send</span>
-                <span>Review Scheduled Messages</span>
+            </div>
+          </div>
+
+          {/* Toolbar */}
+          <div className="p-3.5 rounded-2xl bg-white border border-[#EAE1D7] shadow-sm flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2 flex-1">
+              <div className="relative flex-1 min-w-[240px]">
+                <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-2.5 text-[#8d7168] text-[18px]">search</span>
+                <input
+                  aria-label="Search volunteer, role, or ministry"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search volunteer, role, or ministry..."
+                  className="w-full h-10 pl-9 pr-3 rounded-xl bg-[#faf2ee] text-[#1e1b19] placeholder:text-[#8d7168] text-xs border border-[#EAE1D7] focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#9b2f00]/20 transition-all"
+                />
+              </div>
+              <div className="relative">
+                <select
+                  aria-label="Ministry filter"
+                  value={selectedMinistry}
+                  onChange={(e) => setSelectedMinistry(e.target.value)}
+                  className="h-10 pl-3 pr-8 rounded-xl bg-[#faf2ee] text-[#1e1b19] text-xs font-medium border border-[#EAE1D7] outline-none appearance-none cursor-pointer hover:bg-[#f4ece8]"
+                >
+                  <option value="all">All ministries</option>
+                  {ministries.items.map((ministry) => (
+                    <option key={ministry.id} value={ministry.id}>{ministry.name}</option>
+                  ))}
+                </select>
+                <span aria-hidden="true" className="material-symbols-outlined absolute right-2 top-2.5 text-[#8d7168] text-[18px] pointer-events-none">arrow_drop_down</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 justify-end shrink-0">
+              <div className="flex items-center gap-1 bg-[#faf2ee] p-1 rounded-lg border border-[#EAE1D7]">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('matrix')}
+                  aria-pressed={viewMode === 'matrix'}
+                  title="By ministry"
+                  className={`p-1.5 rounded-md transition-colors ${viewMode === 'matrix' ? 'bg-white text-[#9b2f00] shadow-xs' : 'text-[#59413a] hover:text-[#1e1b19]'}`}
+                >
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">grid_view</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  aria-pressed={viewMode === 'list'}
+                  title="As a list"
+                  className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-[#9b2f00] shadow-xs' : 'text-[#59413a] hover:text-[#1e1b19]'}`}
+                >
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">table_rows</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={exportRoll}
+                disabled={rows.length === 0}
+                className="h-10 px-3.5 rounded-xl bg-[#faf2ee] hover:bg-[#f4ece8] disabled:opacity-60 text-[#1e1b19] text-xs font-semibold flex items-center gap-1.5 border border-[#EAE1D7] transition-colors cursor-pointer"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-[#8d7168]">file_download</span>
+                <span>Export CSV</span>
               </button>
             </div>
           </div>
-        </div>
-      </div>
+
+          {/* Matrix: one column per ministry, one card per person on it. */}
+          {viewMode === 'matrix' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {matrixMinistries.map((ministry) => {
+                const onRoll = rows.filter((row) => row.ministry?.id === ministry.id);
+                return (
+                  <div key={ministry.id} className="bg-white rounded-2xl p-5 shadow-sm border border-[#EAE1D7]/80">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-headline text-sm font-bold text-[#1e1b19]">{ministry.name}</h3>
+                      <span className="px-2 py-0.5 rounded-full bg-[#f4ece8] text-[#59413a] text-[10px] font-bold">
+                        {onRoll.length}
+                      </span>
+                    </div>
+                    <ul className="mt-3 space-y-2">
+                      {onRoll.map((row) => (
+                        <li key={row.id} className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs bg-[#f4ece8] text-[#9b2f00] shrink-0">
+                            {row.member?.initials ?? '?'}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-[#1e1b19] truncate">
+                              {`${row.member?.firstName ?? ''} ${row.member?.lastName ?? ''}`.trim() || 'Unknown'}
+                            </p>
+                            <p className="text-[11px] text-[#59413a] truncate">{row.roleTitle}</p>
+                          </div>
+                        </li>
+                      ))}
+                      {onRoll.length === 0 && (
+                        <li className="text-[11px] text-[#59413a] py-2">Nobody on this roll yet.</li>
+                      )}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="w-full bg-white rounded-2xl shadow-sm border border-[#EAE1D7] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#faf2ee] text-[#59413a] text-xs font-semibold uppercase tracking-wider border-b border-[#EAE1D7]">
+                      <th className="py-3 px-4">Volunteer</th>
+                      <th className="py-3 px-4">Role</th>
+                      <th className="py-3 px-4">Ministry</th>
+                      <th className="py-3 px-4">Since</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#EAE1D7] text-xs text-[#1e1b19]">
+                    {rows.map((row) => (
+                      <tr key={row.id} className="transition-colors hover:bg-[#faf2ee]/70">
+                        <td className="py-3 px-4 font-semibold">
+                          {`${row.member?.firstName ?? ''} ${row.member?.lastName ?? ''}`.trim() || 'Unknown'}
+                        </td>
+                        <td className="py-3 px-4 text-[#59413a]">{row.roleTitle}</td>
+                        <td className="py-3 px-4 text-[#59413a]">{row.ministry?.name ?? '—'}</td>
+                        <td className="py-3 px-4 font-mono text-[#59413a]">{row.joinedAt.slice(0, 10)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-5 py-3.5 bg-[#faf2ee] border-t border-[#EAE1D7] text-xs text-[#59413a]">
+                Showing <strong className="text-[#1e1b19] font-semibold">{rows.length}</strong> of{' '}
+                <strong className="text-[#1e1b19] font-semibold">{roster.items.length}</strong> roll entries
+              </div>
+            </div>
+          )}
+
+          {rows.length === 0 && !searchQuery && selectedMinistry === 'all' && (
+            <EmptyBlock
+              icon="volunteer_activism"
+              title="Nobody is on a ministry roll yet"
+              hint="Add a person to a ministry from their own record in Find Christian — the roll fills from there."
+            />
+          )}
+        </>
+      )}
     </div>
   );
 };

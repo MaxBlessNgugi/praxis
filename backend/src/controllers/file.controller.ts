@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { listFilesQuerySchema, uploadFileSchema } from '../schemas/file.schema';
+import { retireReasonSchema } from '../schemas/common';
 import * as fileService from '../services/file.service';
 import { created, ok } from '../lib/respond';
 import { actor, id } from '../lib/request';
@@ -38,5 +39,5 @@ export async function download(req: Request, res: Response): Promise<void> {
 }
 
 export async function remove(req: Request, res: Response): Promise<void> {
-  ok(res, await fileService.retireFile(id(req)));
+  ok(res, await fileService.retireFile(id(req), retireReasonSchema.parse(req.query), actor(req)));
 }
