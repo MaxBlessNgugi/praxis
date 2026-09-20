@@ -161,9 +161,13 @@ async function main(): Promise<void> {
     const corrected = await call('PATCH', `/api/groups/meetings/${meeting?.id}`, adminToken, { attendedCount: 12 });
     check('the count can be corrected and says so', corrected.status === 200 && data<MeetingRow>(corrected)?.attendedCount === 12, errorOf(corrected));
 
-    const meetings = await call('GET', `/api/groups/meetings?groupId=${cell?.id}`, adminToken);
-    const totals = (meetings.body as { totals?: { meetings: number; attendance: number } } | null)?.totals;
-    check('the meetings ledger totals what the circles reported', totals?.meetings === 1 && totals?.attendance === 12, JSON.stringify(totals));
+    const afterMeeting = data<GroupRow>(await call('GET', `/api/groups/${cell?.id}`, adminToken));
+    const ledger = afterMeeting?.meetings ?? [];
+    check(
+      'the circle’s own record carries the corrected gathering',
+      ledger.length === 1 && ledger[0]?.attendedCount === 12,
+      JSON.stringify(ledger.map((row) => row.attendedCount)),
+    );
 
     console.log('\n4. A circle with people in it cannot be retired');
     const blocked = await call(

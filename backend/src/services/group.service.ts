@@ -11,7 +11,6 @@ import type {
   CreateGroupInput,
   CreateGroupMeetingInput,
   ListGroupsQuery,
-  ListGroupMeetingsQuery,
   UpdateGroupInput,
   UpdateGroupMeetingInput,
 } from '../schemas/group.schema';
@@ -181,32 +180,6 @@ export async function addGroupMember(groupId: string, input: AddGroupMemberInput
   });
 }
 
-export async function updateGroupMember(id: string, input: { roleTitle: string }, actorId: string) {
-  const before = await findLive(prisma.groupMember, id, 'That member is not on this group roll', {
-    include: { member: { select: memberSelect }, group: { select: { name: true } } },
-  });
-
-  return prisma.$transaction(async (tx) => {
-    const row = await tx.groupMember.update({
-      where: { id },
-      data: { roleTitle: input.roleTitle },
-      include: { member: { select: memberSelect }, group: { select: { name: true } } },
-    });
-    await tx.auditLog.create({
-      data: {
-        actorId,
-        action: 'update',
-        entityName: 'GroupMember',
-        entityId: id,
-        summary: `${row.member.firstName} ${row.member.lastName} on ${row.group.name}: ${before.roleTitle} becomes ${row.roleTitle}`,
-        before: { roleTitle: before.roleTitle },
-        after: { roleTitle: row.roleTitle },
-      },
-    });
-    return row;
-  });
-}
-
 export async function removeGroupMember(id: string, actorId: string) {
   const row = await findLive(prisma.groupMember, id, 'That member is not on this group roll', {
     include: { member: { select: memberSelect }, group: { select: { name: true } } },
@@ -276,32 +249,4 @@ export async function updateGroupMeeting(id: string, input: UpdateGroupMeetingIn
     });
     return meeting;
   });
-}
-
-export async function listGroupMeetings(query: ListGroupMeetingsQuery) {
-  const where: Prisma.GroupMeetingWhereInput = {
-    ...live,
-    ...(query.groupId ? { groupId: query.groupId } : {}),
-  };
-
-  const [total, data, byGroup] = await Promise.all([
-    prisma.groupMeeting.count({ where }),
-    prisma.groupMeeting.findMany({
-      where,
-      include: { group: { select: { id: true, name: true } } },
-      orderBy: { metAt: 'desc' },
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-    }),
-    prisma.groupMeeting.groupBy({ by: ['groupId'], where: live, _sum: { attendedCount: true }, _count: true }),
-  ]);
-
-  return {
-    data,
-    meta: page(total, query),
-    totals: {
-      meetings: byGroup.reduce((sum, row) => sum + row._count, 0),
-      attendance: byGroup.reduce((sum, row) => sum + (row._sum.attendedCount ?? 0), 0),
-    },
-  };
 }

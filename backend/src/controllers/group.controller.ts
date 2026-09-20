@@ -3,10 +3,8 @@ import {
   addGroupMemberSchema,
   createGroupMeetingSchema,
   createGroupSchema,
-  listGroupMeetingsQuerySchema,
   listGroupsQuerySchema,
   updateGroupMeetingSchema,
-  updateGroupMemberSchema,
   updateGroupSchema,
 } from '../schemas/group.schema';
 import * as groupService from '../services/group.service';
@@ -38,10 +36,6 @@ export async function addMember(req: Request, res: Response): Promise<void> {
   created(res, await groupService.addGroupMember(id(req), addGroupMemberSchema.parse(req.body), actor(req)));
 }
 
-export async function updateMember(req: Request, res: Response): Promise<void> {
-  ok(res, await groupService.updateGroupMember(id(req), updateGroupMemberSchema.parse(req.body), actor(req)));
-}
-
 export async function removeMember(req: Request, res: Response): Promise<void> {
   await groupService.removeGroupMember(id(req), actor(req));
   noContent(res);
@@ -53,8 +47,4 @@ export async function recordMeeting(req: Request, res: Response): Promise<void> 
 
 export async function updateMeeting(req: Request, res: Response): Promise<void> {
   ok(res, await groupService.updateGroupMeeting(id(req), updateGroupMeetingSchema.parse(req.body), actor(req)));
-}
-
-export async function listMeetings(req: Request, res: Response): Promise<void> {
-  res.json(await groupService.listGroupMeetings(listGroupMeetingsQuerySchema.parse(req.query)));
 }

@@ -141,7 +141,7 @@ export const isProduction = env.NODE_ENV === 'production';
 
 // An unparseable zone makes every Intl call below silently fall back to UTC, which is exactly the
 // kind of drift this setting exists to prevent — so a typo fails at boot, loudly.
-if (!Number.isNaN(new Date().getTimezoneOffset()) && !isValidTimeZone(env.DISPLAY_TIMEZONE)) {
+if (!isValidTimeZone(env.DISPLAY_TIMEZONE)) {
   throw new Error(`DISPLAY_TIMEZONE "${env.DISPLAY_TIMEZONE}" is not an IANA time zone (e.g. Africa/Nairobi).`);
 }
 

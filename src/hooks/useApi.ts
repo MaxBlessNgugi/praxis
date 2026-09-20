@@ -62,7 +62,6 @@ import {
   type MemberRefWithPhone,
   type MeetingDto,
   type GroupDto,
-  type GroupMeetingDto,
   type MinistryDto,
   type MinistryMemberDto,
   type OfferingDto,
@@ -443,18 +442,6 @@ export function useGroups(params?: { q?: string; isActive?: boolean }) {
  */
 export function useGroupDetail(groupId: string | null) {
   return useResource(() => (groupId ? groupsApi.get(groupId) : Promise.resolve(null)), [groupId]);
-}
-
-/** The record of group gatherings across every circle, newest first. */
-export function useGroupMeetings(params?: { groupId?: string }) {
-  const resource = useResource(() => groupsApi.meetings(params), [params?.groupId]);
-  return {
-    items: resource.data?.data ?? ([] as GroupMeetingDto[]),
-    totals: resource.data?.totals ?? { meetings: 0, attendance: 0 },
-    loading: resource.loading,
-    error: resource.error,
-    refetch: resource.refetch,
-  };
 }
 
 /** Both Leadership Roles and Volunteer Roles: the same roll, read with and without `leadershipOnly`. */

@@ -31,10 +31,6 @@ export const addGroupMemberSchema = z.object({
   roleTitle: z.string().trim().min(2, 'Name the role').max(80).default('Member'),
 });
 
-export const updateGroupMemberSchema = z
-  .object({ roleTitle: z.string().trim().min(2).max(80) })
-  .refine((value) => Object.keys(value).length > 0, { message: 'Send at least one field to change' });
-
 /** One gathering of a group, recorded by whoever hosted it. */
 export const createGroupMeetingSchema = z.object({
   metAt: z.coerce.date(),
@@ -45,17 +41,9 @@ export const createGroupMeetingSchema = z.object({
 
 export const updateGroupMeetingSchema = createGroupMeetingSchema.partial();
 
-export const listGroupMeetingsQuerySchema = z.object({
-  groupId: z.string().uuid().optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
-});
-
 export type CreateGroupInput = z.infer<typeof createGroupSchema>;
 export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
 export type ListGroupsQuery = z.infer<typeof listGroupsQuerySchema>;
 export type AddGroupMemberInput = z.infer<typeof addGroupMemberSchema>;
-export type UpdateGroupMemberInput = z.infer<typeof updateGroupMemberSchema>;
 export type CreateGroupMeetingInput = z.infer<typeof createGroupMeetingSchema>;
 export type UpdateGroupMeetingInput = z.infer<typeof updateGroupMeetingSchema>;
-export type ListGroupMeetingsQuery = z.infer<typeof listGroupMeetingsQuerySchema>;

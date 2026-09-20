@@ -1232,15 +1232,11 @@ export const groupsApi = {
     api.delete<ItemEnvelope<unknown>>(`/api/groups/${id}${qs({ reason: body.reason, reasonLabel: body.reasonLabel })}`),
   addMember: (id: string, body: { memberId: string; roleTitle?: string }) =>
     api.post<ItemEnvelope<GroupMemberDto>>(`/api/groups/${id}/members`, body),
-  updateMember: (memberRowId: string, body: { roleTitle: string }) =>
-    api.patch<ItemEnvelope<GroupMemberDto>>(`/api/groups/members/${memberRowId}`, body),
   removeMember: (memberRowId: string) => api.delete<void>(`/api/groups/members/${memberRowId}`),
   recordMeeting: (id: string, body: { metAt: string; hostName?: string; notes?: string; attendedCount?: number }) =>
     api.post<ItemEnvelope<GroupMeetingDto>>(`/api/groups/${id}/meetings`, body),
   updateMeeting: (meetingId: string, body: Partial<{ metAt: string; hostName?: string; notes?: string; attendedCount: number }>) =>
     api.patch<ItemEnvelope<GroupMeetingDto>>(`/api/groups/meetings/${meetingId}`, body),
-  meetings: (params?: { groupId?: string; page?: number; pageSize?: number }) =>
-    api.get<ListEnvelope<GroupMeetingDto> & { totals: { meetings: number; attendance: number } }>(`/api/groups/meetings${qs(params)}`),
 };
 
 // ==================== GOVERNANCE ====================
