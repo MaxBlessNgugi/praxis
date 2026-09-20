@@ -86,7 +86,10 @@ export async function removeChurch(organizationId: string, options: RemoveChurch
   // register does — the alphabetical order the column query returns otherwise tries to delete an
   // item while its own history still points at it. PurchaseLine carries no organizationId of its
   // own (it hangs off its purchase), so it is reached through its parent.
-  const historyFirst = ['"StockMovement"', '"Issue"', '"Transfer"', '"StockTake"', '"MaintenanceRecord"'];
+  // The roster's rows are the same class of problem against *people*: a duty and the swap requests
+  // behind it point at their member with no onDelete rule, and Postgres does not promise the column
+  // query any order — CI's catalog returned Member first and the delete died on its own foreign key.
+  const historyFirst = ['"SwapRequest"', '"RosterDuty"', '"StockMovement"', '"Issue"', '"Transfer"', '"StockTake"', '"MaintenanceRecord"'];
   for (const table of historyFirst) {
     await basePrisma.$executeRawUnsafe(`DELETE FROM ${table} WHERE "organizationId" = $1`, organizationId);
   }
