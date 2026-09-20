@@ -1069,7 +1069,9 @@ const MaintenanceDialog: React.FC<ActDialogProps> = ({ onClose, dialog, onSaved 
 // -------------------------------------------------------------------------------------------
 
 const fieldClass =
-  'w-full px-3 py-2 text-sm rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] text-[#1C1917] focus:outline-none focus:border-[#C2410C] focus:ring-4 focus:ring-[#C2410C]/15';
+  // focus-within mirrors focus because Chrome focuses date inputs' inner segments, not the host —
+  // the host only matches :focus-within, so a :focus-only ring never renders on date fields.
+  'w-full px-3 py-2 text-sm rounded-[9px] border border-[#D6D3D1] bg-[#FDF8F3] text-[#1C1917] focus:outline-none focus:border-[#C2410C] focus:ring-4 focus:ring-[#C2410C]/15 focus-within:border-[#C2410C] focus-within:ring-4 focus-within:ring-[#C2410C]/15';
 const labelClass = 'block font-headline text-xs font-bold text-[#1e1b19] mb-1.5';
 
 interface ActDialogProps {
