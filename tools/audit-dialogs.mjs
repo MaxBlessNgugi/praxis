@@ -333,7 +333,10 @@ async function testDialog(screen, trigger) {
   // about controls it never reached.
   for (let i = 0; i < 130; i++) {
     await pressTab();
-    await sleep(12);
+    // 90ms, not a frame's worth: the ring these controls draw is a `transition-all` effect, so the
+    // computed style changes a frame or two after focus lands. Reading sooner races that transition
+    // and reports a visibly-ringed control as having no ring — on a loaded runner, every time.
+    await sleep(90);
     const m = await evaluate(MEASURE_DIALOG);
     if (!m || m.gone) break;
     if (!m.inside) {
